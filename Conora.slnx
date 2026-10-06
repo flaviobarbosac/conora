@@ -1,0 +1,13 @@
+<Solution>
+  <Folder Name="/src/">
+    <Project Path="src/Conora.Api/Conora.Api.csproj" />
+    <Project Path="src/Conora.Domain/Conora.Domain.csproj" />
+    <Project Path="src/Conora.Infrastructure/Conora.Infrastructure.csproj" />
+    <Project Path="src/Conora.Repository/Conora.Repository.csproj" />
+    <Project Path="src/Conora.Services/Conora.Services.csproj" />
+  </Folder>
+  <Folder Name="/tests/">
+    <Project Path="tests/Conora.IntegrationTests/Conora.IntegrationTests.csproj" />
+    <Project Path="tests/Conora.UnitTests/Conora.UnitTests.csproj" />
+  </Folder>
+</Solution>

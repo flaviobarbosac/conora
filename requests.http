@@ -1,0 +1,17 @@
+@
+POST http://localhost:5080/users
+Content-Type: application/json
+
+{
+  "name": "Ana",
+  "email": "ana@example.com"
+}
+
+###
+GET http://localhost:5080/users/{{id}}
+
+###
+GET http://localhost:5080/audit-events?entityName=User
+
+###
+GET http://localhost:5080/health/live

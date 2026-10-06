@@ -1,0 +1,41 @@
+## .NET
+bin/
+obj/
+out/
+*.user
+*.suo
+.vs/
+.vscode/
+*.userosscache
+*.sln.docstates
+
+## Rider / VS
+.idea/
+*.DotSettings.user
+
+## Test / coverage
+[Tt]est[Rr]esult*/
+*.trx
+*.coverage
+*.coveragexml
+coverage/
+BenchmarkDotNet.Artifacts/
+
+## Build logs (gerados pelo script de verificação, não versionados)
+build-log.txt
+*.binlog
+
+## Segredos e ambiente local — nunca versionar
+.env
+*.pfx
+*.key
+appsettings.*.local.json
+appsettings.Production.json
+
+## SO
+.DS_Store
+Thumbs.db
+
+## Arquivos temporários que a Claude não teve permissão de apagar do disco —
+## seguro ignorar; pode ser removido manualmente a qualquer momento.
+_to_delete/
