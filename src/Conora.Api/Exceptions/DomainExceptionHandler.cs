@@ -41,8 +41,17 @@ public sealed class DomainExceptionHandler : IExceptionHandler
     private static (int? StatusCode, string Title) Map(Exception exception) => exception switch
     {
         ValidationException => (StatusCodes.Status400BadRequest, "Requisição inválida"),
+        NotFoundException => (StatusCodes.Status404NotFound, "Recurso não encontrado"),
+        MonthClosedException => (StatusCodes.Status409Conflict, "Mês fechado"),
+        SystemCategoryProtectedException => (StatusCodes.Status409Conflict, "Categoria protegida"),
+        PlanReadOnlyException => (StatusCodes.Status402PaymentRequired, "Modo somente leitura"),
+        ForbiddenException => (StatusCodes.Status403Forbidden, "Acesso negado"),
         UserNotFoundException => (StatusCodes.Status404NotFound, "Usuário não encontrado"),
         DuplicateEmailException => (StatusCodes.Status409Conflict, "Email duplicado"),
+        DuplicateCpfException => (StatusCodes.Status409Conflict, "CPF duplicado"),
+        InvalidCredentialsException => (StatusCodes.Status401Unauthorized, "Não autorizado"),
+        InvalidTokenException => (StatusCodes.Status401Unauthorized, "Token inválido"),
+        GoogleAuthDisabledException => (StatusCodes.Status503ServiceUnavailable, "Google indisponível"),
         DomainException => (StatusCodes.Status400BadRequest, "Erro de negócio"),
         _ => (null, "Erro interno")
     };

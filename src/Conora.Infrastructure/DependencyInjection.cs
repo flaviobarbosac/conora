@@ -1,5 +1,8 @@
 using Conora.Domain.Ports;
+using Conora.Infrastructure.Email;
+using Conora.Infrastructure.Messaging;
 using Conora.Infrastructure.Persistence;
+using Conora.Infrastructure.Security;
 using Conora.Infrastructure.Telemetry;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Caching.StackExchangeRedis;
@@ -11,11 +14,13 @@ namespace Conora.Infrastructure;
 
 public static class DependencyInjection
 {
-    public static IServiceCollection AddInfrastructure(this IServiceCollection services)
+    public static IServiceCollection AddInfrastructure(this IServiceCollection services, IConfiguration configuration)
     {
+        services.AddScoped<ITenantContext, TenantContext>();
+
         services.AddDbContext<AppDbContext>((sp, options) =>
         {
-            var connectionString = RequireConnection(sp, "Postgres");
+            var connectionString = RequireConnection(configuration, "Postgres");
             options.UseNpgsql(connectionString, npgsql =>
             {
                 npgsql.MigrationsAssembly(typeof(AppDbContext).Assembly.FullName!);
@@ -35,17 +40,20 @@ public static class DependencyInjection
             });
 
         services.AddSingleton<IDomainMetrics, DomainMetrics>();
+        services.AddSingleton<IPasswordHasher, AspNetPasswordHasher>();
+        services.AddSingleton<ITokenService, JwtTokenService>();
+        services.AddSingleton<IGoogleTokenValidator, GoogleTokenValidator>();
+        services.AddSingleton<IEmailSender, SmtpEmailSender>();
+        services.AddHttpClient<IGeminiClient, Ai.GeminiClient>(client => client.Timeout = TimeSpan.FromSeconds(20));
+        services.AddMessaging(configuration);
 
-        services.AddHealthChecks()
+        var health = services.AddHealthChecks()
             .AddCheck("self", () => HealthCheckResult.Healthy(), tags: new[] { "live" })
-            .AddNpgSql(sp => RequireConnection(sp, "Postgres"), name: "postgres", tags: new[] { "ready" })
-            .AddRedis(sp => RequireConnection(sp, "Redis"), name: "redis", tags: new[] { "ready" });
+            .AddNpgSql(_ => RequireConnection(configuration, "Postgres"), name: "postgres", tags: new[] { "ready" })
+            .AddRedis(_ => RequireConnection(configuration, "Redis"), name: "redis", tags: new[] { "ready" });
 
         return services;
     }
-
-    private static string RequireConnection(IServiceProvider sp, string name)
-        => RequireConnection(sp.GetRequiredService<IConfiguration>(), name);
 
     private static string RequireConnection(IConfiguration configuration, string name)
     {

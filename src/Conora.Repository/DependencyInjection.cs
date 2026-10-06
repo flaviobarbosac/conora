@@ -10,6 +10,9 @@ public static class DependencyInjection
         services.AddScoped<IUnitOfWork, UnitOfWork>();
         services.AddScoped<IUserRepository, UserRepository>();
         services.AddScoped<IAuditEventRepository, AuditEventRepository>();
+        services.AddScoped<IRefreshTokenRepository, RefreshTokenRepository>();
+        services.AddScoped<ILgpdRequestRepository, LgpdRequestRepository>();
+        services.AddScoped<IFinanceRepository, FinanceRepository>();
         return services;
     }
 }

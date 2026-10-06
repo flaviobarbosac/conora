@@ -13,6 +13,7 @@ public sealed class UserService
     private readonly IAuditEventRepository _audits;
     private readonly IUnitOfWork _uow;
     private readonly ICorrelationContext _correlation;
+    private readonly ITenantContext _tenant;
     private readonly IDomainMetrics _metrics;
 
     public UserService(
@@ -20,12 +21,14 @@ public sealed class UserService
         IAuditEventRepository audits,
         IUnitOfWork uow,
         ICorrelationContext correlation,
+        ITenantContext tenant,
         IDomainMetrics metrics)
     {
         _users = users;
         _audits = audits;
         _uow = uow;
         _correlation = correlation;
+        _tenant = tenant;
         _metrics = metrics;
     }
 
@@ -41,6 +44,7 @@ public sealed class UserService
 
         var user = User.Create(request.Name, request.Email);
         _users.Add(user);
+        _tenant.Set(user.Id);
 
         AuditRecorder.Record(_audits, _correlation, "User", user.Id, "UserCreated", new
         {
@@ -71,5 +75,5 @@ public sealed class UserService
     }
 
     private static UserResponse ToResponse(User user) =>
-        new(user.Id, user.Name, user.Email, user.CreatedAtUtc);
+        new(user.Id, user.Name, user.Email, user.CreatedAt);
 }

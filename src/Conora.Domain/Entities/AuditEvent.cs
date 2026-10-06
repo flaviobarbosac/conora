@@ -1,8 +1,8 @@
 namespace Conora.Domain.Entities;
 
-public class AuditEvent
+public class AuditEvent : ModelBase, ITenantOwned
 {
-    public Guid Id { get; private set; }
+    public Guid UsuarioId { get; set; }
     public string EntityName { get; private set; } = default!;
     public string EntityId { get; private set; } = default!;
     public string Action { get; private set; } = default!;
@@ -25,7 +25,6 @@ public class AuditEvent
     {
         return new AuditEvent
         {
-            Id = Guid.NewGuid(),
             EntityName = entityName,
             EntityId = entityId,
             Action = action,

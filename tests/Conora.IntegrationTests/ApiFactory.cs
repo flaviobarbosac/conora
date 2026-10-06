@@ -29,7 +29,11 @@ public sealed class ApiFactory : WebApplicationFactory<Program>, IAsyncLifetime
             configBuilder.AddInMemoryCollection(new Dictionary<string, string?>
             {
                 ["ConnectionStrings:Postgres"] = _postgres.GetConnectionString(),
-                ["ConnectionStrings:Redis"] = _redis.GetConnectionString()
+                ["ConnectionStrings:Redis"] = _redis.GetConnectionString(),
+                ["MassTransit:Transport"] = "InMemory",
+                ["Jwt:Key"] = "conora-test-jwt-key-must-be-32-chars!",
+                ["Cors:Origins:0"] = "http://localhost:5173",
+                ["Email:SmtpHost"] = ""
             });
         });
     }

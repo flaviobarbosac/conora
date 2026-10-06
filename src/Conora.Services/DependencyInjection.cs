@@ -8,6 +8,26 @@ public static class DependencyInjection
     {
         services.AddScoped<UserService>();
         services.AddScoped<AuditService>();
+        services.AddScoped<AuthService>();
+        services.AddScoped<LgpdService>();
+
+        // Finance domain
+        services.AddScoped<PlanService>();
+        services.AddScoped<MonthService>();
+        services.AddScoped<CategoryService>();
+        services.AddScoped<MemberService>();
+        services.AddScoped<EntryService>();
+        services.AddScoped<AccountService>();
+        services.AddScoped<CreditCardService>();
+        services.AddScoped<BudgetService>();
+        services.AddScoped<DiagnosisService>();
+        services.AddScoped<ImportService>();
+        services.AddScoped<LifeProjectService>();
+        services.AddScoped<PatrimonyService>();
+        services.AddScoped<DashboardService>();
+        services.AddScoped<GeminiService>();
+        services.AddScoped<WhatsAppService>();
+        services.AddSingleton<HelpService>();
         return services;
     }
 }

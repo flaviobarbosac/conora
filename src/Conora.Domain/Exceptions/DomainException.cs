@@ -37,6 +37,13 @@ public sealed class DuplicateEmailException : DomainException
     }
 }
 
+public sealed class DuplicateCpfException : DomainException
+{
+    public DuplicateCpfException() : base("Já existe um usuário cadastrado com este CPF.")
+    {
+    }
+}
+
 public sealed class UniqueConstraintViolationException : DomainException
 {
     public string ConstraintName { get; }
@@ -45,5 +52,26 @@ public sealed class UniqueConstraintViolationException : DomainException
         : base($"Violação de restrição de unicidade: '{constraintName}'.")
     {
         ConstraintName = constraintName;
+    }
+}
+
+public sealed class InvalidCredentialsException : DomainException
+{
+    public InvalidCredentialsException() : base("Credenciais inválidas.")
+    {
+    }
+}
+
+public sealed class InvalidTokenException : DomainException
+{
+    public InvalidTokenException() : base("Token inválido ou expirado.")
+    {
+    }
+}
+
+public sealed class GoogleAuthDisabledException : DomainException
+{
+    public GoogleAuthDisabledException() : base("Login Google não configurado.")
+    {
     }
 }

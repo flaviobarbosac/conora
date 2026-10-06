@@ -1,0 +1,21 @@
+name: ci
+
+on:
+  push:
+    branches: [main, develop]
+  pull_request:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: .
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: "10.0.x"
+      - run: dotnet restore Conora.slnx
+      - run: dotnet build Conora.slnx -c Release --no-restore
+      - run: dotnet test tests/Conora.UnitTests/Conora.UnitTests.csproj -c Release --no-build

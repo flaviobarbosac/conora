@@ -5,6 +5,7 @@
     <Project Path="src/Conora.Infrastructure/Conora.Infrastructure.csproj" />
     <Project Path="src/Conora.Repository/Conora.Repository.csproj" />
     <Project Path="src/Conora.Services/Conora.Services.csproj" />
+    <Project Path="src/Conora.Worker/Conora.Worker.csproj" />
   </Folder>
   <Folder Name="/tests/">
     <Project Path="tests/Conora.IntegrationTests/Conora.IntegrationTests.csproj" />
