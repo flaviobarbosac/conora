@@ -110,6 +110,19 @@ variable "gemini_model" {
   default = ""
 }
 
+variable "whatsapp_access_token" {
+  description = "Meta WhatsApp Cloud API permanent/system user token for outbound replies"
+  type        = string
+  default     = ""
+  sensitive   = true
+}
+
+variable "whatsapp_phone_number_id" {
+  description = "Meta WhatsApp Cloud API phone number id used to send messages"
+  type        = string
+  default     = ""
+}
+
 variable "whatsapp_verify_token" {
   type      = string
   default   = ""

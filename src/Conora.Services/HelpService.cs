@@ -158,7 +158,7 @@ public sealed class HelpService
                 new("Sair / Remover", "Qualquer lado pode desfazer; o grupo se encerra."),
                 new("Avisos", "Notificações no app, por exemplo quando o convite é aceito."),
                 new("O que soma no grupo", "Orçamento, início e relatórios do mês."),
-                new("O que continua pessoal", "Contas, cartões, lançamentos, diagnóstico, WhatsApp e perfil.")
+                new("O que continua pessoal", "Contas, cartões, lançamentos, diagnóstico e perfil.")
             ]),
 
         new("diagnostico", "Diagnóstico de renda",
@@ -209,11 +209,9 @@ public sealed class HelpService
             ]),
 
         new("whatsapp", "WhatsApp",
-            "Vincula um número para enviar rascunhos de lançamento.",
+            "Funcionalidade futura — ainda não disponível nesta versão.",
             [
-                new("Número", "Telefone no formato internacional."),
-                new("Vínculo", "Associa o número à sua conta."),
-                new("Rascunho", "Mensagem interpretada que você confirma no app antes de gravar.")
+                new("Status", "Em breve: lançamentos por mensagem no WhatsApp."),
             ]),
 
         new("ia", "Perguntar à IA",
@@ -240,7 +238,7 @@ public sealed class HelpService
                 new("Menu lateral", "Expandido ou só ícones no desktop."),
                 new("Modo padrão do orçamento", "Simples ou detalhado quando o mês ainda não tem orçamento."),
                 new("Nome de exibição", "Como você aparece no grupo e nos avisos; gravado na conta."),
-                new("Atalhos", "Grupo, WhatsApp, plano e central de ajuda.")
+                new("Atalhos", "Grupo, plano e central de ajuda.")
             ])
     ];
 

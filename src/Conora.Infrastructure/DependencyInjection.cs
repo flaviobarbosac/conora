@@ -45,6 +45,11 @@ public static class DependencyInjection
         services.AddSingleton<IGoogleTokenValidator, GoogleTokenValidator>();
         services.AddSingleton<IEmailSender, SmtpEmailSender>();
         services.AddHttpClient<IGeminiClient, Ai.GeminiClient>(client => client.Timeout = TimeSpan.FromSeconds(20));
+        services.AddHttpClient<IWhatsAppMessenger, WhatsApp.CloudApiWhatsAppMessenger>(client =>
+        {
+            client.BaseAddress = new Uri("https://graph.facebook.com/v21.0/");
+            client.Timeout = TimeSpan.FromSeconds(20);
+        });
         services.AddMessaging(configuration);
 
         var health = services.AddHealthChecks()

@@ -46,8 +46,10 @@ locals {
       useSsl   = true
     }
     whatsapp = {
-      verifyToken = var.whatsapp_verify_token
-      appSecret   = var.whatsapp_app_secret
+      verifyToken   = var.whatsapp_verify_token
+      appSecret     = var.whatsapp_app_secret
+      accessToken   = var.whatsapp_access_token
+      phoneNumberId = var.whatsapp_phone_number_id
     }
     rabbitmq = {
       user     = "conora"

@@ -13,8 +13,8 @@ using Conora.Services.Contracts;
 namespace Conora.Services;
 
 /// <summary>
-/// WhatsApp Cloud API integration. Incoming text becomes a pending draft; an entry is only written when the
-/// user calls the confirm endpoint. Budget questions are answered without writing anything.
+/// WhatsApp Cloud API integration. Incoming text creates an entry immediately and replies with success or error.
+/// Budget questions are answered without writing anything.
 /// </summary>
 public sealed partial class WhatsAppService
 {
@@ -34,6 +34,7 @@ public sealed partial class WhatsAppService
     private readonly EntryService _entries;
     private readonly BudgetService _budgets;
     private readonly IGeminiClient _gemini;
+    private readonly IWhatsAppMessenger _messenger;
 
     public WhatsAppService(
         IFinanceRepository repo,
@@ -44,7 +45,8 @@ public sealed partial class WhatsAppService
         PlanService plan,
         EntryService entries,
         BudgetService budgets,
-        IGeminiClient gemini)
+        IGeminiClient gemini,
+        IWhatsAppMessenger messenger)
     {
         _repo = repo;
         _audits = audits;
@@ -55,6 +57,7 @@ public sealed partial class WhatsAppService
         _entries = entries;
         _budgets = budgets;
         _gemini = gemini;
+        _messenger = messenger;
     }
 
     public async Task<WhatsAppLinkResponse?> GetLinkAsync(CancellationToken ct)
@@ -135,18 +138,24 @@ public sealed partial class WhatsAppService
         await _uow.SaveChangesAsync(ct);
     }
 
-    /// <summary>Handles a Cloud API webhook body and returns the replies to send back (delivery is a stub for now).</summary>
-    public async Task<IReadOnlyList<WhatsAppReply>> HandleWebhookAsync(string body, CancellationToken ct)
+    /// <summary>Handles a Cloud API webhook body, creates entries when needed, and sends WhatsApp replies.</summary>
+    public async Task HandleWebhookAsync(string body, CancellationToken ct)
     {
-        var replies = new List<WhatsAppReply>();
         foreach (var (from, text) in ExtractMessages(body))
         {
             var reply = await HandleMessageAsync(from, text, ct);
-            if (reply is not null)
-                replies.Add(reply);
-        }
+            if (reply is null)
+                continue;
 
-        return replies;
+            try
+            {
+                await _messenger.SendTextAsync(reply.PhoneE164, reply.Text, ct);
+            }
+            catch (Exception ex) when (ex is not OperationCanceledException)
+            {
+                // Reply delivery must not fail the webhook ack to Meta.
+            }
+        }
     }
 
     public async Task<WhatsAppReply?> HandleMessageAsync(string fromDigits, string text, CancellationToken ct)
@@ -167,24 +176,43 @@ public sealed partial class WhatsAppService
         try
         {
             await _plan.EnsureWritableAsync(ct);
+
+            var payload = await ParseEntryAsync(text, ct);
+            if (payload is null)
+                return new WhatsAppReply(phone, "Não entendi o valor. Exemplo: \"gastei 45,90 no mercado\".");
+
+            var created = await _entries.CreateAsync(new CreateEntryRequest(
+                payload.Type,
+                payload.Amount,
+                payload.OccurredAt,
+                payload.Description), ct);
+
+            AuditRecorder.Record(_audits, _correlation, "Entry", created[0].Id, "WhatsAppEntryCreated",
+                new { payload.Type, payload.Amount, Phone = phone });
+            await _uow.SaveChangesAsync(ct);
+
+            var kind = payload.Type == EntryType.Income ? "receita" : "despesa";
+            var amount = payload.Amount.ToString("N2", new CultureInfo("pt-BR"));
+            return new WhatsAppReply(phone,
+                $"Pronto! {kind} de R$ {amount} ({payload.Description}) registrada com sucesso.");
         }
         catch (PlanReadOnlyException ex)
         {
             return new WhatsAppReply(phone, ex.Message);
         }
-
-        var payload = await ParseEntryAsync(text, ct);
-        if (payload is null)
-            return new WhatsAppReply(phone, "Não entendi o valor. Exemplo: \"gastei 45,90 no mercado\".");
-
-        var draft = WhatsAppDraft.Create(phone, JsonSerializer.Serialize(payload, Json));
-        _repo.Add(draft);
-        AuditRecorder.Record(_audits, _correlation, "WhatsAppDraft", draft.Id, "WhatsAppDraftCreated", new { payload.Type, payload.Amount });
-        await _uow.SaveChangesAsync(ct);
-
-        var kind = payload.Type == EntryType.Income ? "receita" : "despesa";
-        return new WhatsAppReply(phone,
-            $"Entendi: {kind} de R$ {payload.Amount.ToString("N2", new CultureInfo("pt-BR"))} — {payload.Description}. Confirme no Onra App para gravar.");
+        catch (ValidationException ex)
+        {
+            var detail = ex.Errors.SelectMany(pair => pair.Value).FirstOrDefault() ?? ex.Message;
+            return new WhatsAppReply(phone, $"Não consegui registrar: {detail}");
+        }
+        catch (DomainException ex)
+        {
+            return new WhatsAppReply(phone, $"Não consegui registrar: {ex.Message}");
+        }
+        catch (Exception)
+        {
+            return new WhatsAppReply(phone, "Não consegui registrar o lançamento. Tente de novo em instantes.");
+        }
     }
 
     private async Task<string> AnswerBudgetAsync(CancellationToken ct)

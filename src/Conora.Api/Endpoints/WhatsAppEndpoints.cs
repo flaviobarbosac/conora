@@ -84,10 +84,7 @@ public static class WhatsAppEndpoints
 
             try
             {
-                var replies = await service.HandleWebhookAsync(body, ct);
-                // Outbound delivery through the Cloud API is a stub: replies are only logged for now.
-                foreach (var reply in replies)
-                    logger.LogInformation("WhatsApp reply queued for {Phone}", reply.PhoneE164);
+                await service.HandleWebhookAsync(body, ct);
             }
             catch (Exception ex) when (ex is not OperationCanceledException)
             {
