@@ -5,6 +5,7 @@ using Conora.Domain.Ports;
 using Conora.Repository.Interface;
 using Conora.Services.Common;
 using Conora.Services.Contracts;
+using Microsoft.Extensions.Logging;
 
 namespace Conora.Services;
 
@@ -21,6 +22,7 @@ public sealed class AuthService
     private readonly IGoogleTokenValidator _google;
     private readonly IEmailSender _email;
     private readonly CategoryService _categories;
+    private readonly ILogger<AuthService> _logger;
 
     public AuthService(
         IUserRepository users,
@@ -33,7 +35,8 @@ public sealed class AuthService
         ITokenService tokens,
         IGoogleTokenValidator google,
         IEmailSender email,
-        CategoryService categories)
+        CategoryService categories,
+        ILogger<AuthService> logger)
     {
         _users = users;
         _refreshTokens = refreshTokens;
@@ -46,6 +49,7 @@ public sealed class AuthService
         _google = google;
         _email = email;
         _categories = categories;
+        _logger = logger;
     }
 
     public Task<AuthResponse> RegisterAsync(RegisterRequest request, CancellationToken ct)
@@ -162,7 +166,17 @@ public sealed class AuthService
         }
 
         if (notifyWelcome)
-            await _email.SendAsync(user.Email, "Bem-vindo ao Onra App", "Sua conta foi criada.", ct);
+        {
+            try
+            {
+                await _email.SendAsync(user.Email, "Bem-vindo ao Onra App", "Sua conta foi criada.", ct);
+            }
+            catch (Exception ex)
+            {
+                // Registration must succeed even when SES/SMTP is unavailable (sandbox / DNS pending).
+                _logger.LogWarning(ex, "Welcome email failed for {Email}; account created anyway.", user.Email);
+            }
+        }
 
         return new AuthResponse(user.Id, user.Email, pair.AccessToken, pair.RefreshToken, pair.AccessExpiresAtUtc);
     }

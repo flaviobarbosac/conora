@@ -161,6 +161,7 @@ app.MapLifeProjectEndpoints();
 app.MapPatrimonyEndpoints();
 app.MapDashboardEndpoints();
 app.MapMemberEndpoints();
+app.MapFamilyEndpoints();
 app.MapPlanEndpoints();
 app.MapHelpEndpoints();
 app.MapAiEndpoints();

@@ -13,6 +13,9 @@ public static class HelpEndpoints
         group.MapGet("/steps/{key}", (string key, HelpService service) =>
             service.GetStep(key) is { } step ? Results.Ok(step) : Results.NotFound());
 
+        group.MapGet("/modules/{key}", (string key, HelpService service) =>
+            service.GetModule(key) is { } module ? Results.Ok(module) : Results.NotFound());
+
         return app;
     }
 }

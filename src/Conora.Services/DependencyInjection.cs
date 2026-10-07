@@ -16,6 +16,7 @@ public static class DependencyInjection
         services.AddScoped<MonthService>();
         services.AddScoped<CategoryService>();
         services.AddScoped<MemberService>();
+        services.AddScoped<FamilyGroupService>();
         services.AddScoped<EntryService>();
         services.AddScoped<AccountService>();
         services.AddScoped<CreditCardService>();

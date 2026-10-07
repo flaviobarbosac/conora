@@ -9,6 +9,9 @@ public static class BudgetEndpoints
     {
         var group = app.MapGroup("/budgets").WithTags("Budgets").RequireAuthorization();
 
+        group.MapGet("/year/{year:int}", async (int year, BudgetService service, CancellationToken ct) =>
+            Results.Ok(await service.GetYearAsync(year, ct)));
+
         group.MapGet("/{competenceYm}", async (string competenceYm, BudgetService service, CancellationToken ct) =>
             Results.Ok(await service.GetAsync(competenceYm, ct)));
 

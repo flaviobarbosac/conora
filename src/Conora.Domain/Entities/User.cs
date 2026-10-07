@@ -51,6 +51,13 @@ public class User : ModelBase
 
     public void MarkEmailVerified() => EmailVerified = true;
 
+    public void Rename(string name)
+    {
+        if (string.IsNullOrWhiteSpace(name))
+            throw new ArgumentException("Nome é obrigatório.", nameof(name));
+        Name = name.Trim();
+    }
+
     public void RequestDeletion()
     {
         DeletedAt = DateTime.UtcNow;

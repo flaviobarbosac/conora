@@ -13,18 +13,27 @@ public class Category : ModelBase, ITenantOwned
     public bool IsSystem { get; private set; }
     public bool IsActive { get; private set; } = true;
     public bool IsEssential { get; private set; }
+    public BudgetBlock? BudgetBlock { get; private set; }
+    public string? GroupName { get; private set; }
 
     private Category()
     {
     }
 
-    public static Category Create(string name, CategoryKind kind, bool isEssential = false)
+    public static Category Create(string name, CategoryKind kind, bool isEssential = false, BudgetBlock? block = null, string? groupName = null)
     {
         var trimmed = RequireName(name);
         if (SystemCategories.IsForbiddenName(trimmed))
             throw new ValidationException("name", "\"Descontos sobre renda\" não é uma categoria lançável.");
 
-        return new Category { Name = trimmed, Kind = kind, IsEssential = isEssential };
+        return new Category
+        {
+            Name = trimmed,
+            Kind = kind,
+            IsEssential = isEssential,
+            BudgetBlock = block,
+            GroupName = NormalizeGroup(groupName)
+        };
     }
 
     public static Category CreateSystem(SystemCategoryDefinition definition) => new()
@@ -33,10 +42,12 @@ public class Category : ModelBase, ITenantOwned
         Code = definition.Code,
         Kind = definition.Kind,
         IsSystem = true,
-        IsEssential = definition.IsEssential
+        IsEssential = definition.IsEssential,
+        BudgetBlock = definition.Block,
+        GroupName = NormalizeGroup(definition.GroupName)
     };
 
-    public void Update(string name, bool isEssential)
+    public void Update(string name, bool isEssential, BudgetBlock? block = null, string? groupName = null)
     {
         EnsureNotSystem();
         var trimmed = RequireName(name);
@@ -45,6 +56,21 @@ public class Category : ModelBase, ITenantOwned
 
         Name = trimmed;
         IsEssential = isEssential;
+        BudgetBlock = block;
+        GroupName = NormalizeGroup(groupName);
+    }
+
+    /// <summary>Keeps system rows aligned with the catalog without allowing free edits.</summary>
+    public void SyncFromDefinition(SystemCategoryDefinition definition)
+    {
+        if (!IsSystem || Code != definition.Code)
+            return;
+
+        Name = definition.Name;
+        Kind = definition.Kind;
+        IsEssential = definition.IsEssential;
+        BudgetBlock = definition.Block;
+        GroupName = NormalizeGroup(definition.GroupName);
     }
 
     public void SetActive(bool active)
@@ -66,4 +92,7 @@ public class Category : ModelBase, ITenantOwned
 
         return name.Trim();
     }
+
+    private static string? NormalizeGroup(string? groupName)
+        => string.IsNullOrWhiteSpace(groupName) ? null : groupName.Trim();
 }

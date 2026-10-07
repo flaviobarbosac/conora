@@ -38,6 +38,10 @@ public class AppDbContext : DbContext
     public DbSet<LifeProject> LifeProjects => Set<LifeProject>();
     public DbSet<PatrimonyItem> PatrimonyItems => Set<PatrimonyItem>();
     public DbSet<FamilyMember> FamilyMembers => Set<FamilyMember>();
+    public DbSet<FamilyGroup> FamilyGroups => Set<FamilyGroup>();
+    public DbSet<FamilyGroupMember> FamilyGroupMembers => Set<FamilyGroupMember>();
+    public DbSet<FamilyInvite> FamilyInvites => Set<FamilyInvite>();
+    public DbSet<FamilyNotice> FamilyNotices => Set<FamilyNotice>();
     public DbSet<WorkspaceSubscription> WorkspaceSubscriptions => Set<WorkspaceSubscription>();
     public DbSet<ImportBatch> ImportBatches => Set<ImportBatch>();
     public DbSet<ImportPreviewRow> ImportPreviewRows => Set<ImportPreviewRow>();

@@ -14,6 +14,8 @@ public class CategoryConfiguration : IEntityTypeConfiguration<Category>
         builder.Property(e => e.Name).IsRequired().HasMaxLength(120);
         builder.Property(e => e.Code).HasMaxLength(60);
         builder.Property(e => e.Kind).HasConversion<string>().HasMaxLength(20);
+        builder.Property(e => e.BudgetBlock).HasConversion<string>().HasMaxLength(20);
+        builder.Property(e => e.GroupName).HasMaxLength(80);
 
         builder.HasIndex(e => new { e.UsuarioId, e.Code })
             .IsUnique()

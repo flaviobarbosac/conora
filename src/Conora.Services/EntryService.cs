@@ -21,6 +21,7 @@ public sealed class EntryService
     private readonly PlanService _plan;
     private readonly MonthService _months;
     private readonly CategoryService _categories;
+    private readonly FamilyGroupService _family;
 
     public EntryService(
         IFinanceRepository repo,
@@ -29,7 +30,8 @@ public sealed class EntryService
         ICorrelationContext correlation,
         PlanService plan,
         MonthService months,
-        CategoryService categories)
+        CategoryService categories,
+        FamilyGroupService family)
     {
         _repo = repo;
         _audits = audits;
@@ -38,6 +40,7 @@ public sealed class EntryService
         _plan = plan;
         _months = months;
         _categories = categories;
+        _family = family;
     }
 
     public async Task<PagedResponse<EntryResponse>> SearchAsync(EntryFilter filter, CancellationToken ct)
@@ -272,8 +275,8 @@ public sealed class EntryService
         if (memberId is Guid mid && !await _repo.AnyAsync<FamilyMember>(m => m.Id == mid, ct))
             throw new NotFoundException("Membro", mid);
 
-        if (lifeProjectId is Guid pid && !await _repo.AnyAsync<LifeProject>(p => p.Id == pid, ct))
-            throw new NotFoundException("Projeto de vida", pid);
+        if (lifeProjectId is Guid pid)
+            await RequireVisibleProjectAsync(pid, ct);
     }
 
     /// <summary>One income source, one competence, one income entry (spec v1.1 §3 "Trava").</summary>
@@ -318,8 +321,21 @@ public sealed class EntryService
         if (entry.Type != EntryType.ProjectContribution || entry.LifeProjectId is not Guid pid)
             return;
 
-        var project = await _repo.GetAsync<LifeProject>(pid, ct) ?? throw new NotFoundException("Projeto de vida", pid);
+        var project = await RequireVisibleProjectAsync(pid, ct, track: true);
         project.ApplyContribution(entry.Amount * sign);
+    }
+
+    private async Task<LifeProject> RequireVisibleProjectAsync(Guid projectId, CancellationToken ct, bool track = false)
+    {
+        var own = await _repo.FirstOrDefaultAsync<LifeProject>(p => p.Id == projectId, ct, track);
+        if (own is not null)
+            return own;
+
+        var matches = await _repo.ListAnyTenantAsync<LifeProject>(p => p.Id == projectId, ct, track);
+        var project = matches.FirstOrDefault() ?? throw new NotFoundException("Projeto de vida", projectId);
+        if (project.Scope != LifeProjectScope.Group || !await _family.IsInSameGroupAsync(project.UsuarioId, ct))
+            throw new NotFoundException("Projeto de vida", projectId);
+        return project;
     }
 
     private static decimal[] SplitAmounts(decimal total, int installments, int count)

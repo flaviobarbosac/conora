@@ -24,19 +24,35 @@ public sealed class CategoryService
     public void AddDefaults()
         => _repo.AddRange(SystemCategories.All.Select(Category.CreateSystem));
 
-    /// <summary>Idempotent: inserts only the system categories the tenant is still missing.</summary>
+    /// <summary>Idempotent: inserts missing system categories and syncs block/group from the catalog.</summary>
     public async Task EnsureDefaultsAsync(CancellationToken ct)
     {
-        var existing = (await _repo.ListAsync<Category>(c => c.IsSystem, ct))
-            .Select(c => c.Code)
-            .ToHashSet();
+        var existing = await _repo.ListAsync<Category>(c => c.IsSystem, ct);
+        var byCode = existing.Where(c => c.Code is not null).ToDictionary(c => c.Code!);
+        var changed = false;
 
-        var missing = SystemCategories.All.Where(d => !existing.Contains(d.Code)).Select(Category.CreateSystem).ToList();
-        if (missing.Count == 0)
-            return;
+        foreach (var definition in SystemCategories.All)
+        {
+            if (byCode.TryGetValue(definition.Code, out var category))
+            {
+                if (category.BudgetBlock != definition.Block
+                    || category.GroupName != definition.GroupName
+                    || category.Name != definition.Name
+                    || category.IsEssential != definition.IsEssential)
+                {
+                    category.SyncFromDefinition(definition);
+                    changed = true;
+                }
+            }
+            else
+            {
+                _repo.Add(Category.CreateSystem(definition));
+                changed = true;
+            }
+        }
 
-        _repo.AddRange(missing);
-        await _uow.SaveChangesAsync(ct);
+        if (changed)
+            await _uow.SaveChangesAsync(ct);
     }
 
     public async Task<Category> GetByCodeAsync(string code, CancellationToken ct)
@@ -51,13 +67,13 @@ public sealed class CategoryService
         await EnsureDefaultsAsync(ct);
         var items = await _repo.ListAsync<Category>(
             c => (kind == null || c.Kind == kind) && (includeInactive || c.IsActive), ct);
-        return items.OrderBy(c => c.Kind).ThenBy(c => c.Name).Select(ToResponse).ToList();
+        return items.OrderBy(c => c.Kind).ThenBy(c => c.GroupName).ThenBy(c => c.Name).Select(ToResponse).ToList();
     }
 
     public async Task<CategoryResponse> CreateAsync(CreateCategoryRequest request, CancellationToken ct)
     {
         await _plan.EnsureWritableAsync(ct);
-        var category = Category.Create(request.Name, request.Kind, request.IsEssential);
+        var category = Category.Create(request.Name, request.Kind, request.IsEssential, request.BudgetBlock, request.GroupName);
         await EnsureUniqueNameAsync(category.Name, category.Kind, null, ct);
 
         _repo.Add(category);
@@ -69,7 +85,7 @@ public sealed class CategoryService
     {
         await _plan.EnsureWritableAsync(ct);
         var category = await RequireAsync(id, ct);
-        category.Update(request.Name, request.IsEssential);
+        category.Update(request.Name, request.IsEssential, request.BudgetBlock, request.GroupName);
         category.SetActive(request.IsActive);
         await EnsureUniqueNameAsync(category.Name, category.Kind, category.Id, ct);
 
@@ -103,5 +119,5 @@ public sealed class CategoryService
     }
 
     private static CategoryResponse ToResponse(Category c)
-        => new(c.Id, c.Name, c.Code, c.Kind, c.IsSystem, c.IsActive, c.IsEssential);
+        => new(c.Id, c.Name, c.Code, c.Kind, c.IsSystem, c.IsActive, c.IsEssential, c.BudgetBlock, c.GroupName);
 }

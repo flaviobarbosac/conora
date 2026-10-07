@@ -13,6 +13,7 @@ public static class DependencyInjection
         services.AddScoped<IRefreshTokenRepository, RefreshTokenRepository>();
         services.AddScoped<ILgpdRequestRepository, LgpdRequestRepository>();
         services.AddScoped<IFinanceRepository, FinanceRepository>();
+        services.AddScoped<IFamilyGroupRepository, FamilyGroupRepository>();
         return services;
     }
 }

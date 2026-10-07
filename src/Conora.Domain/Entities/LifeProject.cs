@@ -1,3 +1,4 @@
+using Conora.Domain.Enums;
 using Conora.Domain.Exceptions;
 using Conora.Domain.Services;
 
@@ -10,19 +11,20 @@ public class LifeProject : ModelBase, ITenantOwned
     public decimal GoalAmount { get; private set; }
     public DateTime? DueDate { get; private set; }
     public decimal AccumulatedAmount { get; private set; }
+    public LifeProjectScope Scope { get; private set; } = LifeProjectScope.Personal;
 
     private LifeProject()
     {
     }
 
-    public static LifeProject Create(string name, decimal goalAmount, DateTime? dueDate)
+    public static LifeProject Create(string name, decimal goalAmount, DateTime? dueDate, LifeProjectScope scope = LifeProjectScope.Personal)
     {
-        var project = new LifeProject();
-        project.Update(name, goalAmount, dueDate);
+        var project = new LifeProject { Scope = scope };
+        project.Update(name, goalAmount, dueDate, scope);
         return project;
     }
 
-    public void Update(string name, decimal goalAmount, DateTime? dueDate)
+    public void Update(string name, decimal goalAmount, DateTime? dueDate, LifeProjectScope? scope = null)
     {
         var errors = new Dictionary<string, string[]>();
         if (string.IsNullOrWhiteSpace(name)) errors["name"] = ["Nome do projeto é obrigatório."];
@@ -33,6 +35,8 @@ public class LifeProject : ModelBase, ITenantOwned
         Name = name.Trim();
         GoalAmount = decimal.Round(goalAmount, 2);
         DueDate = dueDate is null ? null : Competence.ToUtc(dueDate.Value);
+        if (scope is not null)
+            Scope = scope.Value;
     }
 
     /// <summary>Adds (or removes, when negative) a contribution. No yield is modeled (spec C10).</summary>

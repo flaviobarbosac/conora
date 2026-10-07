@@ -60,6 +60,19 @@ public sealed class FinanceRepository : IFinanceRepository
         where T : ModelBase, ITenantOwned
         => _context.Set<T>().IgnoreQueryFilters().Where(e => e.DeletedAt == null).FirstOrDefaultAsync(predicate, ct);
 
+    public Task<List<T>> ListAnyTenantAsync<T>(Expression<Func<T, bool>> predicate, CancellationToken ct = default, bool track = false)
+        where T : ModelBase, ITenantOwned
+    {
+        IQueryable<T> query = _context.Set<T>().IgnoreQueryFilters().Where(e => e.DeletedAt == null);
+        if (!track)
+            query = query.AsNoTracking();
+        return query.Where(predicate).ToListAsync(ct);
+    }
+
+    public Task<List<TResult>> QueryAnyTenantAsync<T, TResult>(Func<IQueryable<T>, IQueryable<TResult>> shape, CancellationToken ct = default)
+        where T : ModelBase, ITenantOwned
+        => shape(_context.Set<T>().IgnoreQueryFilters().AsNoTracking().Where(e => e.DeletedAt == null)).ToListAsync(ct);
+
     public void Add<T>(T entity) where T : ModelBase, ITenantOwned => _context.Set<T>().Add(entity);
 
     public void AddRange<T>(IEnumerable<T> entities) where T : ModelBase, ITenantOwned => _context.Set<T>().AddRange(entities);

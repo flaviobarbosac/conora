@@ -17,13 +17,20 @@ public sealed class DashboardService
     private readonly MonthService _months;
     private readonly BudgetService _budgets;
     private readonly CategoryService _categories;
+    private readonly FamilyGroupService _family;
 
-    public DashboardService(IFinanceRepository repo, MonthService months, BudgetService budgets, CategoryService categories)
+    public DashboardService(
+        IFinanceRepository repo,
+        MonthService months,
+        BudgetService budgets,
+        CategoryService categories,
+        FamilyGroupService family)
     {
         _repo = repo;
         _months = months;
         _budgets = budgets;
         _categories = categories;
+        _family = family;
     }
 
     public async Task<DashboardResponse> GetAsync(string competenceYm, CancellationToken ct)
@@ -138,17 +145,43 @@ public sealed class DashboardService
     /// </summary>
     private async Task<Totals> ComputeTotalsAsync(string ym, CancellationToken ct)
     {
-        var sources = await _repo.ListAsync<IncomeSource>(s => s.CompetenceYm == ym, ct);
+        var userIds = await _family.GetReadableUsuarioIdsAsync(ct);
+        var multi = userIds.Count > 1;
+
+        var sources = multi
+            ? await _repo.ListAnyTenantAsync<IncomeSource>(s => userIds.Contains(s.UsuarioId) && s.CompetenceYm == ym, ct)
+            : await _repo.ListAsync<IncomeSource>(s => s.CompetenceYm == ym, ct);
         var sourceIds = sources.Select(s => s.Id).ToHashSet();
-        var incomes = await _repo.ListAsync<Entry>(e => e.CompetenceYm == ym && e.Type == EntryType.Income, ct);
+        var incomes = multi
+            ? await _repo.ListAnyTenantAsync<Entry>(
+                e => userIds.Contains(e.UsuarioId) && e.CompetenceYm == ym && e.Type == EntryType.Income, ct)
+            : await _repo.ListAsync<Entry>(e => e.CompetenceYm == ym && e.Type == EntryType.Income, ct);
 
         var extra = incomes.Where(e => e.IncomeSourceId is null || !sourceIds.Contains(e.IncomeSourceId.Value)).Sum(e => e.Amount);
         var income = sources.Sum(s => s.NetSpendable) + extra;
 
-        var expenses = await _repo.SumAsync<Entry>(e => e.CompetenceYm == ym && e.Type == EntryType.Expense, e => e.Amount, ct);
-        var contributions = await _repo.SumAsync<Entry>(e => e.CompetenceYm == ym && e.Type == EntryType.Contribution, e => e.Amount, ct);
-        var cardPurchases = await _repo.SumAsync<CardPurchase>(p => p.CompetenceYm == ym, p => p.Amount, ct);
-        var projects = await _repo.SumAsync<Entry>(e => e.CompetenceYm == ym && e.Type == EntryType.ProjectContribution, e => e.Amount, ct);
+        decimal expenses;
+        decimal contributions;
+        decimal cardPurchases;
+        decimal projects;
+        if (multi)
+        {
+            expenses = (await _repo.ListAnyTenantAsync<Entry>(
+                e => userIds.Contains(e.UsuarioId) && e.CompetenceYm == ym && e.Type == EntryType.Expense, ct)).Sum(e => e.Amount);
+            contributions = (await _repo.ListAnyTenantAsync<Entry>(
+                e => userIds.Contains(e.UsuarioId) && e.CompetenceYm == ym && e.Type == EntryType.Contribution, ct)).Sum(e => e.Amount);
+            cardPurchases = (await _repo.ListAnyTenantAsync<CardPurchase>(
+                p => userIds.Contains(p.UsuarioId) && p.CompetenceYm == ym, ct)).Sum(p => p.Amount);
+            projects = (await _repo.ListAnyTenantAsync<Entry>(
+                e => userIds.Contains(e.UsuarioId) && e.CompetenceYm == ym && e.Type == EntryType.ProjectContribution, ct)).Sum(e => e.Amount);
+        }
+        else
+        {
+            expenses = await _repo.SumAsync<Entry>(e => e.CompetenceYm == ym && e.Type == EntryType.Expense, e => e.Amount, ct);
+            contributions = await _repo.SumAsync<Entry>(e => e.CompetenceYm == ym && e.Type == EntryType.Contribution, e => e.Amount, ct);
+            cardPurchases = await _repo.SumAsync<CardPurchase>(p => p.CompetenceYm == ym, p => p.Amount, ct);
+            projects = await _repo.SumAsync<Entry>(e => e.CompetenceYm == ym && e.Type == EntryType.ProjectContribution, e => e.Amount, ct);
+        }
 
         return new Totals(income, incomes.Sum(e => e.Amount), expenses + contributions + cardPurchases, contributions, cardPurchases, projects);
     }

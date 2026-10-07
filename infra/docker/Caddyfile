@@ -1,0 +1,39 @@
+{
+	email flavio@redfivesistemas.com.br
+}
+
+# Front: https://conora.com.br/app/  API on the apex stays as a fallback for the current stack.
+conora.com.br {
+	encode zstd gzip
+
+	redir / /app/ 302
+
+	handle_path /app* {
+		root * /srv/app
+		try_files {path} /index.html
+		file_server
+	}
+
+	handle {
+		reverse_proxy conora-api:8080 {
+			flush_interval -1
+			transport http {
+				read_timeout 0
+				write_timeout 0
+			}
+		}
+	}
+}
+
+# API: https://api.conora.com.br
+api.conora.com.br {
+	encode zstd gzip
+
+	reverse_proxy conora-api:8080 {
+		flush_interval -1
+		transport http {
+			read_timeout 0
+			write_timeout 0
+		}
+	}
+}

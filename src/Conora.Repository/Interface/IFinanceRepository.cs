@@ -35,6 +35,14 @@ public interface IFinanceRepository
     Task<T?> FirstOrDefaultAnyTenantAsync<T>(Expression<Func<T, bool>> predicate, CancellationToken ct = default)
         where T : ModelBase, ITenantOwned;
 
+    /// <summary>Cross-tenant list. Soft-deleted rows stay excluded. Used for family group reads.</summary>
+    Task<List<T>> ListAnyTenantAsync<T>(Expression<Func<T, bool>> predicate, CancellationToken ct = default, bool track = false)
+        where T : ModelBase, ITenantOwned;
+
+    /// <summary>Cross-tenant shaped query. Soft-deleted rows stay excluded.</summary>
+    Task<List<TResult>> QueryAnyTenantAsync<T, TResult>(Func<IQueryable<T>, IQueryable<TResult>> shape, CancellationToken ct = default)
+        where T : ModelBase, ITenantOwned;
+
     void Add<T>(T entity) where T : ModelBase, ITenantOwned;
 
     void AddRange<T>(IEnumerable<T> entities) where T : ModelBase, ITenantOwned;

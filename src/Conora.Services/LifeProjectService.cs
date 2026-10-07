@@ -1,6 +1,7 @@
 using Conora.Domain.Entities;
 using Conora.Domain.Enums;
 using Conora.Domain.Exceptions;
+using Conora.Domain.Ports;
 using Conora.Repository.Interface;
 using Conora.Services.Contracts;
 
@@ -12,46 +13,94 @@ public sealed class LifeProjectService
     private readonly IUnitOfWork _uow;
     private readonly PlanService _plan;
     private readonly EntryService _entries;
+    private readonly FamilyGroupService _family;
+    private readonly ITenantContext _tenant;
 
-    public LifeProjectService(IFinanceRepository repo, IUnitOfWork uow, PlanService plan, EntryService entries)
+    public LifeProjectService(
+        IFinanceRepository repo,
+        IUnitOfWork uow,
+        PlanService plan,
+        EntryService entries,
+        FamilyGroupService family,
+        ITenantContext tenant)
     {
         _repo = repo;
         _uow = uow;
         _plan = plan;
         _entries = entries;
+        _family = family;
+        _tenant = tenant;
     }
 
     public async Task<IReadOnlyList<LifeProjectResponse>> ListAsync(CancellationToken ct)
     {
-        var items = await _repo.ListAsync<LifeProject>(null, ct);
-        return items.OrderBy(p => p.DueDate ?? DateTime.MaxValue).ThenBy(p => p.Name).Select(ToResponse).ToList();
+        var self = _tenant.UsuarioId ?? throw new ForbiddenException("Usuário não autenticado.");
+        var own = await _repo.ListAsync<LifeProject>(null, ct);
+        var peers = await _family.GetReadableUsuarioIdsAsync(ct);
+        var groupProjects = peers.Count > 1
+            ? await _repo.ListAnyTenantAsync<LifeProject>(
+                p => peers.Contains(p.UsuarioId) && p.UsuarioId != self && p.Scope == LifeProjectScope.Group, ct)
+            : [];
+
+        return own.Concat(groupProjects)
+            .OrderBy(p => p.DueDate ?? DateTime.MaxValue)
+            .ThenBy(p => p.Name)
+            .Select(p => ToResponse(p, self))
+            .ToList();
     }
 
     public async Task<LifeProjectResponse> GetAsync(Guid id, CancellationToken ct)
-        => ToResponse(await RequireAsync(id, ct, track: false));
+    {
+        var self = _tenant.UsuarioId ?? throw new ForbiddenException("Usuário não autenticado.");
+        var project = await RequireVisibleAsync(id, ct, track: false);
+        return ToResponse(project, self);
+    }
 
     public async Task<LifeProjectResponse> CreateAsync(LifeProjectRequest request, CancellationToken ct)
     {
         await _plan.EnsureWritableAsync(ct);
-        var project = LifeProject.Create(request.Name, request.GoalAmount, request.DueDate);
+        if (request.Scope == LifeProjectScope.Group)
+        {
+            var peers = await _family.GetReadableUsuarioIdsAsync(ct);
+            if (peers.Count < 2)
+                throw new ValidationException("scope", "Sem grupo ativo não dá para marcar o projeto como do grupo.");
+        }
+
+        var project = LifeProject.Create(request.Name, decimal.Round(request.GoalAmount, 2), request.DueDate, request.Scope);
         _repo.Add(project);
         await _uow.SaveChangesAsync(ct);
-        return ToResponse(project);
+        return ToResponse(project, project.UsuarioId);
     }
 
     public async Task<LifeProjectResponse> UpdateAsync(Guid id, LifeProjectRequest request, CancellationToken ct)
     {
         await _plan.EnsureWritableAsync(ct);
-        var project = await RequireAsync(id, ct);
-        project.Update(request.Name, request.GoalAmount, request.DueDate);
+        var self = _tenant.UsuarioId ?? throw new ForbiddenException("Usuário não autenticado.");
+        var project = await _repo.FirstOrDefaultAsync<LifeProject>(p => p.Id == id, ct)
+                      ?? throw new NotFoundException("Projeto de vida", id);
+        if (project.UsuarioId != self)
+            throw new ForbiddenException("Só o dono pode editar o projeto.");
+
+        if (request.Scope == LifeProjectScope.Group)
+        {
+            var peers = await _family.GetReadableUsuarioIdsAsync(ct);
+            if (peers.Count < 2)
+                throw new ValidationException("scope", "Sem grupo ativo não dá para marcar o projeto como do grupo.");
+        }
+
+        project.Update(request.Name, decimal.Round(request.GoalAmount, 2), request.DueDate, request.Scope);
         await _uow.SaveChangesAsync(ct);
-        return ToResponse(project);
+        return ToResponse(project, self);
     }
 
     public async Task DeleteAsync(Guid id, CancellationToken ct)
     {
         await _plan.EnsureWritableAsync(ct);
-        var project = await RequireAsync(id, ct);
+        var self = _tenant.UsuarioId ?? throw new ForbiddenException("Usuário não autenticado.");
+        var project = await _repo.FirstOrDefaultAsync<LifeProject>(p => p.Id == id, ct)
+                      ?? throw new NotFoundException("Projeto de vida", id);
+        if (project.UsuarioId != self)
+            throw new ForbiddenException("Só o dono pode excluir o projeto.");
         if (await _repo.AnyAsync<Entry>(e => e.LifeProjectId == id, ct))
             throw new ValidationException("id", "Projeto com aportes não pode ser excluído.");
 
@@ -62,10 +111,10 @@ public sealed class LifeProjectService
     /// <summary>A contribution is an entry of type ProjectContribution; the entry service updates the accumulated amount.</summary>
     public async Task<LifeProjectResponse> ContributeAsync(Guid id, ProjectContributionRequest request, CancellationToken ct)
     {
-        await RequireAsync(id, ct, track: false);
+        await RequireVisibleAsync(id, ct, track: false);
         await _entries.CreateAsync(new CreateEntryRequest(
             EntryType.ProjectContribution,
-            request.Amount,
+            decimal.Round(request.Amount, 2),
             request.OccurredAt,
             string.IsNullOrWhiteSpace(request.Description) ? "Aporte em projeto de vida" : request.Description,
             AccountId: request.AccountId,
@@ -74,14 +123,27 @@ public sealed class LifeProjectService
         return await GetAsync(id, ct);
     }
 
-    private async Task<LifeProject> RequireAsync(Guid id, CancellationToken ct, bool track = true)
-        => await _repo.FirstOrDefaultAsync<LifeProject>(p => p.Id == id, ct, track) ?? throw new NotFoundException("Projeto de vida", id);
+    private async Task<LifeProject> RequireVisibleAsync(Guid id, CancellationToken ct, bool track = true)
+    {
+        var self = _tenant.UsuarioId ?? throw new ForbiddenException("Usuário não autenticado.");
+        var own = await _repo.FirstOrDefaultAsync<LifeProject>(p => p.Id == id, ct, track);
+        if (own is not null)
+            return own;
 
-    private static LifeProjectResponse ToResponse(LifeProject p) => new(
+        var project = await _repo.FirstOrDefaultAnyTenantAsync<LifeProject>(p => p.Id == id, ct)
+                      ?? throw new NotFoundException("Projeto de vida", id);
+        if (project.Scope != LifeProjectScope.Group || !await _family.IsInSameGroupAsync(project.UsuarioId, ct))
+            throw new NotFoundException("Projeto de vida", id);
+        return project;
+    }
+
+    private static LifeProjectResponse ToResponse(LifeProject p, Guid self) => new(
         p.Id,
         p.Name,
         p.GoalAmount,
         p.DueDate,
         p.AccumulatedAmount,
-        p.GoalAmount <= 0 ? 0 : Math.Min(100m, decimal.Round(p.AccumulatedAmount / p.GoalAmount * 100, 1)));
+        p.GoalAmount <= 0 ? 0 : Math.Min(100m, decimal.Round(p.AccumulatedAmount / p.GoalAmount * 100, 1)),
+        p.Scope,
+        p.UsuarioId == self);
 }
