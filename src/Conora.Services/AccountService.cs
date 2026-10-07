@@ -1,3 +1,4 @@
+using Conora.Domain.Catalog;
 using Conora.Domain.Entities;
 using Conora.Domain.Enums;
 using Conora.Domain.Exceptions;
@@ -21,6 +22,9 @@ public sealed class AccountService
         _entries = entries;
     }
 
+    public IReadOnlyList<BankOptionResponse> ListBanks()
+        => BrazilianBanks.All.Select(b => new BankOptionResponse(b.Code, b.Name)).ToList();
+
     public async Task<IReadOnlyList<AccountResponse>> ListAsync(bool includeArchived, CancellationToken ct)
     {
         var items = await _repo.ListAsync<Account>(a => includeArchived || !a.IsArchived, ct);
@@ -30,7 +34,14 @@ public sealed class AccountService
     public async Task<AccountResponse> CreateAsync(CreateAccountRequest request, CancellationToken ct)
     {
         await _plan.EnsureWritableAsync(ct);
-        var account = Account.Create(request.Name, request.Kind, request.OpeningBalance);
+        var account = Account.Create(
+            request.Name,
+            request.Kind,
+            request.OpeningBalance,
+            request.BankCode,
+            request.Agency,
+            request.AccountNumber,
+            request.CheckDigit);
         _repo.Add(account);
         await _uow.SaveChangesAsync(ct);
         return ToResponse(account);
@@ -40,7 +51,7 @@ public sealed class AccountService
     {
         await _plan.EnsureWritableAsync(ct);
         var account = await RequireAsync(id, ct);
-        account.Update(request.Name, request.Kind);
+        account.Update(request.Name, request.Kind, request.BankCode, request.Agency, request.AccountNumber, request.CheckDigit);
         await _uow.SaveChangesAsync(ct);
         return ToResponse(account);
     }
@@ -82,5 +93,16 @@ public sealed class AccountService
     private async Task<Account> RequireAsync(Guid id, CancellationToken ct)
         => await _repo.GetAsync<Account>(id, ct) ?? throw new NotFoundException("Conta", id);
 
-    private static AccountResponse ToResponse(Account a) => new(a.Id, a.Name, a.Kind, a.Balance, a.IsArchived);
+    private static AccountResponse ToResponse(Account a)
+        => new(
+            a.Id,
+            a.Name,
+            a.Kind,
+            a.Balance,
+            a.IsArchived,
+            a.BankCode,
+            a.Agency,
+            a.AccountNumber,
+            a.CheckDigit,
+            BrazilianBanks.Find(a.BankCode)?.Name);
 }

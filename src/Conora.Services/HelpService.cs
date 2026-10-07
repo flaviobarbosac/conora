@@ -42,13 +42,31 @@ public sealed class HelpService
         new("projeto-de-vida", "Projeto de vida",
             "Objetivo com meta, prazo e valor acumulado. Os aportes saem da sua conta; não há simulação de rendimento."),
         new("tenant", "Sua conta (isolamento)",
-            "Cada login vê e grava só os próprios dados. No grupo familiar, a soma do orçamento é leitura compartilhada; contas e lançamentos continuam pessoais."),
+            "Cada pessoa tem login e dados próprios. Contas bancárias, cartões e lançamentos são individuais. No grupo familiar, só algumas telas mostram a soma dos dois — sem misturar o dinheiro de cada um."),
+        new("grupo-familiar", "Grupo familiar",
+            "Vínculo entre duas contas Conora (ex.: casal). Serve para ver orçamento, início e relatórios somados. Não cria conta bancária compartilhada nem permite editar o lançamento do outro."),
         new("alerta-70", "Alertas 70% / 100%",
             "Abaixo de 70% está ok; de 70% a 99% atenção; 100% no limite; acima estourou. Planejado zero com gasto conta como estourou.")
     ];
 
     private static readonly IReadOnlyList<HelpModuleResponse> Modules =
     [
+        new("membros", "Grupo familiar — vincular e desvincular",
+            "Cada usuário tem a própria conta Conora. O grupo só une a visão de algumas telas; os registros de cada um continuam separados.",
+            [
+                new("Visão geral", "Vocês são duas contas independentes. Cada um lança na própria conta, no próprio cartão e nas próprias categorias. O grupo não mistura saldos nem deixa um editar o lançamento do outro."),
+                new("O que fica pessoal", "Contas bancárias, cartões, lançamentos, diagnóstico de renda, WhatsApp, importação e perfil. Só você vê e altera."),
+                new("O que fica em comum (só leitura somada)", "Início (totais do mês), orçamento planejado × realizado e relatórios do mês — somam os dois membros. Projetos de vida podem ser pessoais ou do grupo (quando marcados assim)."),
+                new("Como vincular (convidar)", "Abra Cadastros → Membros (ou Configurações → Grupo familiar). Informe o e-mail da outra pessoa e envie o convite. Ela precisa já ter (ou criar) login no Conora com esse e-mail."),
+                new("Como aceitar o convite", "A pessoa abre o link do e-mail, entra com a conta do e-mail convidado e confirma. O vínculo é criado; quem convidou recebe aviso no app."),
+                new("Regras do convite", "O link é de uso único, com prazo. Outro e-mail não entra. Se o convite expirar ou for cancelado, envie outro."),
+                new("Como desvincular (sair)", "Em Membros, use Sair do grupo. Seu orçamento e telas voltam a ser só pessoais. O grupo se encerra para os dois."),
+                new("Como desvincular (remover o outro)", "Quem está no grupo pode Remover o outro membro. O efeito é o mesmo: o grupo acaba."),
+                new("Cancelar convite pendente", "Se o outro ainda não aceitou, cancele o convite em Membros. O link deixa de valer."),
+                new("Nome de exibição", "Em Configurações ou Membros: como você aparece no grupo e nos avisos."),
+                new("Uma pessoa, um grupo", "Cada conta fica em um grupo por vez. Aceitar outro convite não cria segundo grupo paralelo.")
+            ]),
+
         new("inicio", "Início",
             "Painel do mês: receitas, despesas, resultado e alertas. Em grupo familiar, os totais somam os dois membros.",
             [
@@ -91,14 +109,18 @@ public sealed class HelpService
             ]),
 
         new("contas", "Contas",
-            "Contas bancárias e de caixa. Cada pessoa vê só as suas, mesmo em grupo familiar.",
+            "Contas bancárias e dinheiro em espécie. Cada pessoa cadastra e vê só as suas, mesmo em grupo familiar.",
             [
-                new("Nome", "Como a conta aparece nos lançamentos."),
-                new("Tipo", "Conta corrente, caixa ou outro."),
+                new("Descrição", "Nome da conta no app (ex.: BB salário, Banestes casa)."),
+                new("Tipo de conta", "Corrente, poupança, investimento ou dinheiro."),
+                new("Banco", "Código COMPE da instituição (ex.: 001 Banco do Brasil, 021 Banestes)."),
+                new("Agência", "Número da agência."),
+                new("Número da conta", "Número da conta sem o dígito."),
+                new("Dígito verificador", "Dígito da conta."),
                 new("Saldo inicial", "Saldo ao cadastrar a conta."),
                 new("Saldo atual", "Atualizado pelos lançamentos e transferências."),
                 new("Arquivar", "Esconde a conta sem apagar o histórico."),
-                new("Transferir", "Move valor entre duas contas suas.")
+                new("Transferir", "Move valor entre duas contas suas — não é receita nem despesa do mês.")
             ]),
 
         new("cartoes", "Cartões",
@@ -146,19 +168,6 @@ public sealed class HelpService
                 new("Tipo", "Ativo (bem) ou passivo (dívida)."),
                 new("Valor", "Valor atual do bem ou da dívida."),
                 new("Patrimônio líquido", "Ativos menos passivos.")
-            ]),
-
-        new("membros", "Membros e grupo familiar",
-            "Perfil, convite e gestão do casal/família. Cada um mantém login próprio.",
-            [
-                new("Nome de exibição", "Como você aparece no grupo e nos avisos."),
-                new("Convite (e-mail)", "Envia link por e-mail (SES). Só o e-mail convidado consegue entrar."),
-                new("Link do convite", "Abre o Conora; não entra no grupo sozinho. Token de uso único e com prazo."),
-                new("Aceitar convite", "Liga você ao grupo de quem convidou e mostra a tela de boas-vindas."),
-                new("Sair / Remover", "Qualquer lado pode desfazer; o grupo se encerra."),
-                new("Avisos", "Notificações no app, por exemplo quando o convite é aceito."),
-                new("O que soma no grupo", "Orçamento, início e relatórios do mês."),
-                new("O que continua pessoal", "Contas, cartões, lançamentos, diagnóstico e perfil.")
             ]),
 
         new("diagnostico", "Diagnóstico de renda",
