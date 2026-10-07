@@ -57,13 +57,13 @@ public sealed class HelpService
                 new("Visão geral", "Vocês são duas contas independentes. Cada um lança na própria conta, no próprio cartão e nas próprias categorias. O grupo não mistura saldos nem deixa um editar o lançamento do outro."),
                 new("O que fica pessoal", "Contas bancárias, cartões, lançamentos, diagnóstico de renda, WhatsApp, importação e perfil. Só você vê e altera."),
                 new("O que fica em comum (só leitura somada)", "Início (totais do mês), orçamento planejado × realizado e relatórios do mês — somam os dois membros. Projetos de vida podem ser pessoais ou do grupo (quando marcados assim)."),
-                new("Como vincular (convidar)", "Abra Cadastros → Membros (ou Configurações → Grupo familiar). Informe o e-mail da outra pessoa e envie o convite. Ela precisa já ter (ou criar) login no Conora com esse e-mail."),
+                new("Como vincular (convidar)", "Abra Cadastros → Membros. Informe o e-mail da outra pessoa e envie o convite. Ela precisa já ter (ou criar) login no Conora com esse e-mail."),
                 new("Como aceitar o convite", "A pessoa abre o link do e-mail, entra com a conta do e-mail convidado e confirma. O vínculo é criado; quem convidou recebe aviso no app."),
                 new("Regras do convite", "O link é de uso único, com prazo. Outro e-mail não entra. Se o convite expirar ou for cancelado, envie outro."),
                 new("Como desvincular (sair)", "Em Membros, use Sair do grupo. Seu orçamento e telas voltam a ser só pessoais. O grupo se encerra para os dois."),
                 new("Como desvincular (remover o outro)", "Quem está no grupo pode Remover o outro membro. O efeito é o mesmo: o grupo acaba."),
                 new("Cancelar convite pendente", "Se o outro ainda não aceitou, cancele o convite em Membros. O link deixa de valer."),
-                new("Nome de exibição", "Em Configurações ou Membros: como você aparece no grupo e nos avisos."),
+                new("Nome de exibição", "Em Perfil (menu da conta) ou em Membros: como você aparece no grupo e nos avisos."),
                 new("Uma pessoa, um grupo", "Cada conta fica em um grupo por vez. Aceitar outro convite não cria segundo grupo paralelo.")
             ]),
 
@@ -183,7 +183,7 @@ public sealed class HelpService
             ]),
 
         new("relatorios", "Relatórios",
-            "Resumo do mês, exportações e atalhos para outras funções.",
+            "Resumo do mês, exportações e links para outras funções.",
             [
                 new("Resumo do mês", "Receitas, despesas e resultado da competência."),
                 new("Por categoria", "Quanto foi gasto em cada categoria."),
@@ -235,19 +235,19 @@ public sealed class HelpService
             "Navegação e aparência do aplicativo.",
             [
                 new("Cadastros", "Guia recolhida no menu: Contas, Cartões, Categorias, Projetos, Patrimônio e Membros."),
+                new("Menu da conta", "Avatar no topo: Perfil, tema (Claro/Escuro), Plano, Central de ajuda e Sair."),
                 new("Recolher menu", "No desktop largo, deixa só os ícones para ganhar espaço."),
-                new("Tema", "Ícone de sol (claro) ou lua (escuro)."),
+                new("Tema", "No menu da conta: se o tema atual for claro, aparece Escuro — e o contrário."),
                 new("Versão", "Número do app no rodapé do menu (ex.: 0.1.2).")
             ]),
 
         new("configuracoes", "Configurações",
-            "Preferências de cada usuário. Atalho no rodapé do menu, acima do perfil.",
+            "Preferências de cada usuário. Abra pelo item Perfil no menu da conta.",
             [
-                new("Tema", "Claro ou escuro; fica neste aparelho."),
+                new("Tema", "Claro ou escuro; fica neste aparelho. Também pode trocar pelo menu da conta."),
                 new("Menu lateral", "Expandido ou só ícones no desktop."),
                 new("Modo padrão do orçamento", "Simples ou detalhado quando o mês ainda não tem orçamento."),
-                new("Nome de exibição", "Como você aparece no grupo e nos avisos; gravado na conta."),
-                new("Atalhos", "Grupo, plano e central de ajuda.")
+                new("Nome de exibição", "Como você aparece no grupo e nos avisos; gravado na conta.")
             ])
     ];
 
