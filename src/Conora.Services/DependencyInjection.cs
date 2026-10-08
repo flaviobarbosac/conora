@@ -14,7 +14,7 @@ public static class DependencyInjection
         // Finance domain
         services.AddScoped<PlanService>();
         services.AddScoped<MonthService>();
-        services.AddScoped<CategoryService>();
+        services.AddScoped<ChartAccountService>();
         services.AddScoped<MemberService>();
         services.AddScoped<FamilyGroupService>();
         services.AddScoped<EntryService>();
@@ -28,6 +28,7 @@ public static class DependencyInjection
         services.AddScoped<DashboardService>();
         services.AddScoped<GeminiService>();
         services.AddScoped<WhatsAppService>();
+        services.AddScoped<SesFeedbackService>();
         services.AddSingleton<HelpService>();
         return services;
     }

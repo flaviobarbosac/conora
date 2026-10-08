@@ -1,4 +1,4 @@
-using System.Globalization;
+﻿using System.Globalization;
 using System.Text.Json;
 using System.Text.RegularExpressions;
 using Conora.Domain.Entities;
@@ -121,7 +121,7 @@ public sealed partial class WhatsAppService
                 payload.OccurredAt,
                 payload.Description,
                 AccountId: request.AccountId,
-                CategoryId: request.CategoryId), token);
+                ChartAccountId: request.ChartAccountId), token);
 
             draft.Confirm();
             AuditRecorder.Record(_audits, _correlation, "WhatsAppDraft", draft.Id, "WhatsAppDraftConfirmed", new { payload.Type, payload.Amount });
@@ -166,7 +166,7 @@ public sealed partial class WhatsAppService
         var phone = WhatsAppLink.NormalizePhone(fromDigits);
         var link = await _repo.FirstOrDefaultAnyTenantAsync<WhatsAppLink>(l => l.PhoneE164 == phone, ct);
         if (link is null)
-            return new WhatsAppReply(phone, "Este número ainda não está vinculado. Abra o Onra App e vincule seu telefone para usar o WhatsApp.");
+            return new WhatsAppReply(phone, "Este número ainda não está vinculado. Abra o Conora e vincule seu telefone para usar o WhatsApp.");
 
         _tenant.Set(link.UsuarioId);
 

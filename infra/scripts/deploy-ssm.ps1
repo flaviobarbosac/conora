@@ -15,7 +15,8 @@ param(
     [string]$Profile = '',
     [string]$Region = 'sa-east-1',
     [string]$InstanceId = '',
-    [string]$FrontDist = ''
+    [string]$FrontDist = '',
+    [string]$PublicSite = ''
 )
 
 $ErrorActionPreference = 'Stop'
@@ -54,8 +55,16 @@ if ($FrontDist) {
     aws s3 sync $FrontDist "s3://$Bucket/front/" --delete | Out-Null
 }
 
+if (-not $PublicSite) {
+    $PublicSite = Join-Path $PSScriptRoot '..\public-site'
+}
+if (Test-Path $PublicSite) {
+    Write-Host "Syncing public site $PublicSite -> s3://$Bucket/public/ ..." -ForegroundColor Cyan
+    aws s3 sync $PublicSite "s3://$Bucket/public/" --delete | Out-Null
+}
+
 Write-Host "Deploying on $InstanceId ..." -ForegroundColor Cyan
-$remote = "aws s3 cp s3://$Bucket/deploy.sh /tmp/conora-deploy.sh --region $Region && bash /tmp/conora-deploy.sh && aws s3 cp s3://$Bucket/front/index.html /opt/conora/app/index.html --region $Region && cd /opt/conora && docker compose up -d --force-recreate caddy"
+$remote = "aws s3 cp s3://$Bucket/deploy.sh /tmp/conora-deploy.sh --region $Region && bash /tmp/conora-deploy.sh && mkdir -p /opt/conora/public && aws s3 sync s3://$Bucket/public/ /opt/conora/public/ --delete --region $Region && aws s3 cp s3://$Bucket/front/index.html /opt/conora/app/index.html --region $Region 2>/dev/null; cd /opt/conora && docker compose up -d --force-recreate caddy"
 $paramsFile = [System.IO.Path]::GetTempFileName()
 $utf8NoBom = New-Object System.Text.UTF8Encoding $false
 [System.IO.File]::WriteAllText($paramsFile, (@{ commands = @($remote) } | ConvertTo-Json -Compress), $utf8NoBom)
@@ -80,5 +89,8 @@ if ($err) { Write-Host $err -ForegroundColor Yellow }
 if ($status -ne 'Success') { exit 1 }
 
 Write-Host ''
-Write-Host 'API:   https://api.conora.com.br/health/live' -ForegroundColor Cyan
-Write-Host 'Front: https://conora.com.br/app/' -ForegroundColor Cyan
+Write-Host 'API:      https://api.conora.com.br/health/live' -ForegroundColor Cyan
+Write-Host 'Site:     https://conora.com.br/' -ForegroundColor Cyan
+Write-Host 'Privacy:  https://conora.com.br/privacidade' -ForegroundColor Cyan
+Write-Host 'Terms:    https://conora.com.br/termos' -ForegroundColor Cyan
+Write-Host 'Front:    https://conora.com.br/app/' -ForegroundColor Cyan

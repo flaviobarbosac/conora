@@ -9,16 +9,27 @@ namespace Conora.Infrastructure.Email;
 public sealed class SmtpEmailSender : IEmailSender
 {
     private readonly IConfiguration _configuration;
+    private readonly IEmailSuppressionStore _suppressions;
     private readonly ILogger<SmtpEmailSender> _logger;
 
-    public SmtpEmailSender(IConfiguration configuration, ILogger<SmtpEmailSender> logger)
+    public SmtpEmailSender(
+        IConfiguration configuration,
+        IEmailSuppressionStore suppressions,
+        ILogger<SmtpEmailSender> logger)
     {
         _configuration = configuration;
+        _suppressions = suppressions;
         _logger = logger;
     }
 
     public async Task SendAsync(string to, string subject, string body, CancellationToken ct = default)
     {
+        if (await _suppressions.IsSuppressedAsync(to, ct))
+        {
+            _logger.LogWarning("E-mail bloqueado (supressão SES). To={To} Subject={Subject}", to, subject);
+            return;
+        }
+
         var host = _configuration["Email:SmtpHost"];
         if (string.IsNullOrWhiteSpace(host))
         {
@@ -28,6 +39,7 @@ public sealed class SmtpEmailSender : IEmailSender
 
         var port = int.TryParse(_configuration["Email:SmtpPort"], out var parsed) ? parsed : 587;
         var from = _configuration["Email:From"] ?? "noreply@localhost";
+        var configurationSet = _configuration["Email:ConfigurationSet"];
 
         using var client = new SmtpClient(host, port)
         {
@@ -38,6 +50,9 @@ public sealed class SmtpEmailSender : IEmailSender
         };
 
         using var message = new MailMessage(from, to, subject, body);
+        if (!string.IsNullOrWhiteSpace(configurationSet))
+            message.Headers.Add("X-SES-CONFIGURATION-SET", configurationSet);
+
         await client.SendMailAsync(message, ct);
     }
 }

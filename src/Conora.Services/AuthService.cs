@@ -21,7 +21,7 @@ public sealed class AuthService
     private readonly ITokenService _tokens;
     private readonly IGoogleTokenValidator _google;
     private readonly IEmailSender _email;
-    private readonly CategoryService _categories;
+    private readonly ChartAccountService _chartAccounts;
     private readonly ILogger<AuthService> _logger;
 
     public AuthService(
@@ -35,7 +35,7 @@ public sealed class AuthService
         ITokenService tokens,
         IGoogleTokenValidator google,
         IEmailSender email,
-        CategoryService categories,
+        ChartAccountService chartAccounts,
         ILogger<AuthService> logger)
     {
         _users = users;
@@ -48,7 +48,7 @@ public sealed class AuthService
         _tokens = tokens;
         _google = google;
         _email = email;
-        _categories = categories;
+        _chartAccounts = chartAccounts;
         _logger = logger;
     }
 
@@ -136,7 +136,7 @@ public sealed class AuthService
     {
         _users.Add(user);
         _tenant.Set(user.Id);
-        _categories.AddDefaults();
+        _chartAccounts.AddDefaults();
         return await PersistSessionAsync(user, action, notifyWelcome: true, ct);
     }
 
@@ -169,7 +169,7 @@ public sealed class AuthService
         {
             try
             {
-                await _email.SendAsync(user.Email, "Bem-vindo ao Onra App", "Sua conta foi criada.", ct);
+                await _email.SendAsync(user.Email, "Bem-vindo ao Conora", "Sua conta no Conora foi criada.", ct);
             }
             catch (Exception ex)
             {

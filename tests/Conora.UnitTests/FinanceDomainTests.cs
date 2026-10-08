@@ -10,25 +10,29 @@ namespace Conora.UnitTests;
 public class FinanceDomainTests
 {
     [Fact]
-    public void System_seed_has_contributions_and_no_income_discount_category()
+    public void System_chart_has_seven_roots_and_tithe_under_discount()
     {
-        Assert.Contains(SystemCategories.All, c => c.Code == SystemCategories.Contributions);
-        Assert.DoesNotContain(SystemCategories.All, c => c.Name.Contains("Descontos sobre renda", StringComparison.OrdinalIgnoreCase));
+        var roots = SystemChartAccounts.All.Where(c => c.Level == ChartAccountLevel.Root).ToList();
+        Assert.Equal(7, roots.Count);
+        Assert.Contains(SystemChartAccounts.All, c => c.Code == SystemChartAccounts.Tithe);
+        Assert.Equal(ChartSection.Discount, SystemChartAccounts.All.First(c => c.Code == SystemChartAccounts.Tithe).Section);
     }
 
     [Fact]
-    public void System_category_cannot_be_renamed_or_deleted()
+    public void System_chart_account_cannot_be_renamed()
     {
-        var category = Category.CreateSystem(SystemCategories.All[0]);
+        var account = ChartAccount.CreateSystem(SystemChartAccounts.All.First(c => c.Level == ChartAccountLevel.Analytical), Guid.NewGuid());
 
-        Assert.Throws<SystemCategoryProtectedException>(() => category.EnsureNotSystem());
-        Assert.Throws<SystemCategoryProtectedException>(() => category.Update("Outro", false));
+        Assert.Throws<SystemChartAccountProtectedException>(() => account.EnsureNotSystem());
+        Assert.Throws<SystemChartAccountProtectedException>(() => account.Rename("Outro"));
     }
 
     [Fact]
-    public void Income_discount_category_cannot_be_created()
+    public void User_analytical_can_be_renamed()
     {
-        Assert.Throws<ValidationException>(() => Category.Create("Descontos sobre renda", CategoryKind.Expense));
+        var account = ChartAccount.CreateAnalytical("Extra", Guid.NewGuid(), ChartSection.Essential);
+        account.Rename("Extra 2");
+        Assert.Equal("Extra 2", account.Name);
     }
 
     [Fact]
@@ -40,6 +44,7 @@ public class FinanceDomainTests
 
         Assert.Equal(0m, entry.BalanceEffects().Sum(e => e.Delta));
         Assert.False(entry.AffectsMonthlyResult);
+        Assert.Null(entry.ChartAccountId);
     }
 
     [Fact]

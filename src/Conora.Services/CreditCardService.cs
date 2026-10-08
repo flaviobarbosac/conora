@@ -1,4 +1,4 @@
-using Conora.Domain.Entities;
+﻿using Conora.Domain.Entities;
 using Conora.Domain.Enums;
 using Conora.Domain.Exceptions;
 using Conora.Domain.Ports;
@@ -92,12 +92,13 @@ public sealed class CreditCardService
         await _plan.EnsureWritableAsync(ct);
         var card = await RequireCardAsync(cardId, ct, track: false);
 
-        var category = await _repo.FirstOrDefaultAsync<Category>(c => c.Id == request.CategoryId, ct, track: false)
-                       ?? throw new NotFoundException("Categoria", request.CategoryId);
-        if (!category.IsActive || category.Kind != CategoryKind.Expense)
-            throw new ValidationException("categoryId", "Informe uma categoria de despesa ativa.");
+        var chart = await _repo.FirstOrDefaultAsync<ChartAccount>(c => c.Id == request.ChartAccountId, ct, track: false)
+                       ?? throw new NotFoundException("Conta do plano", request.ChartAccountId);
+        if (!chart.AcceptsPosting
+            || chart.Section is not (ChartSection.Essential or ChartSection.Social or ChartSection.LifeProject or ChartSection.Discount))
+            throw new ValidationException("chartAccountId", "Informe uma conta analítica de despesa ativa.");
 
-        var purchase = CardPurchase.Create(card, request.Amount, request.PurchasedAt, request.Installments, request.CategoryId, request.Description);
+        var purchase = CardPurchase.Create(card, request.Amount, request.PurchasedAt, request.Installments, request.ChartAccountId, request.Description);
         await _months.EnsureOpenAsync(purchase.CompetenceYm, ct);
 
         var used = await UsedLimitAsync(cardId, ct);
@@ -217,7 +218,7 @@ public sealed class CreditCardService
         => new(c.Id, c.Name, c.LimitTotal, c.ClosingDay, c.DueDay, c.PaymentAccountId, used, c.LimitTotal - used);
 
     private static CardPurchaseResponse ToResponse(CardPurchase p) => new(
-        p.Id, p.CreditCardId, p.Amount, p.PurchasedAt, p.Installments, p.CategoryId, p.Description, p.CompetenceYm, p.FirstInvoiceYm);
+        p.Id, p.CreditCardId, p.Amount, p.PurchasedAt, p.Installments, p.ChartAccountId, p.Description, p.CompetenceYm, p.FirstInvoiceYm);
 
     private static CardInvoiceResponse ToResponse(CreditCard card, CardInvoice invoice)
     {

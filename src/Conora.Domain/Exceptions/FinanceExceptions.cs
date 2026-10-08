@@ -11,9 +11,9 @@ public sealed class NotFoundException : DomainException
     }
 }
 
-public sealed class SystemCategoryProtectedException : DomainException
+public sealed class SystemChartAccountProtectedException : DomainException
 {
-    public SystemCategoryProtectedException() : base("Categoria de sistema não pode ser alterada ou excluída.")
+    public SystemChartAccountProtectedException() : base("Conta padrão do sistema não pode ser alterada ou excluída.")
     {
     }
 }
@@ -32,7 +32,7 @@ public sealed class MonthClosedException : DomainException
 public sealed class PlanReadOnlyException : DomainException
 {
     public PlanReadOnlyException()
-        : base("Assinatura vencida: o Onra App está em modo somente leitura. Renove o plano para lançar ou editar.")
+        : base("Assinatura vencida: o Conora está em modo somente leitura. Renove o plano para lançar ou editar.")
     {
     }
 }

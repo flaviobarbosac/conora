@@ -1,3 +1,4 @@
+using Conora.Domain.Catalog;
 using Conora.Domain.Entities;
 using Conora.Domain.Enums;
 using Conora.Domain.Exceptions;
@@ -12,49 +13,83 @@ public sealed class PatrimonyService
     private readonly IFinanceRepository _repo;
     private readonly IUnitOfWork _uow;
     private readonly PlanService _plan;
+    private readonly ChartAccountService _chartAccounts;
 
-    public PatrimonyService(IFinanceRepository repo, IUnitOfWork uow, PlanService plan)
+    public PatrimonyService(IFinanceRepository repo, IUnitOfWork uow, PlanService plan, ChartAccountService chartAccounts)
     {
         _repo = repo;
         _uow = uow;
         _plan = plan;
+        _chartAccounts = chartAccounts;
     }
 
     public async Task<PatrimonySummaryResponse> GetSummaryAsync(CancellationToken ct)
     {
+        await _chartAccounts.EnsureDefaultsAsync(ct);
         var items = await _repo.ListAsync<PatrimonyItem>(null, ct);
-        var accounts = await _repo.ListAsync<Account>(a => !a.IsArchived, ct);
+        var accounts = (await _chartAccounts.ListAsync(null, true, false, ct)).ToDictionary(c => c.Id);
+        var bankAccounts = await _repo.ListAsync<Account>(a => !a.IsArchived, ct);
         var unpaid = await _repo.SumAsync<CardInvoice>(i => i.Status != InvoiceStatus.Paid, i => i.Total, ct);
 
-        var accountsBalance = accounts.Sum(a => a.Balance);
-        var assets = items.Where(i => i.Kind == PatrimonyKind.Asset).Sum(i => i.Amount) + accountsBalance;
-        var liabilities = items.Where(i => i.Kind == PatrimonyKind.Liability).Sum(i => i.Amount) + unpaid;
+        var accountsBalance = bankAccounts.Sum(a => a.Balance);
+        var responses = items
+            .Select(i => ToResponse(i, accounts))
+            .OrderBy(i => i.Section)
+            .ThenBy(i => i.GroupName)
+            .ThenBy(i => i.ChartAccountName)
+            .ToList();
+
+        var assetsInUse = responses.Where(i => i.Section == ChartSection.Asset && i.GroupName == "Bens de Uso").Sum(i => i.Amount);
+        var assetsNotInUse = responses.Where(i => i.Section == ChartSection.Asset && i.GroupName == "Bens de Não Uso").Sum(i => i.Amount);
+        var assets = responses.Where(i => i.Section == ChartSection.Asset).Sum(i => i.Amount) + accountsBalance;
+        var liabilities = responses.Where(i => i.Section == ChartSection.Liability).Sum(i => i.Amount) + unpaid;
+
+        var groups = responses
+            .GroupBy(i => (i.Section, i.GroupName))
+            .Select(g => new PatrimonyGroupTotal(g.Key.GroupName, g.Key.Section, g.Sum(x => x.Amount)))
+            .OrderBy(g => g.Section)
+            .ThenBy(g => g.GroupName)
+            .ToList();
 
         return new PatrimonySummaryResponse(
             accountsBalance,
             assets,
+            assetsInUse,
+            assetsNotInUse,
             unpaid,
             liabilities,
             assets - liabilities,
-            items.OrderBy(i => i.Kind).ThenBy(i => i.Name).Select(ToResponse).ToList());
+            groups,
+            responses);
     }
 
     public async Task<PatrimonyItemResponse> CreateAsync(PatrimonyItemRequest request, CancellationToken ct)
     {
         await _plan.EnsureWritableAsync(ct);
-        var item = PatrimonyItem.Create(request.Kind, request.Name, request.Amount);
+        var account = await _chartAccounts.RequireAnalyticalAsync(request.ChartAccountId, ct);
+        if (!SystemChartAccounts.IsPatrimonySection(account.Section))
+            throw new ValidationException("chartAccountId", "Patrimônio só aceita contas de Ativo ou Passivo.");
+
+        if (await _repo.AnyAsync<PatrimonyItem>(p => p.ChartAccountId == account.Id, ct))
+            throw new ValidationException("chartAccountId", "Já existe um valor cadastrado nesta conta.");
+
+        var item = PatrimonyItem.Create(account.Id, request.Amount);
         _repo.Add(item);
         await _uow.SaveChangesAsync(ct);
-        return ToResponse(item);
+
+        var accounts = (await _chartAccounts.ListAsync(null, true, false, ct)).ToDictionary(c => c.Id);
+        return ToResponse(item, accounts);
     }
 
     public async Task<PatrimonyItemResponse> UpdateAsync(Guid id, UpdatePatrimonyItemRequest request, CancellationToken ct)
     {
         await _plan.EnsureWritableAsync(ct);
         var item = await _repo.GetAsync<PatrimonyItem>(id, ct) ?? throw new NotFoundException("Item de patrimônio", id);
-        item.Update(request.Name, request.Amount);
+        item.SetAmount(request.Amount);
         await _uow.SaveChangesAsync(ct);
-        return ToResponse(item);
+
+        var accounts = (await _chartAccounts.ListAsync(null, true, false, ct)).ToDictionary(c => c.Id);
+        return ToResponse(item, accounts);
     }
 
     public async Task DeleteAsync(Guid id, CancellationToken ct)
@@ -65,14 +100,12 @@ public sealed class PatrimonyService
         await _uow.SaveChangesAsync(ct);
     }
 
-    /// <summary>
-    /// Reserve base (spec v1.1 §2): average of the last 3 months of essential spending; with fewer months uses
-    /// the ones available; with no history uses the essential budget of the reference month.
-    /// </summary>
     public async Task<ReserveResponse> GetReserveAsync(string? referenceYm, CancellationToken ct)
     {
         var reference = string.IsNullOrWhiteSpace(referenceYm) ? Competence.From(DateTime.UtcNow) : Competence.Require(referenceYm);
-        var essentialIds = (await _repo.ListAsync<Category>(c => c.IsEssential, ct)).Select(c => c.Id).ToList();
+        var essentialIds = (await _chartAccounts.ListAsync(ChartSection.Essential, false, true, ct))
+            .Select(c => c.Id)
+            .ToList();
         if (essentialIds.Count == 0)
             return new ReserveResponse(reference, 0, 0, "None");
 
@@ -83,10 +116,10 @@ public sealed class PatrimonyService
             var spent = await _repo.SumAsync<Entry>(
                 e => e.CompetenceYm == ym
                      && (e.Type == EntryType.Expense || e.Type == EntryType.Contribution)
-                     && e.CategoryId != null && essentialIds.Contains(e.CategoryId.Value),
+                     && e.ChartAccountId != null && essentialIds.Contains(e.ChartAccountId.Value),
                 e => e.Amount, ct);
             spent += await _repo.SumAsync<CardPurchase>(
-                p => p.CompetenceYm == ym && essentialIds.Contains(p.CategoryId), p => p.Amount, ct);
+                p => p.CompetenceYm == ym && essentialIds.Contains(p.ChartAccountId), p => p.Amount, ct);
 
             if (spent > 0)
                 monthly.Add(spent);
@@ -101,11 +134,24 @@ public sealed class PatrimonyService
             return new ReserveResponse(reference, 0, 0, "None");
 
         var planned = await _repo.SumAsync<BudgetLine>(
-            l => l.BudgetId == budget.Id && essentialIds.Contains(l.CategoryId), l => l.PlannedAmount, ct);
+            l => l.BudgetId == budget.Id && essentialIds.Contains(l.ChartAccountId), l => l.PlannedAmount, ct);
         return planned > 0
             ? new ReserveResponse(reference, planned, 0, "Budget")
             : new ReserveResponse(reference, 0, 0, "None");
     }
 
-    private static PatrimonyItemResponse ToResponse(PatrimonyItem i) => new(i.Id, i.Kind, i.Name, i.Amount);
+    private static PatrimonyItemResponse ToResponse(PatrimonyItem item, Dictionary<Guid, ChartAccountResponse> accounts)
+    {
+        var account = accounts.GetValueOrDefault(item.ChartAccountId);
+        var group = account?.ParentId is Guid pid && accounts.TryGetValue(pid, out var parent)
+            ? parent.Name
+            : account?.Name ?? "—";
+        return new(
+            item.Id,
+            item.ChartAccountId,
+            account?.Name ?? "—",
+            account?.Section ?? ChartSection.Asset,
+            group,
+            item.Amount);
+    }
 }

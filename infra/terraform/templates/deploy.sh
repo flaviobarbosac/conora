@@ -21,7 +21,7 @@ if [ ! -x /usr/local/lib/docker/cli-plugins/docker-compose ]; then
   chmod +x /usr/local/lib/docker/cli-plugins/docker-compose
 fi
 
-mkdir -p "$${APP_DIR}/app"
+mkdir -p "$${APP_DIR}/app" "$${APP_DIR}/public"
 aws s3 cp "s3://$${BUCKET}/docker-compose.yml" "$${APP_DIR}/docker-compose.yml" --region "$${REGION}"
 aws s3 cp "s3://$${BUCKET}/Caddyfile" "$${APP_DIR}/Caddyfile" --region "$${REGION}"
 aws s3 cp "s3://$${BUCKET}/generate-env.sh" "$${APP_DIR}/generate-env.sh" --region "$${REGION}"
@@ -32,6 +32,9 @@ chmod +x "$${APP_DIR}/generate-env.sh"
 aws s3 sync "s3://$${BUCKET}/front/" "$${APP_DIR}/app/" --delete --region "$${REGION}" || true
 # Ensure index.html is never stale relative to hashed assets.
 aws s3 cp "s3://$${BUCKET}/front/index.html" "$${APP_DIR}/app/index.html" --region "$${REGION}" || true
+
+# Public marketing / legal pages (landing, privacy, terms)
+aws s3 sync "s3://$${BUCKET}/public/" "$${APP_DIR}/public/" --delete --region "$${REGION}" || true
 
 cd "$${APP_DIR}"
 export AWS_REGION="$${REGION}"

@@ -17,7 +17,7 @@ namespace Conora.Services;
 public sealed partial class GeminiService
 {
     public const string UnavailableMessage =
-        "O assistente de IA não está disponível no momento. O restante do Onra App continua funcionando normalmente.";
+        "O assistente de IA não está disponível no momento. O restante do Conora continua funcionando normalmente.";
 
     public const string TradeAdviceRefusal =
         "Não posso indicar compra ou venda de ativos nem recomendar investimentos. Posso ajudar a entender o método Raio X, seu orçamento e seus projetos de vida.";
@@ -26,7 +26,7 @@ public sealed partial class GeminiService
     private const int MaxQuestionsPerHour = 20;
 
     private const string SystemInstruction =
-        "Você é o assistente do Onra App, que aplica o método Raio X da Vida Financeira (diagnosticar, organizar, planejar, registrar, acompanhar, corrigir e construir). " +
+        "Você é o assistente do Conora, que aplica o método Raio X da Vida Financeira (diagnosticar, organizar, planejar, registrar, acompanhar, corrigir e construir). " +
         "Responda sempre em português do Brasil, de forma curta, clara e didática. " +
         "Ajude apenas com o método, o uso do aplicativo e a leitura dos números do usuário. " +
         "NUNCA recomende comprar ou vender ativos (ações, fundos, cripto, títulos) e nunca dê recomendação individual de investimento. " +

@@ -1,4 +1,4 @@
-using System.Security.Cryptography;
+﻿using System.Security.Cryptography;
 using System.Text;
 using Conora.Domain.Entities;
 using Conora.Domain.Enums;
@@ -116,7 +116,7 @@ public sealed class ImportService
                 row.MappedDate,
                 row.MappedDescription,
                 accountId: request.AccountId,
-                categoryId: isIncome ? request.DefaultIncomeCategoryId : request.DefaultExpenseCategoryId,
+                chartAccountId: isIncome ? request.DefaultIncomeChartAccountId : request.DefaultExpenseChartAccountId,
                 importHash: row.ImportHash));
         }
 

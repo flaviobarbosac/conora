@@ -1,4 +1,4 @@
-using Conora.Domain.Catalog;
+﻿using Conora.Domain.Catalog;
 using Conora.Domain.Entities;
 using Conora.Domain.Enums;
 using Conora.Domain.Exceptions;
@@ -20,7 +20,7 @@ public sealed class EntryService
     private readonly ICorrelationContext _correlation;
     private readonly PlanService _plan;
     private readonly MonthService _months;
-    private readonly CategoryService _categories;
+    private readonly ChartAccountService _chartAccounts;
     private readonly FamilyGroupService _family;
 
     public EntryService(
@@ -30,7 +30,7 @@ public sealed class EntryService
         ICorrelationContext correlation,
         PlanService plan,
         MonthService months,
-        CategoryService categories,
+        ChartAccountService chartAccounts,
         FamilyGroupService family)
     {
         _repo = repo;
@@ -39,7 +39,7 @@ public sealed class EntryService
         _correlation = correlation;
         _plan = plan;
         _months = months;
-        _categories = categories;
+        _chartAccounts = chartAccounts;
         _family = family;
     }
 
@@ -47,7 +47,7 @@ public sealed class EntryService
     {
         var ym = string.IsNullOrWhiteSpace(filter.CompetenceYm) ? null : Competence.Require(filter.CompetenceYm);
         var type = filter.Type;
-        var categoryId = filter.CategoryId;
+        var chartAccountId = filter.ChartAccountId;
         var accountId = filter.AccountId;
         var search = string.IsNullOrWhiteSpace(filter.Search) ? null : filter.Search.Trim().ToLowerInvariant();
         var skip = Math.Max(0, filter.Skip);
@@ -56,7 +56,7 @@ public sealed class EntryService
         System.Linq.Expressions.Expression<Func<Entry, bool>> predicate = e =>
             (ym == null || e.CompetenceYm == ym)
             && (type == null || e.Type == type)
-            && (categoryId == null || e.CategoryId == categoryId)
+            && (chartAccountId == null || e.ChartAccountId == chartAccountId)
             && (accountId == null || e.AccountId == accountId || e.ContraAccountId == accountId)
             && (search == null || e.Description.ToLower().Contains(search));
 
@@ -95,14 +95,14 @@ public sealed class EntryService
             throw new ValidationException("amount", "Valor deve ser maior que zero.");
 
         var count = Math.Max(installments, repeat);
-        var categoryId = await ResolveCategoryAsync(request.Type, request.CategoryId, ct);
+        var chartAccountId = await ResolveChartAccountAsync(request.Type, request.ChartAccountId, ct);
         var firstDate = Competence.ToUtc(request.OccurredAt);
         var baseYm = string.IsNullOrWhiteSpace(request.CompetenceYm) ? Competence.From(firstDate) : Competence.Require(request.CompetenceYm);
         var competences = Enumerable.Range(0, count).Select(i => Competence.AddMonths(baseYm, i)).ToList();
 
         await _months.EnsureOpenAsync(competences, ct);
         await ValidateReferencesAsync(
-            request.Type, request.AccountId, request.ContraAccountId, categoryId, request.MemberId, request.LifeProjectId, ct);
+            request.Type, request.AccountId, request.ContraAccountId, chartAccountId, request.MemberId, request.LifeProjectId, ct);
         await ValidateIncomeLinkAsync(request.Type, request.IncomeSourceId, request.Amount, competences[0], count, null, ct);
         await ValidateContributionDuplicateAsync(request.Type, request.Amount, competences[0], request.ConfirmDuplicate, null, ct);
 
@@ -119,7 +119,7 @@ public sealed class EntryService
                 competences[i],
                 request.AccountId,
                 request.ContraAccountId,
-                categoryId,
+                chartAccountId,
                 request.IncomeSourceId,
                 lifeProjectId: request.LifeProjectId,
                 memberId: request.MemberId,
@@ -152,16 +152,16 @@ public sealed class EntryService
         var newYm = string.IsNullOrWhiteSpace(request.CompetenceYm) ? Competence.From(newDate) : Competence.Require(request.CompetenceYm);
         await _months.EnsureOpenAsync([oldYm, newYm], ct);
 
-        var categoryId = await ResolveCategoryAsync(entry.Type, request.CategoryId, ct);
+        var chartAccountId = await ResolveChartAccountAsync(entry.Type, request.ChartAccountId, ct);
         await ValidateReferencesAsync(
-            entry.Type, request.AccountId, request.ContraAccountId, categoryId, request.MemberId, entry.LifeProjectId, ct);
+            entry.Type, request.AccountId, request.ContraAccountId, chartAccountId, request.MemberId, entry.LifeProjectId, ct);
         await ValidateIncomeLinkAsync(entry.Type, request.IncomeSourceId, request.Amount, newYm, 1, entry.Id, ct);
         await ValidateContributionDuplicateAsync(entry.Type, request.Amount, newYm, request.ConfirmDuplicate, entry.Id, ct);
 
         await EntryLedger.ApplyAsync(_repo, entry, -1, ct);
         await ApplyProjectAsync(entry, -1, ct);
         entry.Update(request.Amount, newDate, newYm, request.AccountId, request.ContraAccountId,
-            categoryId, request.IncomeSourceId, request.MemberId, request.Description);
+            chartAccountId, request.IncomeSourceId, request.MemberId, request.Description);
         await EntryLedger.ApplyAsync(_repo, entry, 1, ct);
         await ApplyProjectAsync(entry, 1, ct);
 
@@ -198,34 +198,34 @@ public sealed class EntryService
             source.Description,
             AccountId: source.AccountId,
             ContraAccountId: source.ContraAccountId,
-            CategoryId: source.CategoryId,
+            ChartAccountId: source.ChartAccountId,
             LifeProjectId: source.LifeProjectId,
             MemberId: source.MemberId,
             ConfirmDuplicate: true), ct);
     }
 
-    /// <summary>Suggests the category most used for entries with a similar description.</summary>
-    public async Task<CategorySuggestionResponse> SuggestCategoryAsync(string description, CancellationToken ct)
+    /// <summary>Suggests the ChartAccount most used for entries with a similar description.</summary>
+    public async Task<ChartAccountSuggestionResponse> SuggestAccountAsync(string description, CancellationToken ct)
     {
         var token = (description ?? string.Empty)
             .ToLowerInvariant()
             .Split([' ', '-', '/', ','], StringSplitOptions.RemoveEmptyEntries)
             .FirstOrDefault(w => w.Length >= 3);
         if (token is null)
-            return new CategorySuggestionResponse(null, null);
+            return new ChartAccountSuggestionResponse(null, null);
 
         var ranked = await _repo.QueryAsync<Entry, Guid?>(q => q
-            .Where(e => e.CategoryId != null && e.Description.ToLower().Contains(token))
-            .GroupBy(e => e.CategoryId)
+            .Where(e => e.ChartAccountId != null && e.Description.ToLower().Contains(token))
+            .GroupBy(e => e.ChartAccountId)
             .OrderByDescending(g => g.Count())
             .Select(g => g.Key)
             .Take(1), ct);
 
-        if (ranked.Count == 0 || ranked[0] is not Guid categoryId)
-            return new CategorySuggestionResponse(null, null);
+        if (ranked.Count == 0 || ranked[0] is not Guid chartAccountId)
+            return new ChartAccountSuggestionResponse(null, null);
 
-        var category = await _repo.FirstOrDefaultAsync<Category>(c => c.Id == categoryId, ct, track: false);
-        return new CategorySuggestionResponse(category?.Id, category?.Name);
+        var account = await _repo.FirstOrDefaultAsync<ChartAccount>(c => c.Id == chartAccountId, ct, track: false);
+        return new ChartAccountSuggestionResponse(account?.Id, account?.Name);
     }
 
     private static void EnsureEditable(Entry entry)
@@ -234,11 +234,10 @@ public sealed class EntryService
             throw new ValidationException("type", "Pagamento de fatura não pode ser editado ou excluído por aqui.");
     }
 
-    private async Task<Guid?> ResolveCategoryAsync(EntryType type, Guid? requested, CancellationToken ct)
+    private async Task<Guid?> ResolveChartAccountAsync(EntryType type, Guid? requested, CancellationToken ct)
     {
-        // Contribution entries (tithe/offering) always live in Contribuições/Doações, never as income discount.
         if (type == EntryType.Contribution)
-            return (await _categories.GetByCodeAsync(SystemCategories.Contributions, ct)).Id;
+            return (await _chartAccounts.GetByCodeAsync(SystemChartAccounts.Tithe, ct)).Id;
 
         return requested;
     }
@@ -247,7 +246,7 @@ public sealed class EntryService
         EntryType type,
         Guid? accountId,
         Guid? contraAccountId,
-        Guid? categoryId,
+        Guid? chartAccountId,
         Guid? memberId,
         Guid? lifeProjectId,
         CancellationToken ct)
@@ -260,16 +259,18 @@ public sealed class EntryService
                 throw new ValidationException("accountId", $"A conta '{account.Name}' está arquivada.");
         }
 
-        if (categoryId is Guid cid)
+        if (chartAccountId is Guid cid)
         {
-            var category = await _repo.FirstOrDefaultAsync<Category>(c => c.Id == cid, ct, track: false)
-                           ?? throw new NotFoundException("Categoria", cid);
-            if (!category.IsActive)
-                throw new ValidationException("categoryId", "Categoria inativa.");
-
-            var expected = type == EntryType.Income ? CategoryKind.Income : CategoryKind.Expense;
-            if (type is EntryType.Income or EntryType.Expense or EntryType.Contribution && category.Kind != expected)
-                throw new ValidationException("categoryId", "A categoria não é compatível com o tipo do lançamento.");
+            var chart = await _chartAccounts.RequireAnalyticalAsync(cid, ct);
+            var ok = type switch
+            {
+                EntryType.Income => chart.Section == ChartSection.Income,
+                EntryType.Expense or EntryType.Contribution => chart.Section is ChartSection.Discount
+                    or ChartSection.LifeProject or ChartSection.Essential or ChartSection.Social,
+                _ => true
+            };
+            if (type is EntryType.Income or EntryType.Expense or EntryType.Contribution && !ok)
+                throw new ValidationException("chartAccountId", "A conta não é compatível com o tipo do lançamento.");
         }
 
         if (memberId is Guid mid && !await _repo.AnyAsync<FamilyMember>(m => m.Id == mid, ct))
@@ -359,7 +360,7 @@ public sealed class EntryService
     }
 
     internal static EntryResponse ToResponse(Entry e) => new(
-        e.Id, e.Type, e.Amount, e.OccurredAt, e.CompetenceYm, e.AccountId, e.ContraAccountId, e.CategoryId,
+        e.Id, e.Type, e.Amount, e.OccurredAt, e.CompetenceYm, e.AccountId, e.ContraAccountId, e.ChartAccountId,
         e.IncomeSourceId, e.CreditCardId, e.LifeProjectId, e.MemberId, e.Description, e.RecurrenceKey,
         e.InstallmentNumber, e.InstallmentCount);
 }

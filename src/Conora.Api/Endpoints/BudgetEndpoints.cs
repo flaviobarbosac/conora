@@ -1,4 +1,4 @@
-using Conora.Services;
+﻿using Conora.Services;
 using Conora.Services.Contracts;
 
 namespace Conora.Api.Endpoints;
@@ -21,8 +21,8 @@ public static class BudgetEndpoints
         group.MapPost("/{competenceYm}/copy-previous", async (string competenceYm, BudgetService service, CancellationToken ct) =>
             Results.Ok(await service.CopyFromPreviousAsync(competenceYm, ct)));
 
-        group.MapDelete("/{competenceYm}/lines/{categoryId:guid}", async (string competenceYm, Guid categoryId, BudgetService service, CancellationToken ct) =>
-            Results.Ok(await service.DeleteLineAsync(competenceYm, categoryId, ct)));
+        group.MapDelete("/{competenceYm}/lines/{ChartAccountId:guid}", async (string competenceYm, Guid ChartAccountId, BudgetService service, CancellationToken ct) =>
+            Results.Ok(await service.DeleteLineAsync(competenceYm, ChartAccountId, ct)));
 
         return app;
     }

@@ -2,16 +2,18 @@ using Conora.Domain.Enums;
 
 namespace Conora.Services.Contracts;
 
-public sealed record BudgetLineInput(Guid CategoryId, decimal PlannedAmount);
+public sealed record BudgetLineInput(Guid ChartAccountId, decimal PlannedAmount);
 
 public sealed record UpsertBudgetRequest(BudgetMode Mode, IReadOnlyList<BudgetLineInput> Lines);
 
 /// <summary>Status follows the fixed rule: under 70% Ok, 70-99% Attention, 100% Limit, above 100% Exceeded.</summary>
 public sealed record BudgetLineResponse(
-    Guid? CategoryId,
-    string CategoryName,
+    Guid? ChartAccountId,
+    string ChartAccountName,
+    Guid? ParentId,
     string GroupName,
-    BudgetBlock Block,
+    ChartSection Section,
+    ChartAccountLevel Level,
     decimal PlannedAmount,
     decimal ActualAmount,
     decimal Remaining,
@@ -21,8 +23,8 @@ public sealed record BudgetLineResponse(
 
 public sealed record BudgetIncomeSourceResponse(Guid Id, string Name, decimal NetSpendable);
 
-public sealed record BudgetBlockResponse(
-    BudgetBlock Block,
+public sealed record BudgetSectionResponse(
+    ChartSection Section,
     string Name,
     decimal PlannedAmount,
     decimal ActualAmount,
@@ -38,16 +40,16 @@ public sealed record BudgetResponse(
     decimal SpendableIncome,
     decimal MonthResult,
     IReadOnlyList<BudgetIncomeSourceResponse> IncomeSources,
-    IReadOnlyList<BudgetBlockResponse> Blocks,
+    IReadOnlyList<BudgetSectionResponse> Sections,
     IReadOnlyList<BudgetLineResponse> Lines);
 
 public sealed record BudgetYearMonthCell(string CompetenceYm, decimal PlannedAmount, decimal ActualAmount);
 
 public sealed record BudgetYearLineResponse(
-    Guid? CategoryId,
-    string CategoryName,
+    Guid? ChartAccountId,
+    string ChartAccountName,
     string GroupName,
-    BudgetBlock Block,
+    ChartSection Section,
     IReadOnlyList<BudgetYearMonthCell> Months);
 
 public sealed record BudgetYearResponse(

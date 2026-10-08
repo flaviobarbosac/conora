@@ -43,7 +43,9 @@ public static class DependencyInjection
         services.AddSingleton<IPasswordHasher, AspNetPasswordHasher>();
         services.AddSingleton<ITokenService, JwtTokenService>();
         services.AddSingleton<IGoogleTokenValidator, GoogleTokenValidator>();
-        services.AddSingleton<IEmailSender, SmtpEmailSender>();
+        services.AddScoped<IEmailSuppressionStore, EfEmailSuppressionStore>();
+        services.AddScoped<IEmailSender, SmtpEmailSender>();
+        services.AddHttpClient("ses-sns", client => client.Timeout = TimeSpan.FromSeconds(15));
         services.AddHttpClient<IGeminiClient, Ai.GeminiClient>(client => client.Timeout = TimeSpan.FromSeconds(20));
         services.AddHttpClient<IWhatsAppMessenger, WhatsApp.CloudApiWhatsAppMessenger>(client =>
         {

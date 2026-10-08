@@ -63,6 +63,7 @@ Email__SmtpPort=$(get_int .email.smtpPort)
 Email__User=$(get_int .email.user)
 Email__Password=$(esc "$(get_int .email.password)")
 Email__UseSsl=$(get_int .email.useSsl)
+Email__ConfigurationSet=conora-${ENV_NAME}-transactional
 WhatsApp__VerifyToken=$(esc "$(get_int .whatsapp.verifyToken)")
 WhatsApp__AppSecret=$(esc "$(get_int .whatsapp.appSecret)")
 WhatsApp__AccessToken=$(esc "$(get_int .whatsapp.accessToken)")

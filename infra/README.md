@@ -66,8 +66,11 @@ infra/
    # com front: -FrontDist ..\Conora-frontEnd\dist
    ```
 
-6. **SES produção** (depois do domínio verificado): `.\infra\scripts\request-ses-production.ps1`.
-   Confirme o e-mail de inscrição SNS enviado para `flavio@redfivesistemas.com.br` (alertas de budget).
+6. **SES produção** (depois do domínio verificado, site público e webhook de bounce no ar):
+   `.\infra\scripts\request-ses-production.ps1`.
+   Se o caso anterior foi negado (`179137300900718`), o script **não** reenvia via API —
+   imprime o texto para responder no Support Center.
+   Confirme o e-mail de inscrição SNS (budget e SES feedback) em `flavio@redfivesistemas.com.br`.
 
 7. **GitHub**: salvar `terraform output github_actions_role_arn` como secret `AWS_GITHUB_ACTIONS_ROLE_ARN`
    nos repositórios `flaviobarbosac/conora` e `flaviobarbosac/conora-front`.

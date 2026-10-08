@@ -14,7 +14,7 @@ public sealed record CreateEntryRequest(
     string? CompetenceYm = null,
     Guid? AccountId = null,
     Guid? ContraAccountId = null,
-    Guid? CategoryId = null,
+    Guid? ChartAccountId = null,
     Guid? IncomeSourceId = null,
     Guid? LifeProjectId = null,
     Guid? MemberId = null,
@@ -29,7 +29,7 @@ public sealed record UpdateEntryRequest(
     string? CompetenceYm = null,
     Guid? AccountId = null,
     Guid? ContraAccountId = null,
-    Guid? CategoryId = null,
+    Guid? ChartAccountId = null,
     Guid? IncomeSourceId = null,
     Guid? MemberId = null,
     bool ConfirmDuplicate = false);
@@ -42,7 +42,7 @@ public sealed record EntryResponse(
     string CompetenceYm,
     Guid? AccountId,
     Guid? ContraAccountId,
-    Guid? CategoryId,
+    Guid? ChartAccountId,
     Guid? IncomeSourceId,
     Guid? CreditCardId,
     Guid? LifeProjectId,
@@ -55,10 +55,10 @@ public sealed record EntryResponse(
 public sealed record EntryFilter(
     string? CompetenceYm = null,
     EntryType? Type = null,
-    Guid? CategoryId = null,
+    Guid? ChartAccountId = null,
     Guid? AccountId = null,
     string? Search = null,
     int Skip = 0,
     int Take = 50);
 
-public sealed record CategorySuggestionResponse(Guid? CategoryId, string? CategoryName);
+public sealed record ChartAccountSuggestionResponse(Guid? ChartAccountId, string? ChartAccountName);

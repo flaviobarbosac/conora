@@ -203,7 +203,7 @@ namespace Conora.Infrastructure.Persistence.Migrations
                     b.Property<Guid>("BudgetId")
                         .HasColumnType("uuid");
 
-                    b.Property<Guid>("CategoryId")
+                    b.Property<Guid>("ChartAccountId")
                         .HasColumnType("uuid");
 
                     b.Property<DateTime>("CreatedAt")
@@ -227,9 +227,9 @@ namespace Conora.Infrastructure.Persistence.Migrations
 
                     b.HasKey("Id");
 
-                    b.HasIndex("BudgetId", "CategoryId")
+                    b.HasIndex("BudgetId", "ChartAccountId")
                         .IsUnique()
-                        .HasDatabaseName("IX_budget_lines_Budget_Category")
+                        .HasDatabaseName("IX_budget_lines_Budget_ChartAccount")
                         .HasFilter("\"DeletedAt\" IS NULL");
 
                     b.ToTable("budget_lines", (string)null);
@@ -293,7 +293,7 @@ namespace Conora.Infrastructure.Persistence.Migrations
                         .HasPrecision(18, 2)
                         .HasColumnType("numeric(18,2)");
 
-                    b.Property<Guid>("CategoryId")
+                    b.Property<Guid>("ChartAccountId")
                         .HasColumnType("uuid");
 
                     b.Property<string>("CompetenceYm")
@@ -344,15 +344,11 @@ namespace Conora.Infrastructure.Persistence.Migrations
                     b.ToTable("card_purchases", (string)null);
                 });
 
-            modelBuilder.Entity("Conora.Domain.Entities.Category", b =>
+            modelBuilder.Entity("Conora.Domain.Entities.ChartAccount", b =>
                 {
                     b.Property<Guid>("Id")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("uuid");
-
-                    b.Property<string>("BudgetBlock")
-                        .HasMaxLength(20)
-                        .HasColumnType("character varying(20)");
 
                     b.Property<string>("Code")
                         .HasMaxLength(60)
@@ -364,28 +360,32 @@ namespace Conora.Infrastructure.Persistence.Migrations
                     b.Property<DateTime?>("DeletedAt")
                         .HasColumnType("timestamp with time zone");
 
-                    b.Property<string>("GroupName")
-                        .HasMaxLength(80)
-                        .HasColumnType("character varying(80)");
-
                     b.Property<bool>("IsActive")
-                        .HasColumnType("boolean");
-
-                    b.Property<bool>("IsEssential")
                         .HasColumnType("boolean");
 
                     b.Property<bool>("IsSystem")
                         .HasColumnType("boolean");
 
-                    b.Property<string>("Kind")
+                    b.Property<string>("Level")
                         .IsRequired()
                         .HasMaxLength(20)
                         .HasColumnType("character varying(20)");
 
                     b.Property<string>("Name")
                         .IsRequired()
-                        .HasMaxLength(120)
-                        .HasColumnType("character varying(120)");
+                        .HasMaxLength(160)
+                        .HasColumnType("character varying(160)");
+
+                    b.Property<Guid?>("ParentId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("Section")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)");
+
+                    b.Property<int>("SortOrder")
+                        .HasColumnType("integer");
 
                     b.Property<DateTime>("UpdatedAt")
                         .HasColumnType("timestamp with time zone");
@@ -400,12 +400,14 @@ namespace Conora.Infrastructure.Persistence.Migrations
 
                     b.HasIndex("UsuarioId", "Code")
                         .IsUnique()
-                        .HasDatabaseName("IX_categories_UsuarioId_Code")
+                        .HasDatabaseName("IX_chart_accounts_UsuarioId_Code")
                         .HasFilter("\"Code\" IS NOT NULL AND \"DeletedAt\" IS NULL");
 
-                    b.HasIndex("UsuarioId", "Kind");
+                    b.HasIndex("UsuarioId", "ParentId");
 
-                    b.ToTable("categories", (string)null);
+                    b.HasIndex("UsuarioId", "Section");
+
+                    b.ToTable("chart_accounts", (string)null);
                 });
 
             modelBuilder.Entity("Conora.Domain.Entities.CreditCard", b =>
@@ -454,6 +456,29 @@ namespace Conora.Infrastructure.Persistence.Migrations
                     b.ToTable("credit_cards", (string)null);
                 });
 
+            modelBuilder.Entity("Conora.Domain.Entities.EmailSuppression", b =>
+                {
+                    b.Property<string>("Email")
+                        .HasMaxLength(320)
+                        .HasColumnType("character varying(320)");
+
+                    b.Property<DateTime>("CreatedAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("Reason")
+                        .IsRequired()
+                        .HasMaxLength(40)
+                        .HasColumnType("character varying(40)");
+
+                    b.Property<string>("SourceMessageId")
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)");
+
+                    b.HasKey("Email");
+
+                    b.ToTable("email_suppressions", (string)null);
+                });
+
             modelBuilder.Entity("Conora.Domain.Entities.Entry", b =>
                 {
                     b.Property<Guid>("Id")
@@ -467,7 +492,7 @@ namespace Conora.Infrastructure.Persistence.Migrations
                         .HasPrecision(18, 2)
                         .HasColumnType("numeric(18,2)");
 
-                    b.Property<Guid?>("CategoryId")
+                    b.Property<Guid?>("ChartAccountId")
                         .HasColumnType("uuid");
 
                     b.Property<string>("CompetenceYm")
@@ -534,7 +559,7 @@ namespace Conora.Infrastructure.Persistence.Migrations
 
                     b.HasKey("Id");
 
-                    b.HasIndex("UsuarioId", "CategoryId");
+                    b.HasIndex("UsuarioId", "ChartAccountId");
 
                     b.HasIndex("UsuarioId", "CompetenceYm");
 
@@ -1051,21 +1076,14 @@ namespace Conora.Infrastructure.Persistence.Migrations
                         .HasPrecision(18, 2)
                         .HasColumnType("numeric(18,2)");
 
+                    b.Property<Guid>("ChartAccountId")
+                        .HasColumnType("uuid");
+
                     b.Property<DateTime>("CreatedAt")
                         .HasColumnType("timestamp with time zone");
 
                     b.Property<DateTime?>("DeletedAt")
                         .HasColumnType("timestamp with time zone");
-
-                    b.Property<string>("Kind")
-                        .IsRequired()
-                        .HasMaxLength(20)
-                        .HasColumnType("character varying(20)");
-
-                    b.Property<string>("Name")
-                        .IsRequired()
-                        .HasMaxLength(120)
-                        .HasColumnType("character varying(120)");
 
                     b.Property<DateTime>("UpdatedAt")
                         .HasColumnType("timestamp with time zone");
@@ -1078,7 +1096,10 @@ namespace Conora.Infrastructure.Persistence.Migrations
 
                     b.HasKey("Id");
 
-                    b.HasIndex("UsuarioId", "Kind");
+                    b.HasIndex("UsuarioId", "ChartAccountId")
+                        .IsUnique()
+                        .HasDatabaseName("IX_patrimony_items_UsuarioId_ChartAccount")
+                        .HasFilter("\"DeletedAt\" IS NULL");
 
                     b.ToTable("patrimony_items", (string)null);
                 });

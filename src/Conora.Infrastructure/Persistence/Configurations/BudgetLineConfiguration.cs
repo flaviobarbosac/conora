@@ -12,9 +12,9 @@ public class BudgetLineConfiguration : IEntityTypeConfiguration<BudgetLine>
         builder.HasKey(e => e.Id);
         builder.Property(e => e.UsuarioId).IsRequired();
         builder.Property(e => e.PlannedAmount).HasPrecision(18, 2);
-        builder.HasIndex(e => new { e.BudgetId, e.CategoryId })
+        builder.HasIndex(e => new { e.BudgetId, e.ChartAccountId })
             .IsUnique()
             .HasFilter("\"DeletedAt\" IS NULL")
-            .HasDatabaseName("IX_budget_lines_Budget_Category");
+            .HasDatabaseName("IX_budget_lines_Budget_ChartAccount");
     }
 }

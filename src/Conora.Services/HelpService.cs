@@ -10,9 +10,9 @@ public sealed class HelpService
         new(1, "diagnosticar", "Diagnosticar",
             "Descubra para onde seu dinheiro vai hoje. Informe a renda bruta, o INSS e o IR para ver a renda gastável do mês."),
         new(2, "organizar", "Organizar",
-            "Cadastre suas contas, cartões e categorias. Cada centavo precisa ter um lugar para ser registrado."),
+            "Cadastre suas contas, cartões e o plano de contas. Cada centavo precisa ter um lugar para ser registrado."),
         new(3, "planejar", "Planejar",
-            "Defina quanto pode gastar em cada categoria no mês. O orçamento transforma intenção em limite."),
+            "Defina quanto pode gastar em cada conta analítica no mês. O orçamento transforma intenção em limite."),
         new(4, "registrar", "Registrar",
             "Lance receitas e despesas no dia a dia. A movimentação é a única fonte da verdade do aplicativo."),
         new(5, "acompanhar", "Acompanhar",
@@ -54,7 +54,7 @@ public sealed class HelpService
         new("membros", "Grupo familiar — vincular e desvincular",
             "Cada usuário tem a própria conta Conora. O grupo só une a visão de algumas telas; os registros de cada um continuam separados.",
             [
-                new("Visão geral", "Vocês são duas contas independentes. Cada um lança na própria conta, no próprio cartão e nas próprias categorias. O grupo não mistura saldos nem deixa um editar o lançamento do outro."),
+                new("Visão geral", "Vocês são duas contas independentes. Cada um lança na própria conta, no próprio cartão e nas próprias contas do plano. O grupo não mistura saldos nem deixa um editar o lançamento do outro."),
                 new("O que fica pessoal", "Contas bancárias, cartões, lançamentos, diagnóstico de renda, WhatsApp, importação e perfil. Só você vê e altera."),
                 new("O que fica em comum (só leitura somada)", "Início (totais do mês), orçamento planejado × realizado e relatórios do mês — somam os dois membros. Projetos de vida podem ser pessoais ou do grupo (quando marcados assim)."),
                 new("Como vincular (convidar)", "Abra Cadastros → Membros. Informe o e-mail da outra pessoa e envie o convite. Ela precisa já ter (ou criar) login no Conora com esse e-mail."),
@@ -109,10 +109,10 @@ public sealed class HelpService
             ]),
 
         new("contas", "Contas",
-            "Contas bancárias e dinheiro em espécie. Cada pessoa cadastra e vê só as suas, mesmo em grupo familiar.",
+            "Contas bancárias. Cada pessoa cadastra e vê só as suas, mesmo em grupo familiar.",
             [
                 new("Descrição", "Nome da conta no app (ex.: BB salário, Banestes casa)."),
-                new("Tipo de conta", "Corrente, poupança, investimento ou dinheiro."),
+                new("Tipo de conta", "Corrente, poupança ou investimento."),
                 new("Banco", "Código COMPE da instituição (ex.: 001 Banco do Brasil, 021 Banestes)."),
                 new("Agência", "Número da agência."),
                 new("Número da conta", "Número da conta sem o dígito."),
@@ -131,21 +131,19 @@ public sealed class HelpService
                 new("Dia de fechamento", "Dia em que a fatura fecha."),
                 new("Dia de vencimento", "Dia de pagamento da fatura."),
                 new("Conta de pagamento", "Conta usada ao pagar a fatura."),
-                new("Compra", "Valor, data, parcelas, categoria e descrição."),
+                new("Compra", "Valor, data, parcelas, conta do plano e descrição."),
                 new("Parcelas da compra", "Divide a compra na fatura mês a mês."),
                 new("Fatura", "Total do mês; pagar gera lançamento de pagamento (não conta como despesa de novo).")
             ]),
 
-        new("categorias", "Categorias",
-            "Classificam lançamentos e linhas de orçamento. Há categorias do sistema e as suas.",
+        new("plano-de-contas", "Plano de contas",
+            "O lançamento entra na conta analítica. As contas de cima (Receita, Desconto, Essencial…) só somam.",
             [
-                new("Nome", "Rótulo da categoria."),
-                new("Tipo", "Despesa, receita ou transferência."),
-                new("Bloco", "Investimento, essencial ou social — usado no orçamento."),
-                new("Grupo", "Agrupador (Habitação, Alimentação…). No modo simples o orçamento soma por grupo."),
-                new("Essencial", "Marca gasto essencial para reserva e organização."),
-                new("Ativa", "Categoria inativa não aparece para novos lançamentos."),
-                new("Do sistema", "Não pode ser renomeada ou excluída; só as personalizadas.")
+                new("Conta sintética", "As sete contas de cima e os grupos (Habitação, Curto prazo…). Não recebem valor."),
+                new("Conta analítica", "Linha que recebe o lançamento (Salário, Aluguel…)."),
+                new("Padrão", "Conta do sistema: não renomeia nem exclui."),
+                new("Sua conta", "Analítica que você cria sob um grupo ou sob a conta, quando não há grupo."),
+                new("Desativar", "Tira a conta dos seletores e mantém o histórico.")
             ]),
 
         new("projetos", "Projetos de vida",
@@ -234,7 +232,7 @@ public sealed class HelpService
         new("menu", "Menu e preferências",
             "Navegação e aparência do aplicativo.",
             [
-                new("Cadastros", "Guia recolhida no menu: Contas, Cartões, Categorias, Projetos, Patrimônio e Membros."),
+                new("Cadastros", "Guia recolhida no menu: Contas, Cartões, Plano de contas, Projetos, Patrimônio e Membros."),
                 new("Menu da conta", "Avatar no topo: Perfil, tema (Claro/Escuro), Plano, Central de ajuda e Sair."),
                 new("Recolher menu", "No desktop largo, deixa só os ícones para ganhar espaço."),
                 new("Tema", "No menu da conta: se o tema atual for claro, aparece Escuro — e o contrário."),

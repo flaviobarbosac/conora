@@ -136,11 +136,12 @@ public sealed class FamilyGroupService
         var invite = FamilyInvite.Create(self, email, membership?.FamilyGroupId, InviteTtl);
         _family.AddInvite(invite);
 
-        var link = $"{PublicWebBase()}/app/grupo/convite/{invite.Token}";
+        var returnTo = Uri.EscapeDataString($"/grupo/convite/{invite.Token}");
+        var link = $"{PublicWebBase()}/app/register?email={Uri.EscapeDataString(email)}&returnTo={returnTo}";
         await _email.SendAsync(
             email,
             $"{me.Name} convidou você para o grupo no Conora",
-            $"Olá,\n\n{me.Name} convidou você para compartilhar o orçamento familiar no Conora.\n\nAbra o link para entrar (é preciso usar este e-mail): {link}\n\nO convite vale até {invite.ExpiresAt:dd/MM/yyyy HH:mm} UTC.\n",
+            $"Olá,\n\n{me.Name} convidou você para compartilhar o orçamento familiar no Conora.\n\nCrie sua conta neste link (use este e-mail): {link}\n\nSe já tiver conta, entre e abra: {PublicWebBase()}/app/grupo/convite/{invite.Token}\n\nO convite vale até {invite.ExpiresAt:dd/MM/yyyy HH:mm} UTC.\n",
             ct);
 
         AuditRecorder.Record(_audits, _correlation, "FamilyInvite", invite.Id, "FamilyInviteSent", new { email });

@@ -149,7 +149,7 @@ app.MapAuthEndpoints();
 app.MapUserEndpoints();
 app.MapAuditEndpoints();
 app.MapLgpdEndpoints();
-app.MapCategoryEndpoints();
+app.MapChartAccountEndpoints();
 app.MapDiagnosisEndpoints();
 app.MapAccountEndpoints();
 app.MapCreditCardEndpoints();
@@ -166,6 +166,7 @@ app.MapPlanEndpoints();
 app.MapHelpEndpoints();
 app.MapAiEndpoints();
 app.MapWhatsAppEndpoints();
+app.MapSesWebhookEndpoints();
 
 using (var scope = app.Services.CreateScope())
 {

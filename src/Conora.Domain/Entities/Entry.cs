@@ -14,7 +14,7 @@ public class Entry : ModelBase, ITenantOwned
     public string CompetenceYm { get; private set; } = default!;
     public Guid? AccountId { get; private set; }
     public Guid? ContraAccountId { get; private set; }
-    public Guid? CategoryId { get; private set; }
+    public Guid? ChartAccountId { get; private set; }
     public Guid? IncomeSourceId { get; private set; }
     public Guid? CreditCardId { get; private set; }
     public Guid? LifeProjectId { get; private set; }
@@ -40,7 +40,7 @@ public class Entry : ModelBase, ITenantOwned
         string? competenceYm = null,
         Guid? accountId = null,
         Guid? contraAccountId = null,
-        Guid? categoryId = null,
+        Guid? chartAccountId = null,
         Guid? incomeSourceId = null,
         Guid? creditCardId = null,
         Guid? lifeProjectId = null,
@@ -60,7 +60,7 @@ public class Entry : ModelBase, ITenantOwned
             InstallmentCount = installmentCount,
             ImportHash = importHash
         };
-        entry.Apply(amount, occurredAt, competenceYm, accountId, contraAccountId, categoryId, incomeSourceId, memberId, description);
+        entry.Apply(amount, occurredAt, competenceYm, accountId, contraAccountId, chartAccountId, incomeSourceId, memberId, description);
         return entry;
     }
 
@@ -70,11 +70,11 @@ public class Entry : ModelBase, ITenantOwned
         string? competenceYm,
         Guid? accountId,
         Guid? contraAccountId,
-        Guid? categoryId,
+        Guid? chartAccountId,
         Guid? incomeSourceId,
         Guid? memberId,
         string description)
-        => Apply(amount, occurredAt, competenceYm, accountId, contraAccountId, categoryId, incomeSourceId, memberId, description);
+        => Apply(amount, occurredAt, competenceYm, accountId, contraAccountId, chartAccountId, incomeSourceId, memberId, description);
 
     /// <summary>Signed balance effects of this entry on accounts. Transfers net to zero across accounts.</summary>
     public IEnumerable<(Guid AccountId, decimal Delta)> BalanceEffects()
@@ -100,7 +100,7 @@ public class Entry : ModelBase, ITenantOwned
         string? competenceYm,
         Guid? accountId,
         Guid? contraAccountId,
-        Guid? categoryId,
+        Guid? chartAccountId,
         Guid? incomeSourceId,
         Guid? memberId,
         string description)
@@ -135,7 +135,7 @@ public class Entry : ModelBase, ITenantOwned
         CompetenceYm = string.IsNullOrWhiteSpace(competenceYm) ? Competence.From(date) : Competence.Require(competenceYm);
         AccountId = accountId;
         ContraAccountId = Type == EntryType.Transfer ? contraAccountId : null;
-        CategoryId = Type == EntryType.Transfer ? null : categoryId;
+        ChartAccountId = Type == EntryType.Transfer ? null : chartAccountId;
         IncomeSourceId = Type == EntryType.Income ? incomeSourceId : null;
         MemberId = memberId;
         Description = description.Trim();

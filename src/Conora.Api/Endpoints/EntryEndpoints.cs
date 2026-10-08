@@ -1,4 +1,4 @@
-using Conora.Services;
+﻿using Conora.Services;
 using Conora.Services.Contracts;
 using Microsoft.AspNetCore.Mvc;
 
@@ -13,8 +13,8 @@ public static class EntryEndpoints
         group.MapGet("/", async ([AsParameters] EntryFilter filter, EntryService service, CancellationToken ct) =>
             Results.Ok(await service.SearchAsync(filter, ct)));
 
-        group.MapGet("/suggest-category", async (string description, EntryService service, CancellationToken ct) =>
-            Results.Ok(await service.SuggestCategoryAsync(description, ct)));
+        group.MapGet("/suggest-account", async (string description, EntryService service, CancellationToken ct) =>
+            Results.Ok(await service.SuggestAccountAsync(description, ct)));
 
         group.MapGet("/{id:guid}", async (Guid id, EntryService service, CancellationToken ct) =>
             Results.Ok(await service.GetAsync(id, ct)));

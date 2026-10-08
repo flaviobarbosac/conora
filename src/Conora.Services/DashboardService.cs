@@ -1,4 +1,4 @@
-using System.Globalization;
+﻿using System.Globalization;
 using System.Text;
 using Conora.Domain.Entities;
 using Conora.Domain.Enums;
@@ -16,20 +16,20 @@ public sealed class DashboardService
     private readonly IFinanceRepository _repo;
     private readonly MonthService _months;
     private readonly BudgetService _budgets;
-    private readonly CategoryService _categories;
+    private readonly ChartAccountService _chartAccounts;
     private readonly FamilyGroupService _family;
 
     public DashboardService(
         IFinanceRepository repo,
         MonthService months,
         BudgetService budgets,
-        CategoryService categories,
+        ChartAccountService chartAccounts,
         FamilyGroupService family)
     {
         _repo = repo;
         _months = months;
         _budgets = budgets;
-        _categories = categories;
+        _chartAccounts = chartAccounts;
         _family = family;
     }
 
@@ -64,9 +64,9 @@ public sealed class DashboardService
         var summary = await GetAsync(ym, ct);
 
         var actuals = await _budgets.GetActualsAsync(ym, ct);
-        var names = (await _categories.ListAsync(null, true, ct)).ToDictionary(c => c.Id, c => c.Name);
-        var byCategory = actuals
-            .Select(kv => new CategoryTotalResponse(kv.Key, names.GetValueOrDefault(kv.Key, "—"), kv.Value))
+        var names = (await _chartAccounts.ListAsync(null, true, true, ct)).ToDictionary(c => c.Id, c => c.Name);
+        var ByAccount = actuals
+            .Select(kv => new ChartAccountTotalResponse(kv.Key, names.GetValueOrDefault(kv.Key, "—"), kv.Value))
             .OrderByDescending(c => c.Amount)
             .ToList();
 
@@ -74,7 +74,7 @@ public sealed class DashboardService
         var previous = await ComputeTotalsAsync(previousYm, ct);
         return new MonthlyReportResponse(
             summary,
-            byCategory,
+            ByAccount,
             previousYm,
             previous.Expense,
             summary.ExpenseTotal - previous.Expense,
@@ -86,12 +86,12 @@ public sealed class DashboardService
     {
         var ym = string.IsNullOrWhiteSpace(competenceYm) ? null : Competence.Require(competenceYm);
         var entries = await _repo.ListAsync<Entry>(e => ym == null || e.CompetenceYm == ym, ct);
-        var categories = (await _categories.ListAsync(null, true, ct)).ToDictionary(c => c.Id, c => c.Name);
+        var categories = (await _chartAccounts.ListAsync(null, true, true, ct)).ToDictionary(c => c.Id, c => c.Name);
         var accounts = (await _repo.ListAsync<Account>(null, ct)).ToDictionary(a => a.Id, a => a.Name);
         var members = (await _repo.ListAsync<FamilyMember>(null, ct)).ToDictionary(m => m.Id, m => m.Name);
 
         var sb = new StringBuilder();
-        sb.AppendLine("Data;Competencia;Tipo;Valor;Conta;ContaDestino;Categoria;Membro;Descricao");
+        sb.AppendLine("Data;Competencia;Tipo;Valor;Conta;ContaDestino;conta;Membro;Descricao");
         foreach (var e in entries.OrderBy(e => e.OccurredAt))
         {
             sb.AppendLine(string.Join(';',
@@ -101,7 +101,7 @@ public sealed class DashboardService
                 e.Amount.ToString("0.00", CultureInfo.InvariantCulture),
                 Cell(e.AccountId is Guid a ? accounts.GetValueOrDefault(a) : null),
                 Cell(e.ContraAccountId is Guid c ? accounts.GetValueOrDefault(c) : null),
-                Cell(e.CategoryId is Guid k ? categories.GetValueOrDefault(k) : null),
+                Cell(e.ChartAccountId is Guid k ? categories.GetValueOrDefault(k) : null),
                 Cell(e.MemberId is Guid m ? members.GetValueOrDefault(m) : null),
                 Cell(e.Description)));
         }
@@ -125,9 +125,9 @@ public sealed class DashboardService
         Line("Compras no cartao", s.CardPurchasesTotal);
         Line("Aportes em projetos", s.ProjectContributionsTotal);
         sb.AppendLine();
-        sb.AppendLine("Categoria;Valor");
-        foreach (var c in report.ByCategory)
-            sb.AppendLine($"{Cell(c.CategoryName)};{c.Amount.ToString("0.00", CultureInfo.InvariantCulture)}");
+        sb.AppendLine("conta;Valor");
+        foreach (var c in report.ByAccount)
+            sb.AppendLine($"{Cell(c.ChartAccountName)};{c.Amount.ToString("0.00", CultureInfo.InvariantCulture)}");
 
         return ToFile($"resumo-{ym}.csv", sb.ToString());
     }
@@ -196,8 +196,8 @@ public sealed class DashboardService
             alerts.Add(new AlertResponse(
                 $"BUDGET_{line.Status.ToUpperInvariant()}",
                 line.Status,
-                MessageFor(line.Status, $"Categoria {line.CategoryName}", line.Percent),
-                line.CategoryId,
+                MessageFor(line.Status, $"conta {line.ChartAccountName}", line.Percent),
+                line.ChartAccountId,
                 line.Percent));
         }
 
