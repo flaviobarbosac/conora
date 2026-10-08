@@ -267,9 +267,12 @@ public sealed class EntryService
                 EntryType.Income => chart.Section == ChartSection.Income,
                 EntryType.Expense or EntryType.Contribution => chart.Section is ChartSection.Discount
                     or ChartSection.LifeProject or ChartSection.Essential or ChartSection.Social,
+                EntryType.ProjectContribution => chart.Section == ChartSection.LifeProject,
                 _ => true
             };
-            if (type is EntryType.Income or EntryType.Expense or EntryType.Contribution && !ok)
+            if ((type is EntryType.Income or EntryType.Expense or EntryType.Contribution
+                    or EntryType.ProjectContribution)
+                && !ok)
                 throw new ValidationException("chartAccountId", "A conta não é compatível com o tipo do lançamento.");
         }
 

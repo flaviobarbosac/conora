@@ -2,14 +2,15 @@ using Conora.Domain.Enums;
 
 namespace Conora.Services.Contracts;
 
-public sealed record PatrimonyItemRequest(Guid ChartAccountId, decimal Amount);
+public sealed record PatrimonyItemRequest(Guid ChartAccountId, string Name, decimal Amount);
 
-public sealed record UpdatePatrimonyItemRequest(decimal Amount);
+public sealed record UpdatePatrimonyItemRequest(string Name, decimal Amount);
 
 public sealed record PatrimonyItemResponse(
     Guid Id,
     Guid ChartAccountId,
     string ChartAccountName,
+    string Name,
     ChartSection Section,
     string GroupName,
     decimal Amount);

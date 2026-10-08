@@ -65,29 +65,36 @@ public sealed class BudgetService
         var ym = Competence.Require(competenceYm);
         var userIds = await _family.GetReadableUsuarioIdsAsync(ct);
         var multi = userIds.Count > 1;
+        var until = ActualUntilUtc(ym);
 
         var entries = multi
             ? await _repo.QueryAnyTenantAsync<Entry, AccountSum>(q => q
                 .Where(e => userIds.Contains(e.UsuarioId)
                             && e.CompetenceYm == ym
-                            && (e.Type == EntryType.Expense || e.Type == EntryType.Contribution)
+                            && e.OccurredAt <= until
+                            && (e.Type == EntryType.Expense
+                                || e.Type == EntryType.Contribution
+                                || e.Type == EntryType.ProjectContribution)
                             && e.ChartAccountId != null)
                 .GroupBy(e => e.ChartAccountId!.Value)
                 .Select(g => new AccountSum(g.Key, g.Sum(x => x.Amount))), ct)
             : await _repo.QueryAsync<Entry, AccountSum>(q => q
                 .Where(e => e.CompetenceYm == ym
-                            && (e.Type == EntryType.Expense || e.Type == EntryType.Contribution)
+                            && e.OccurredAt <= until
+                            && (e.Type == EntryType.Expense
+                                || e.Type == EntryType.Contribution
+                                || e.Type == EntryType.ProjectContribution)
                             && e.ChartAccountId != null)
                 .GroupBy(e => e.ChartAccountId!.Value)
                 .Select(g => new AccountSum(g.Key, g.Sum(x => x.Amount))), ct);
 
         var purchases = multi
             ? await _repo.QueryAnyTenantAsync<CardPurchase, AccountSum>(q => q
-                .Where(p => userIds.Contains(p.UsuarioId) && p.CompetenceYm == ym)
+                .Where(p => userIds.Contains(p.UsuarioId) && p.CompetenceYm == ym && p.PurchasedAt <= until)
                 .GroupBy(p => p.ChartAccountId)
                 .Select(g => new AccountSum(g.Key, g.Sum(x => x.Amount))), ct)
             : await _repo.QueryAsync<CardPurchase, AccountSum>(q => q
-                .Where(p => p.CompetenceYm == ym)
+                .Where(p => p.CompetenceYm == ym && p.PurchasedAt <= until)
                 .GroupBy(p => p.ChartAccountId)
                 .Select(g => new AccountSum(g.Key, g.Sum(x => x.Amount))), ct);
 
@@ -185,6 +192,7 @@ public sealed class BudgetService
 
         var totalPlanned = displayLines.Sum(l => l.PlannedAmount);
         var totalActual = actuals.Values.Sum();
+        var receivedIncome = await GetReceivedIncomeAsync(ym, userIds, multi, ct);
         return new BudgetResponse(
             ym,
             mode,
@@ -192,6 +200,7 @@ public sealed class BudgetService
             totalActual,
             Project(ym, totalActual),
             spendable,
+            receivedIncome,
             spendable - totalActual,
             sources,
             sections,
@@ -455,6 +464,37 @@ public sealed class BudgetService
 
         var daysInMonth = DateTime.DaysInMonth(today.Year, today.Month);
         return decimal.Round(actual / today.Day * daysInMonth, 2);
+    }
+
+    /// <summary>For the current competence, only counts amounts through today; past months use the full month.</summary>
+    private static DateTime ActualUntilUtc(string ym)
+    {
+        var today = DateTime.UtcNow;
+        if (ym != Competence.From(today))
+            return DateTime.SpecifyKind(DateTime.MaxValue.AddDays(-1), DateTimeKind.Utc);
+
+        return today;
+    }
+
+    private async Task<decimal> GetReceivedIncomeAsync(
+        string ym,
+        IReadOnlyList<Guid> userIds,
+        bool multi,
+        CancellationToken ct)
+    {
+        var until = ActualUntilUtc(ym);
+        if (multi)
+        {
+            return (await _repo.ListAnyTenantAsync<Entry>(
+                e => userIds.Contains(e.UsuarioId)
+                     && e.CompetenceYm == ym
+                     && e.Type == EntryType.Income
+                     && e.OccurredAt <= until, ct)).Sum(e => e.Amount);
+        }
+
+        return await _repo.SumAsync<Entry>(
+            e => e.CompetenceYm == ym && e.Type == EntryType.Income && e.OccurredAt <= until,
+            e => e.Amount, ct);
     }
 
     private static ChartAccountResponse ToResponse(ChartAccount c)

@@ -14,6 +14,7 @@ public sealed class LifeProjectService
     private readonly PlanService _plan;
     private readonly EntryService _entries;
     private readonly FamilyGroupService _family;
+    private readonly ChartAccountService _chartAccounts;
     private readonly ITenantContext _tenant;
 
     public LifeProjectService(
@@ -22,6 +23,7 @@ public sealed class LifeProjectService
         PlanService plan,
         EntryService entries,
         FamilyGroupService family,
+        ChartAccountService chartAccounts,
         ITenantContext tenant)
     {
         _repo = repo;
@@ -29,6 +31,7 @@ public sealed class LifeProjectService
         _plan = plan;
         _entries = entries;
         _family = family;
+        _chartAccounts = chartAccounts;
         _tenant = tenant;
     }
 
@@ -42,10 +45,12 @@ public sealed class LifeProjectService
                 p => peers.Contains(p.UsuarioId) && p.UsuarioId != self && p.Scope == LifeProjectScope.Group, ct)
             : [];
 
+        var accounts = (await _chartAccounts.ListAsync(ChartSection.LifeProject, true, false, ct))
+            .ToDictionary(c => c.Id);
         return own.Concat(groupProjects)
             .OrderBy(p => p.DueDate ?? DateTime.MaxValue)
             .ThenBy(p => p.Name)
-            .Select(p => ToResponse(p, self))
+            .Select(p => ToResponse(p, self, accounts))
             .ToList();
     }
 
@@ -53,7 +58,9 @@ public sealed class LifeProjectService
     {
         var self = _tenant.UsuarioId ?? throw new ForbiddenException("Usuário não autenticado.");
         var project = await RequireVisibleAsync(id, ct, track: false);
-        return ToResponse(project, self);
+        var accounts = (await _chartAccounts.ListAsync(ChartSection.LifeProject, true, false, ct))
+            .ToDictionary(c => c.Id);
+        return ToResponse(project, self, accounts);
     }
 
     public async Task<LifeProjectResponse> CreateAsync(LifeProjectRequest request, CancellationToken ct)
@@ -66,10 +73,12 @@ public sealed class LifeProjectService
                 throw new ValidationException("scope", "Sem grupo ativo não dá para marcar o projeto como do grupo.");
         }
 
-        var project = LifeProject.Create(request.Name, decimal.Round(request.GoalAmount, 2), request.DueDate, request.Scope);
+        var chartAccountId = await RequireLifeProjectAccountAsync(request.ChartAccountId, ct);
+        var project = LifeProject.Create(
+            request.Name, decimal.Round(request.GoalAmount, 2), request.DueDate, chartAccountId, request.Scope);
         _repo.Add(project);
         await _uow.SaveChangesAsync(ct);
-        return ToResponse(project, project.UsuarioId);
+        return await GetAsync(project.Id, ct);
     }
 
     public async Task<LifeProjectResponse> UpdateAsync(Guid id, LifeProjectRequest request, CancellationToken ct)
@@ -88,9 +97,10 @@ public sealed class LifeProjectService
                 throw new ValidationException("scope", "Sem grupo ativo não dá para marcar o projeto como do grupo.");
         }
 
-        project.Update(request.Name, decimal.Round(request.GoalAmount, 2), request.DueDate, request.Scope);
+        var chartAccountId = await RequireLifeProjectAccountAsync(request.ChartAccountId, ct);
+        project.Update(request.Name, decimal.Round(request.GoalAmount, 2), request.DueDate, chartAccountId, request.Scope);
         await _uow.SaveChangesAsync(ct);
-        return ToResponse(project, self);
+        return await GetAsync(id, ct);
     }
 
     public async Task DeleteAsync(Guid id, CancellationToken ct)
@@ -111,16 +121,32 @@ public sealed class LifeProjectService
     /// <summary>A contribution is an entry of type ProjectContribution; the entry service updates the accumulated amount.</summary>
     public async Task<LifeProjectResponse> ContributeAsync(Guid id, ProjectContributionRequest request, CancellationToken ct)
     {
-        await RequireVisibleAsync(id, ct, track: false);
+        var project = await RequireVisibleAsync(id, ct, track: false);
+        if (project.ChartAccountId is null)
+            throw new ValidationException("chartAccountId", "Vincule o projeto a uma conta do plano antes de aportar.");
+
         await _entries.CreateAsync(new CreateEntryRequest(
             EntryType.ProjectContribution,
             decimal.Round(request.Amount, 2),
             request.OccurredAt,
             string.IsNullOrWhiteSpace(request.Description) ? "Aporte em projeto de vida" : request.Description,
             AccountId: request.AccountId,
+            ChartAccountId: project.ChartAccountId,
             LifeProjectId: id), ct);
 
         return await GetAsync(id, ct);
+    }
+
+    private async Task<Guid> RequireLifeProjectAccountAsync(Guid? chartAccountId, CancellationToken ct)
+    {
+        if (chartAccountId is null)
+            throw new ValidationException("chartAccountId", "Escolha a conta do plano de contas para o projeto.");
+
+        var account = await _chartAccounts.RequireAnalyticalAsync(chartAccountId.Value, ct);
+        if (account.Section != ChartSection.LifeProject)
+            throw new ValidationException("chartAccountId", "O projeto só aceita contas da seção Projetos de vida.");
+
+        return account.Id;
     }
 
     private async Task<LifeProject> RequireVisibleAsync(Guid id, CancellationToken ct, bool track = true)
@@ -137,13 +163,25 @@ public sealed class LifeProjectService
         return project;
     }
 
-    private static LifeProjectResponse ToResponse(LifeProject p, Guid self) => new(
-        p.Id,
-        p.Name,
-        p.GoalAmount,
-        p.DueDate,
-        p.AccumulatedAmount,
-        p.GoalAmount <= 0 ? 0 : Math.Min(100m, decimal.Round(p.AccumulatedAmount / p.GoalAmount * 100, 1)),
-        p.Scope,
-        p.UsuarioId == self);
+    private static LifeProjectResponse ToResponse(
+        LifeProject p,
+        Guid self,
+        IReadOnlyDictionary<Guid, ChartAccountResponse> accounts)
+    {
+        string? accountName = null;
+        if (p.ChartAccountId is Guid aid && accounts.TryGetValue(aid, out var account))
+            accountName = account.Name;
+
+        return new(
+            p.Id,
+            p.Name,
+            p.GoalAmount,
+            p.DueDate,
+            p.AccumulatedAmount,
+            p.GoalAmount <= 0 ? 0 : Math.Min(100m, decimal.Round(p.AccumulatedAmount / p.GoalAmount * 100, 1)),
+            p.Scope,
+            p.UsuarioId == self,
+            p.ChartAccountId,
+            accountName);
+    }
 }

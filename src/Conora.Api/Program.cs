@@ -36,10 +36,13 @@ builder.Services.AddInfrastructure(builder.Configuration);
 builder.Services.AddRepositories();
 builder.Services.AddServices();
 
-var jwtKey = builder.Configuration["Jwt:Key"] ?? "conora-dev-jwt-key-must-be-32-chars!";
 builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
-    .AddJwtBearer(options =>
+    .AddJwtBearer();
+builder.Services.AddOptions<JwtBearerOptions>(JwtBearerDefaults.AuthenticationScheme)
+    .Configure<IConfiguration>((options, configuration) =>
     {
+        // Read the key from the final configuration so test hosts (WebApplicationFactory) override appsettings.
+        var jwtKey = configuration["Jwt:Key"] ?? "conora-dev-jwt-key-must-be-32-chars!";
         options.MapInboundClaims = false;
         options.TokenValidationParameters = new TokenValidationParameters
         {

@@ -91,7 +91,7 @@ public sealed class HelpService
                 new("Competência", "Mês em que o lançamento entra no orçamento e nos relatórios.")
             ]),
 
-        new("orcamento", "Orçamento",
+        new("orcamento", "Raio-X",
             "Planejado x realizado do mês, em três blocos, com visão do ano.",
             [
                 new("Renda gastável", "Soma dos líquidos do diagnóstico do mês (base do percentual dos blocos)."),

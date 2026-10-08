@@ -52,6 +52,36 @@ h1 {
   margin: 0 0 2rem;
 }
 
+.meta {
+  font-size: 0.9rem;
+  color: var(--muted);
+  margin: 0 0 1rem;
+}
+
+.features {
+  display: grid;
+  gap: 1rem;
+  margin: 0 0 2rem;
+}
+
+.features article {
+  background: #fff;
+  border: 1px solid var(--border);
+  border-radius: 0.75rem;
+  padding: 1rem 1.1rem;
+}
+
+.features h2 {
+  font-size: 1.05rem;
+  margin: 0 0 0.35rem;
+}
+
+.features p {
+  margin: 0;
+  color: var(--muted);
+  font-size: 0.95rem;
+}
+
 .cta {
   display: flex;
   flex-wrap: wrap;

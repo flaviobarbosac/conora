@@ -181,20 +181,16 @@ public sealed partial class WhatsAppService
             if (payload is null)
                 return new WhatsAppReply(phone, "Não entendi o valor. Exemplo: \"gastei 45,90 no mercado\".");
 
-            var created = await _entries.CreateAsync(new CreateEntryRequest(
-                payload.Type,
-                payload.Amount,
-                payload.OccurredAt,
-                payload.Description), ct);
-
-            AuditRecorder.Record(_audits, _correlation, "Entry", created[0].Id, "WhatsAppEntryCreated",
+            var draft = WhatsAppDraft.Create(phone, JsonSerializer.Serialize(payload, Json));
+            _repo.Add(draft);
+            AuditRecorder.Record(_audits, _correlation, "WhatsAppDraft", draft.Id, "WhatsAppDraftCreated",
                 new { payload.Type, payload.Amount, Phone = phone });
             await _uow.SaveChangesAsync(ct);
 
             var kind = payload.Type == EntryType.Income ? "receita" : "despesa";
             var amount = payload.Amount.ToString("N2", new CultureInfo("pt-BR"));
             return new WhatsAppReply(phone,
-                $"Pronto! {kind} de R$ {amount} ({payload.Description}) registrada com sucesso.");
+                $"Entendi: {kind} de R$ {amount} ({payload.Description}). Abra o Conora e confirme o rascunho antes de gravar.");
         }
         catch (PlanReadOnlyException ex)
         {
@@ -203,15 +199,15 @@ public sealed partial class WhatsAppService
         catch (ValidationException ex)
         {
             var detail = ex.Errors.SelectMany(pair => pair.Value).FirstOrDefault() ?? ex.Message;
-            return new WhatsAppReply(phone, $"Não consegui registrar: {detail}");
+            return new WhatsAppReply(phone, $"Não consegui preparar o rascunho: {detail}");
         }
         catch (DomainException ex)
         {
-            return new WhatsAppReply(phone, $"Não consegui registrar: {ex.Message}");
+            return new WhatsAppReply(phone, $"Não consegui preparar o rascunho: {ex.Message}");
         }
         catch (Exception)
         {
-            return new WhatsAppReply(phone, "Não consegui registrar o lançamento. Tente de novo em instantes.");
+            return new WhatsAppReply(phone, "Não consegui preparar o rascunho. Tente de novo em instantes.");
         }
     }
 

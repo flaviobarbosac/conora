@@ -38,6 +38,7 @@ public sealed record BudgetResponse(
     decimal TotalActual,
     decimal ProjectedExpense,
     decimal SpendableIncome,
+    decimal ReceivedIncome,
     decimal MonthResult,
     IReadOnlyList<BudgetIncomeSourceResponse> IncomeSources,
     IReadOnlyList<BudgetSectionResponse> Sections,

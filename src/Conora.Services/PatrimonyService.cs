@@ -37,6 +37,7 @@ public sealed class PatrimonyService
             .OrderBy(i => i.Section)
             .ThenBy(i => i.GroupName)
             .ThenBy(i => i.ChartAccountName)
+            .ThenBy(i => i.Name)
             .ToList();
 
         var assetsInUse = responses.Where(i => i.Section == ChartSection.Asset && i.GroupName == "Bens de Uso").Sum(i => i.Amount);
@@ -70,10 +71,7 @@ public sealed class PatrimonyService
         if (!SystemChartAccounts.IsPatrimonySection(account.Section))
             throw new ValidationException("chartAccountId", "Patrimônio só aceita contas de Ativo ou Passivo.");
 
-        if (await _repo.AnyAsync<PatrimonyItem>(p => p.ChartAccountId == account.Id, ct))
-            throw new ValidationException("chartAccountId", "Já existe um valor cadastrado nesta conta.");
-
-        var item = PatrimonyItem.Create(account.Id, request.Amount);
+        var item = PatrimonyItem.Create(account.Id, request.Name, request.Amount);
         _repo.Add(item);
         await _uow.SaveChangesAsync(ct);
 
@@ -85,6 +83,7 @@ public sealed class PatrimonyService
     {
         await _plan.EnsureWritableAsync(ct);
         var item = await _repo.GetAsync<PatrimonyItem>(id, ct) ?? throw new NotFoundException("Item de patrimônio", id);
+        item.SetName(request.Name);
         item.SetAmount(request.Amount);
         await _uow.SaveChangesAsync(ct);
 
@@ -150,6 +149,7 @@ public sealed class PatrimonyService
             item.Id,
             item.ChartAccountId,
             account?.Name ?? "—",
+            item.Name,
             account?.Section ?? ChartSection.Asset,
             group,
             item.Amount);

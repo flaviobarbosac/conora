@@ -12,19 +12,30 @@ public class LifeProject : ModelBase, ITenantOwned
     public DateTime? DueDate { get; private set; }
     public decimal AccumulatedAmount { get; private set; }
     public LifeProjectScope Scope { get; private set; } = LifeProjectScope.Personal;
+    public Guid? ChartAccountId { get; private set; }
 
     private LifeProject()
     {
     }
 
-    public static LifeProject Create(string name, decimal goalAmount, DateTime? dueDate, LifeProjectScope scope = LifeProjectScope.Personal)
+    public static LifeProject Create(
+        string name,
+        decimal goalAmount,
+        DateTime? dueDate,
+        Guid? chartAccountId,
+        LifeProjectScope scope = LifeProjectScope.Personal)
     {
         var project = new LifeProject { Scope = scope };
-        project.Update(name, goalAmount, dueDate, scope);
+        project.Update(name, goalAmount, dueDate, chartAccountId, scope);
         return project;
     }
 
-    public void Update(string name, decimal goalAmount, DateTime? dueDate, LifeProjectScope? scope = null)
+    public void Update(
+        string name,
+        decimal goalAmount,
+        DateTime? dueDate,
+        Guid? chartAccountId,
+        LifeProjectScope? scope = null)
     {
         var errors = new Dictionary<string, string[]>();
         if (string.IsNullOrWhiteSpace(name)) errors["name"] = ["Nome do projeto é obrigatório."];
@@ -35,6 +46,7 @@ public class LifeProject : ModelBase, ITenantOwned
         Name = name.Trim();
         GoalAmount = decimal.Round(goalAmount, 2);
         DueDate = dueDate is null ? null : Competence.ToUtc(dueDate.Value);
+        ChartAccountId = chartAccountId;
         if (scope is not null)
             Scope = scope.Value;
     }

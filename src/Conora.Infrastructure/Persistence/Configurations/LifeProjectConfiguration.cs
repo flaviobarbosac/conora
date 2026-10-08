@@ -16,5 +16,6 @@ public class LifeProjectConfiguration : IEntityTypeConfiguration<LifeProject>
         builder.Property(e => e.AccumulatedAmount).HasPrecision(18, 2);
         builder.Property(e => e.Scope).HasConversion<string>().HasMaxLength(20);
         builder.HasIndex(e => e.UsuarioId);
+        builder.HasIndex(e => e.ChartAccountId);
     }
 }
