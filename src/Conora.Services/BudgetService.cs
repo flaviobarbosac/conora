@@ -170,7 +170,7 @@ public sealed class BudgetService
         foreach (var pair in plannedPairs.Where(p => !accounts.ContainsKey(p.ChartAccountId)))
         {
             accounts[pair.ChartAccountId] = new ChartAccountResponse(
-                pair.ChartAccountId, null, "—", null, ChartAccountLevel.Analytical, ChartSection.Social,
+                pair.ChartAccountId, null, "—", null, null, ChartAccountLevel.Analytical, ChartSection.Social,
                 false, true, 0, true);
         }
 
@@ -403,7 +403,11 @@ public sealed class BudgetService
             var group = account?.ParentId is Guid pid && parents.TryGetValue(pid, out var parent)
                 ? parent.Name
                 : account?.Name ?? "—";
-            var name = account?.Name ?? "—";
+            var name = account is null
+                ? "—"
+                : string.IsNullOrWhiteSpace(account.DisplayNumber)
+                    ? account.Name
+                    : $"{account.DisplayNumber} {account.Name}";
             var (percent, status) = Evaluate(plan, actual);
             responses.Add(new BudgetLineResponse(
                 id, name, account?.ParentId, group, section, ChartAccountLevel.Analytical,
@@ -433,6 +437,41 @@ public sealed class BudgetService
             .OrderBy(l => l.Section)
             .ThenBy(l => l.GroupName)
             .ToList();
+    }
+
+    public async Task UpsertPlannedForAccountAsync(
+        Guid chartAccountId,
+        IReadOnlyList<string> months,
+        decimal planned,
+        CancellationToken ct)
+    {
+        foreach (var ym in months)
+        {
+            var budget = await GetOrCreateBudgetAsync(ym, BudgetMode.Detailed, ct);
+            await SetLineAsync(budget, chartAccountId, planned, ct);
+        }
+
+        await _uow.SaveChangesAsync(ct);
+    }
+
+    public async Task ClearPlannedForAccountAsync(Guid chartAccountId, IReadOnlyList<string> months, CancellationToken ct)
+    {
+        if (months.Count == 0)
+            return;
+
+        foreach (var ym in months)
+        {
+            var budget = await _repo.FirstOrDefaultAsync<Budget>(b => b.CompetenceYm == ym, ct);
+            if (budget is null)
+                continue;
+
+            var line = await _repo.FirstOrDefaultAsync<BudgetLine>(
+                l => l.BudgetId == budget.Id && l.ChartAccountId == chartAccountId, ct);
+            if (line is not null)
+                _repo.SoftDelete(line);
+        }
+
+        await _uow.SaveChangesAsync(ct);
     }
 
     private async Task<Budget> GetOrCreateBudgetAsync(string ym, BudgetMode mode, CancellationToken ct)
@@ -498,5 +537,5 @@ public sealed class BudgetService
     }
 
     private static ChartAccountResponse ToResponse(ChartAccount c)
-        => new(c.Id, c.ParentId, c.Name, c.Code, c.Level, c.Section, c.IsSystem, c.IsActive, c.SortOrder, c.AcceptsPosting);
+        => new(c.Id, c.ParentId, c.Name, c.Code, c.DisplayNumber, c.Level, c.Section, c.IsSystem, c.IsActive, c.SortOrder, c.AcceptsPosting);
 }

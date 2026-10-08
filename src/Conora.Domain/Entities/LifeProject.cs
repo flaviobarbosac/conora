@@ -9,7 +9,8 @@ public class LifeProject : ModelBase, ITenantOwned
     public Guid UsuarioId { get; set; }
     public string Name { get; private set; } = default!;
     public decimal GoalAmount { get; private set; }
-    public DateTime? DueDate { get; private set; }
+    public DateTime DueDate { get; private set; }
+    public string ContributionStartYm { get; private set; } = default!;
     public decimal AccumulatedAmount { get; private set; }
     public LifeProjectScope Scope { get; private set; } = LifeProjectScope.Personal;
     public Guid? ChartAccountId { get; private set; }
@@ -21,19 +22,21 @@ public class LifeProject : ModelBase, ITenantOwned
     public static LifeProject Create(
         string name,
         decimal goalAmount,
-        DateTime? dueDate,
+        DateTime dueDate,
+        string contributionStartYm,
         Guid? chartAccountId,
         LifeProjectScope scope = LifeProjectScope.Personal)
     {
         var project = new LifeProject { Scope = scope };
-        project.Update(name, goalAmount, dueDate, chartAccountId, scope);
+        project.Update(name, goalAmount, dueDate, contributionStartYm, chartAccountId, scope);
         return project;
     }
 
     public void Update(
         string name,
         decimal goalAmount,
-        DateTime? dueDate,
+        DateTime dueDate,
+        string contributionStartYm,
         Guid? chartAccountId,
         LifeProjectScope? scope = null)
     {
@@ -43,9 +46,14 @@ public class LifeProject : ModelBase, ITenantOwned
         if (errors.Count > 0)
             throw new ValidationException(errors);
 
+        var startYm = Competence.Require(contributionStartYm, "contributionStartYm");
+        var dueYm = Competence.From(dueDate);
+        Competence.RangeInclusive(startYm, dueYm);
+
         Name = name.Trim();
         GoalAmount = decimal.Round(goalAmount, 2);
-        DueDate = dueDate is null ? null : Competence.ToUtc(dueDate.Value);
+        DueDate = Competence.ToUtc(dueDate);
+        ContributionStartYm = startYm;
         ChartAccountId = chartAccountId;
         if (scope is not null)
             Scope = scope.Value;

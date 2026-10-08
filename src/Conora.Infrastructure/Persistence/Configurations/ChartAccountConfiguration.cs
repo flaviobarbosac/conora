@@ -13,6 +13,7 @@ public class ChartAccountConfiguration : IEntityTypeConfiguration<ChartAccount>
         builder.Property(e => e.UsuarioId).IsRequired();
         builder.Property(e => e.Name).IsRequired().HasMaxLength(160);
         builder.Property(e => e.Code).HasMaxLength(60);
+        builder.Property(e => e.DisplayNumber).HasMaxLength(40);
         builder.Property(e => e.Level).HasConversion<string>().HasMaxLength(20);
         builder.Property(e => e.Section).HasConversion<string>().HasMaxLength(20);
         builder.Ignore(e => e.AcceptsPosting);

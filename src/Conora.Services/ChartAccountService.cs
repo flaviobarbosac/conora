@@ -2,6 +2,7 @@ using Conora.Domain.Catalog;
 using Conora.Domain.Entities;
 using Conora.Domain.Enums;
 using Conora.Domain.Exceptions;
+using Conora.Domain.Services;
 using Conora.Repository.Interface;
 using Conora.Services.Contracts;
 
@@ -31,6 +32,8 @@ public sealed class ChartAccountService
             _repo.Add(account);
             byCode[definition.Code] = account;
         }
+
+        ChartAccountDisplayNumbers.Apply(byCode.Values.ToList());
     }
 
     /// <summary>Idempotent: inserts missing system accounts and syncs name/parent/order from the catalog.</summary>
@@ -72,6 +75,8 @@ public sealed class ChartAccountService
 
         if (changed)
             await _uow.SaveChangesAsync(ct);
+
+        await RenumberIfNeededAsync(ct);
     }
 
     public async Task<ChartAccount> GetByCodeAsync(string code, CancellationToken ct)
@@ -121,7 +126,9 @@ public sealed class ChartAccountService
 
         _repo.Add(account);
         await _uow.SaveChangesAsync(ct);
-        return ToResponse(account);
+        await RenumberAsync(ct);
+        var numbered = await RequireAsync(account.Id, ct);
+        return ToResponse(numbered);
     }
 
     public async Task<ChartAccountResponse> UpdateAsync(Guid id, UpdateChartAccountRequest request, CancellationToken ct)
@@ -151,6 +158,7 @@ public sealed class ChartAccountService
 
         _repo.SoftDelete(account);
         await _uow.SaveChangesAsync(ct);
+        await RenumberAsync(ct);
     }
 
     public async Task<ChartAccount> RequireAnalyticalAsync(Guid id, CancellationToken ct)
@@ -174,6 +182,23 @@ public sealed class ChartAccountService
             throw new ValidationException("name", "Já existe uma conta com este nome neste grupo.");
     }
 
+    private async Task RenumberIfNeededAsync(CancellationToken ct)
+    {
+        var accounts = await _repo.ListAsync<ChartAccount>(ct: ct);
+        if (accounts.Count == 0 || accounts.All(a => !string.IsNullOrWhiteSpace(a.DisplayNumber)))
+            return;
+
+        ChartAccountDisplayNumbers.Apply(accounts);
+        await _uow.SaveChangesAsync(ct);
+    }
+
+    private async Task RenumberAsync(CancellationToken ct)
+    {
+        var accounts = await _repo.ListAsync<ChartAccount>(ct: ct);
+        ChartAccountDisplayNumbers.Apply(accounts);
+        await _uow.SaveChangesAsync(ct);
+    }
+
     private static ChartAccountResponse ToResponse(ChartAccount c)
-        => new(c.Id, c.ParentId, c.Name, c.Code, c.Level, c.Section, c.IsSystem, c.IsActive, c.SortOrder, c.AcceptsPosting);
+        => new(c.Id, c.ParentId, c.Name, c.Code, c.DisplayNumber, c.Level, c.Section, c.IsSystem, c.IsActive, c.SortOrder, c.AcceptsPosting);
 }

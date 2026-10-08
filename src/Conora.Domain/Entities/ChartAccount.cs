@@ -10,6 +10,7 @@ public class ChartAccount : ModelBase, ITenantOwned
     public Guid? ParentId { get; private set; }
     public string Name { get; private set; } = default!;
     public string? Code { get; private set; }
+    public string? DisplayNumber { get; private set; }
     public ChartAccountLevel Level { get; private set; }
     public ChartSection Section { get; private set; }
     public bool IsSystem { get; private set; }
@@ -45,6 +46,8 @@ public class ChartAccount : ModelBase, ITenantOwned
         IsSystem = true,
         SortOrder = definition.SortOrder
     };
+
+    public void SetDisplayNumber(string? displayNumber) => DisplayNumber = displayNumber;
 
     public void Rename(string name)
     {

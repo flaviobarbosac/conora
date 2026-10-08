@@ -2,6 +2,7 @@ using Conora.Domain.Entities;
 using Conora.Domain.Enums;
 using Conora.Domain.Exceptions;
 using Conora.Domain.Ports;
+using Conora.Domain.Services;
 using Conora.Repository.Interface;
 using Conora.Services.Contracts;
 
@@ -15,6 +16,7 @@ public sealed class LifeProjectService
     private readonly EntryService _entries;
     private readonly FamilyGroupService _family;
     private readonly ChartAccountService _chartAccounts;
+    private readonly BudgetService _budgets;
     private readonly ITenantContext _tenant;
 
     public LifeProjectService(
@@ -24,6 +26,7 @@ public sealed class LifeProjectService
         EntryService entries,
         FamilyGroupService family,
         ChartAccountService chartAccounts,
+        BudgetService budgets,
         ITenantContext tenant)
     {
         _repo = repo;
@@ -32,6 +35,7 @@ public sealed class LifeProjectService
         _entries = entries;
         _family = family;
         _chartAccounts = chartAccounts;
+        _budgets = budgets;
         _tenant = tenant;
     }
 
@@ -48,7 +52,7 @@ public sealed class LifeProjectService
         var accounts = (await _chartAccounts.ListAsync(ChartSection.LifeProject, true, false, ct))
             .ToDictionary(c => c.Id);
         return own.Concat(groupProjects)
-            .OrderBy(p => p.DueDate ?? DateTime.MaxValue)
+            .OrderBy(p => p.DueDate)
             .ThenBy(p => p.Name)
             .Select(p => ToResponse(p, self, accounts))
             .ToList();
@@ -74,10 +78,18 @@ public sealed class LifeProjectService
         }
 
         var chartAccountId = await RequireLifeProjectAccountAsync(request.ChartAccountId, ct);
+        await EnsureAccountFreeAsync(chartAccountId, null, ct);
+        EnsureContributionWindow(request.ContributionStartYm, request.DueDate, previousStartYm: null);
         var project = LifeProject.Create(
-            request.Name, decimal.Round(request.GoalAmount, 2), request.DueDate, chartAccountId, request.Scope);
+            request.Name,
+            decimal.Round(request.GoalAmount, 2),
+            request.DueDate,
+            request.ContributionStartYm,
+            chartAccountId,
+            request.Scope);
         _repo.Add(project);
         await _uow.SaveChangesAsync(ct);
+        await SyncBudgetLinesAsync(project, previousAccountId: null, previousMonths: null, ct);
         return await GetAsync(project.Id, ct);
     }
 
@@ -98,8 +110,19 @@ public sealed class LifeProjectService
         }
 
         var chartAccountId = await RequireLifeProjectAccountAsync(request.ChartAccountId, ct);
-        project.Update(request.Name, decimal.Round(request.GoalAmount, 2), request.DueDate, chartAccountId, request.Scope);
+        await EnsureAccountFreeAsync(chartAccountId, project.Id, ct);
+        EnsureContributionWindow(request.ContributionStartYm, request.DueDate, project.ContributionStartYm);
+        var previousAccountId = project.ChartAccountId;
+        var previousMonths = MonthsOf(project);
+        project.Update(
+            request.Name,
+            decimal.Round(request.GoalAmount, 2),
+            request.DueDate,
+            request.ContributionStartYm,
+            chartAccountId,
+            request.Scope);
         await _uow.SaveChangesAsync(ct);
+        await SyncBudgetLinesAsync(project, previousAccountId, previousMonths, ct);
         return await GetAsync(id, ct);
     }
 
@@ -113,6 +136,9 @@ public sealed class LifeProjectService
             throw new ForbiddenException("Só o dono pode excluir o projeto.");
         if (await _repo.AnyAsync<Entry>(e => e.LifeProjectId == id, ct))
             throw new ValidationException("id", "Projeto com aportes não pode ser excluído.");
+
+        if (project.ChartAccountId is Guid accountId)
+            await _budgets.ClearPlannedForAccountAsync(accountId, MonthsOf(project), ct);
 
         _repo.SoftDelete(project);
         await _uow.SaveChangesAsync(ct);
@@ -170,18 +196,66 @@ public sealed class LifeProjectService
     {
         string? accountName = null;
         if (p.ChartAccountId is Guid aid && accounts.TryGetValue(aid, out var account))
-            accountName = account.Name;
+            accountName = string.IsNullOrWhiteSpace(account.DisplayNumber)
+                ? account.Name
+                : $"{account.DisplayNumber} {account.Name}";
 
         return new(
             p.Id,
             p.Name,
             p.GoalAmount,
             p.DueDate,
+            p.ContributionStartYm,
             p.AccumulatedAmount,
             p.GoalAmount <= 0 ? 0 : Math.Min(100m, decimal.Round(p.AccumulatedAmount / p.GoalAmount * 100, 1)),
             p.Scope,
             p.UsuarioId == self,
             p.ChartAccountId,
             accountName);
+    }
+
+    private async Task EnsureAccountFreeAsync(Guid chartAccountId, Guid? ignoreProjectId, CancellationToken ct)
+    {
+        var clash = await _repo.AnyAsync<LifeProject>(
+            p => p.ChartAccountId == chartAccountId && p.Id != ignoreProjectId, ct);
+        if (clash)
+            throw new ValidationException("chartAccountId", "Já existe um projeto nesta conta do plano.");
+    }
+
+    private static void EnsureContributionWindow(string contributionStartYm, DateTime dueDate, string? previousStartYm)
+    {
+        var startYm = Competence.Require(contributionStartYm, "contributionStartYm");
+        var currentYm = Competence.From(DateTime.UtcNow);
+        if (Competence.Compare(startYm, currentYm) < 0 && startYm != previousStartYm)
+            throw new ValidationException("contributionStartYm", "O início do aporte não pode ser antes do mês atual.");
+
+        Competence.RangeInclusive(startYm, Competence.From(dueDate));
+    }
+
+    private static IReadOnlyList<string> MonthsOf(LifeProject project)
+        => Competence.RangeInclusive(project.ContributionStartYm, Competence.From(project.DueDate));
+
+    private async Task SyncBudgetLinesAsync(
+        LifeProject project,
+        Guid? previousAccountId,
+        IReadOnlyList<string>? previousMonths,
+        CancellationToken ct)
+    {
+        if (project.ChartAccountId is not Guid accountId)
+            return;
+
+        if (previousAccountId is Guid oldAccount && oldAccount != accountId && previousMonths is { Count: > 0 })
+            await _budgets.ClearPlannedForAccountAsync(oldAccount, previousMonths, ct);
+        else if (previousMonths is { Count: > 0 })
+        {
+            var next = MonthsOf(project);
+            var removed = previousMonths.Except(next).ToList();
+            if (removed.Count > 0)
+                await _budgets.ClearPlannedForAccountAsync(accountId, removed, ct);
+        }
+
+        var months = MonthsOf(project);
+        var planned = decimal.Round(project.GoalAmount / months.Count, 2);
+        await _budgets.UpsertPlannedForAccountAsync(accountId, months, planned, ct);
     }
 }

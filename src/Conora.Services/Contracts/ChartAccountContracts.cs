@@ -7,6 +7,7 @@ public sealed record ChartAccountResponse(
     Guid? ParentId,
     string Name,
     string? Code,
+    string? DisplayNumber,
     ChartAccountLevel Level,
     ChartSection Section,
     bool IsSystem,

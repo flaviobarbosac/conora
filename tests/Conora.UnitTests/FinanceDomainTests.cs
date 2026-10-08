@@ -102,4 +102,52 @@ public class FinanceDomainTests
         Assert.True(Competence.IsValid("2026-10"));
         Assert.False(Competence.IsValid("2026-13"));
     }
+
+    [Fact]
+    public void Competence_range_inclusive_counts_start_and_due()
+    {
+        var months = Competence.RangeInclusive("2026-11", "2027-01");
+        Assert.Equal(["2026-11", "2026-12", "2027-01"], months);
+    }
+
+    [Fact]
+    public void Display_numbers_follow_siblings_and_prefix_children()
+    {
+        var income = ChartAccount.CreateSystem(SystemChartAccounts.All.First(c => c.Code == "INC"), null);
+        var salary = ChartAccount.CreateAnalytical("Salário", income.Id, ChartSection.Income, 1);
+        var extra = ChartAccount.CreateAnalytical("Extra", income.Id, ChartSection.Income, 2);
+        var discount = ChartAccount.CreateSystem(SystemChartAccounts.All.First(c => c.Code == "DISC"), null);
+
+        ChartAccountDisplayNumbers.Apply([income, salary, extra, discount]);
+
+        Assert.Equal("1", income.DisplayNumber);
+        Assert.Equal("1.1", salary.DisplayNumber);
+        Assert.Equal("1.2", extra.DisplayNumber);
+        Assert.Equal("2", discount.DisplayNumber);
+    }
+
+    [Fact]
+    public void Display_numbers_renumber_after_sibling_removed()
+    {
+        var income = ChartAccount.CreateSystem(SystemChartAccounts.All.First(c => c.Code == "INC"), null);
+        var first = ChartAccount.CreateAnalytical("A", income.Id, ChartSection.Income, 1);
+        var second = ChartAccount.CreateAnalytical("B", income.Id, ChartSection.Income, 2);
+        var third = ChartAccount.CreateAnalytical("C", income.Id, ChartSection.Income, 3);
+        ChartAccountDisplayNumbers.Apply([income, first, second, third]);
+
+        ChartAccountDisplayNumbers.Apply([income, second, third]);
+
+        Assert.Equal("1.1", second.DisplayNumber);
+        Assert.Equal("1.2", third.DisplayNumber);
+    }
+
+    [Fact]
+    public void Life_project_requires_start_and_due_window()
+    {
+        var due = new DateTime(2027, 3, 1, 0, 0, 0, DateTimeKind.Utc);
+        var project = LifeProject.Create("Reserva", 1200m, due, "2026-11", Guid.NewGuid());
+        Assert.Equal("2026-11", project.ContributionStartYm);
+        Assert.Equal(5, Competence.RangeInclusive(project.ContributionStartYm, Competence.From(project.DueDate)).Count);
+        Assert.Throws<ValidationException>(() => project.Update("Reserva", 1200m, due, "2027-04", project.ChartAccountId));
+    }
 }

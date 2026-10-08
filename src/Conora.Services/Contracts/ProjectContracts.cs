@@ -5,7 +5,8 @@ namespace Conora.Services.Contracts;
 public sealed record LifeProjectRequest(
     string Name,
     decimal GoalAmount,
-    DateTime? DueDate = null,
+    DateTime DueDate,
+    string ContributionStartYm,
     LifeProjectScope Scope = LifeProjectScope.Personal,
     Guid? ChartAccountId = null);
 
@@ -15,7 +16,8 @@ public sealed record LifeProjectResponse(
     Guid Id,
     string Name,
     decimal GoalAmount,
-    DateTime? DueDate,
+    DateTime DueDate,
+    string ContributionStartYm,
     decimal AccumulatedAmount,
     decimal ProgressPercent,
     LifeProjectScope Scope,

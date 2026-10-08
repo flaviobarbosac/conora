@@ -24,6 +24,27 @@ public static class Competence
 
     public static string AddMonths(string ym, int months) => From(Start(ym).AddMonths(months));
 
+    public static int Compare(string leftYm, string rightYm) => string.CompareOrdinal(Require(leftYm), Require(rightYm));
+
+    public static IReadOnlyList<string> RangeInclusive(string fromYm, string toYm, string fromField = "contributionStartYm", string toField = "dueDate")
+    {
+        var current = Require(fromYm, fromField);
+        var end = Require(toYm, toField);
+        if (Compare(current, end) > 0)
+            throw new ValidationException(fromField, "O início do aporte não pode ser depois do prazo.");
+
+        var months = new List<string>();
+        while (true)
+        {
+            months.Add(current);
+            if (current == end)
+                break;
+            current = AddMonths(current, 1);
+        }
+
+        return months;
+    }
+
     public static DateTime Start(string ym)
     {
         var parsed = DateTime.ParseExact(ym, Format, CultureInfo.InvariantCulture);
