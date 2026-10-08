@@ -78,7 +78,6 @@ public sealed class LifeProjectService
         }
 
         var chartAccountId = await RequireLifeProjectAccountAsync(request.ChartAccountId, ct);
-        await EnsureAccountFreeAsync(chartAccountId, null, ct);
         EnsureContributionWindow(request.ContributionStartYm, request.DueDate, previousStartYm: null);
         var project = LifeProject.Create(
             request.Name,
@@ -90,7 +89,7 @@ public sealed class LifeProjectService
             request.DetailedDescription);
         _repo.Add(project);
         await _uow.SaveChangesAsync(ct);
-        await SyncBudgetLinesAsync(project, previousAccountId: null, previousMonths: null, ct);
+        await RebuildBudgetForAccountAsync(project.ChartAccountId, MonthsOf(project), ct);
         return await GetAsync(project.Id, ct);
     }
 
@@ -111,7 +110,6 @@ public sealed class LifeProjectService
         }
 
         var chartAccountId = await RequireLifeProjectAccountAsync(request.ChartAccountId, ct);
-        await EnsureAccountFreeAsync(chartAccountId, project.Id, ct);
         EnsureContributionWindow(request.ContributionStartYm, request.DueDate, project.ContributionStartYm);
         var previousAccountId = project.ChartAccountId;
         var previousMonths = MonthsOf(project);
@@ -124,7 +122,8 @@ public sealed class LifeProjectService
             request.Scope,
             request.DetailedDescription);
         await _uow.SaveChangesAsync(ct);
-        await SyncBudgetLinesAsync(project, previousAccountId, previousMonths, ct);
+        await RebuildBudgetForAccountAsync(previousAccountId, previousMonths, ct);
+        await RebuildBudgetForAccountAsync(project.ChartAccountId, MonthsOf(project), ct);
         return await GetAsync(id, ct);
     }
 
@@ -139,19 +138,22 @@ public sealed class LifeProjectService
         if (await _repo.AnyAsync<Entry>(e => e.LifeProjectId == id, ct))
             throw new ValidationException("id", "Projeto com aportes não pode ser excluído.");
 
-        if (project.ChartAccountId is Guid accountId)
-            await _budgets.ClearPlannedForAccountAsync(accountId, MonthsOf(project), ct);
-
+        var accountId = project.ChartAccountId;
+        var months = MonthsOf(project);
         _repo.SoftDelete(project);
         await _uow.SaveChangesAsync(ct);
+        await RebuildBudgetForAccountAsync(accountId, months, ct);
     }
 
     /// <summary>A contribution is an entry of type ProjectContribution; the entry service updates the accumulated amount.</summary>
     public async Task<LifeProjectResponse> ContributeAsync(Guid id, ProjectContributionRequest request, CancellationToken ct)
     {
         var project = await RequireVisibleAsync(id, ct, track: false);
-        if (project.ChartAccountId is null)
-            throw new ValidationException("chartAccountId", "Vincule o projeto a uma conta do plano antes de aportar.");
+        if (request.AccountId is null)
+            throw new ValidationException("accountId", "Escolha a conta bancária de origem.");
+
+        var chartAccountId = request.ChartAccountId ?? project.ChartAccountId;
+        chartAccountId = await RequireLifeProjectAccountAsync(chartAccountId, ct);
 
         await _entries.CreateAsync(new CreateEntryRequest(
             EntryType.ProjectContribution,
@@ -159,7 +161,7 @@ public sealed class LifeProjectService
             request.OccurredAt,
             string.IsNullOrWhiteSpace(request.Description) ? "Aporte em projeto de vida" : request.Description,
             AccountId: request.AccountId,
-            ChartAccountId: project.ChartAccountId,
+            ChartAccountId: chartAccountId,
             LifeProjectId: id), ct);
 
         return await GetAsync(id, ct);
@@ -243,14 +245,6 @@ public sealed class LifeProjectService
         return null;
     }
 
-    private async Task EnsureAccountFreeAsync(Guid chartAccountId, Guid? ignoreProjectId, CancellationToken ct)
-    {
-        var clash = await _repo.AnyAsync<LifeProject>(
-            p => p.ChartAccountId == chartAccountId && p.Id != ignoreProjectId, ct);
-        if (clash)
-            throw new ValidationException("chartAccountId", "Já existe um projeto nesta conta do plano.");
-    }
-
     private static void EnsureContributionWindow(string contributionStartYm, DateTime dueDate, string? previousStartYm)
     {
         var startYm = Competence.Require(contributionStartYm, "contributionStartYm");
@@ -264,27 +258,35 @@ public sealed class LifeProjectService
     private static IReadOnlyList<string> MonthsOf(LifeProject project)
         => Competence.RangeInclusive(project.ContributionStartYm, Competence.From(project.DueDate));
 
-    private async Task SyncBudgetLinesAsync(
-        LifeProject project,
-        Guid? previousAccountId,
-        IReadOnlyList<string>? previousMonths,
+    /// <summary>
+    /// Rebuilds planned BudgetLines for a chart account by summing monthly parcels of all active projects on it.
+    /// </summary>
+    private async Task RebuildBudgetForAccountAsync(
+        Guid? chartAccountId,
+        IReadOnlyList<string>? seedMonths,
         CancellationToken ct)
     {
-        if (project.ChartAccountId is not Guid accountId)
+        if (chartAccountId is not Guid accountId)
             return;
 
-        if (previousAccountId is Guid oldAccount && oldAccount != accountId && previousMonths is { Count: > 0 })
-            await _budgets.ClearPlannedForAccountAsync(oldAccount, previousMonths, ct);
-        else if (previousMonths is { Count: > 0 })
+        var projects = await _repo.ListAsync<LifeProject>(p => p.ChartAccountId == accountId, ct);
+        var plannedByMonth = new Dictionary<string, decimal>(StringComparer.Ordinal);
+        foreach (var item in projects)
         {
-            var next = MonthsOf(project);
-            var removed = previousMonths.Except(next).ToList();
-            if (removed.Count > 0)
-                await _budgets.ClearPlannedForAccountAsync(accountId, removed, ct);
+            var months = MonthsOf(item);
+            if (months.Count == 0)
+                continue;
+            var parcel = decimal.Round(item.GoalAmount / months.Count, 2);
+            foreach (var ym in months)
+                plannedByMonth[ym] = plannedByMonth.GetValueOrDefault(ym) + parcel;
         }
 
-        var months = MonthsOf(project);
-        var planned = decimal.Round(project.GoalAmount / months.Count, 2);
-        await _budgets.UpsertPlannedForAccountAsync(accountId, months, planned, ct);
+        var allMonths = (seedMonths ?? []).Concat(plannedByMonth.Keys).Distinct().OrderBy(m => m).ToList();
+        var toClear = allMonths.Where(ym => !plannedByMonth.ContainsKey(ym) || plannedByMonth[ym] <= 0).ToList();
+        if (toClear.Count > 0)
+            await _budgets.ClearPlannedForAccountAsync(accountId, toClear, ct);
+
+        foreach (var (ym, amount) in plannedByMonth.Where(kv => kv.Value > 0))
+            await _budgets.UpsertPlannedForAccountAsync(accountId, [ym], amount, ct);
     }
 }

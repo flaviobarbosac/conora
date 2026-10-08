@@ -11,7 +11,12 @@ public sealed record LifeProjectRequest(
     Guid? ChartAccountId = null,
     string? DetailedDescription = null);
 
-public sealed record ProjectContributionRequest(decimal Amount, DateTime OccurredAt, Guid? AccountId = null, string? Description = null);
+public sealed record ProjectContributionRequest(
+    decimal Amount,
+    DateTime OccurredAt,
+    Guid? AccountId = null,
+    Guid? ChartAccountId = null,
+    string? Description = null);
 
 public sealed record LifeProjectResponse(
     Guid Id,

@@ -20,8 +20,6 @@ public class LifeProjectConfiguration : IEntityTypeConfiguration<LifeProject>
         builder.Property(e => e.Scope).HasConversion<string>().HasMaxLength(20);
         builder.HasIndex(e => e.UsuarioId);
         builder.HasIndex(e => new { e.UsuarioId, e.ChartAccountId })
-            .IsUnique()
-            .HasFilter("\"ChartAccountId\" IS NOT NULL AND \"DeletedAt\" IS NULL")
             .HasDatabaseName("IX_life_projects_UsuarioId_ChartAccountId");
     }
 }
