@@ -3,7 +3,8 @@
   <PropertyGroup>
     <RootNamespace>Conora.Api</RootNamespace>
     <UserSecretsId>conora-api-secrets</UserSecretsId>
-    <InvariantGlobalization>true</InvariantGlobalization>
+    <!-- pt-BR culture is required for chart sorting and WhatsApp money formatting -->
+    <InvariantGlobalization>false</InvariantGlobalization>
   </PropertyGroup>
 
   <ItemGroup>
