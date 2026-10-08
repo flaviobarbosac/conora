@@ -242,7 +242,7 @@ public sealed partial class WhatsAppService
         {
             using var doc = JsonDocument.Parse(raw);
             var root = doc.RootElement;
-            if (!root.TryGetProperty("amount", out var amountEl) || !amountEl.TryGetDecimal(out var amount) || amount <= 0 || amount > 1_000_000)
+            if (!root.TryGetProperty("amount", out var amountEl) || !amountEl.TryGetDecimal(out var amount) || amount <= 0 || amount > 99_999_999.99m)
                 return null;
 
             var income = root.TryGetProperty("type", out var typeEl) && typeEl.GetString() == "income";
@@ -266,7 +266,7 @@ public sealed partial class WhatsAppService
             return null;
 
         var amount = ImportParser.ParseAmount(match.Value);
-        if (amount is null or <= 0 or > 1_000_000)
+        if (amount is null or <= 0 or > 99_999_999.99m)
             return null;
 
         var lowered = text.ToLowerInvariant();
