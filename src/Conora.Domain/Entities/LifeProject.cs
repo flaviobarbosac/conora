@@ -8,6 +8,7 @@ public class LifeProject : ModelBase, ITenantOwned
 {
     public Guid UsuarioId { get; set; }
     public string Name { get; private set; } = default!;
+    public string? DetailedDescription { get; private set; }
     public decimal GoalAmount { get; private set; }
     public DateTime DueDate { get; private set; }
     public string ContributionStartYm { get; private set; } = default!;
@@ -25,10 +26,11 @@ public class LifeProject : ModelBase, ITenantOwned
         DateTime dueDate,
         string contributionStartYm,
         Guid? chartAccountId,
-        LifeProjectScope scope = LifeProjectScope.Personal)
+        LifeProjectScope scope = LifeProjectScope.Personal,
+        string? detailedDescription = null)
     {
         var project = new LifeProject { Scope = scope };
-        project.Update(name, goalAmount, dueDate, contributionStartYm, chartAccountId, scope);
+        project.Update(name, goalAmount, dueDate, contributionStartYm, chartAccountId, scope, detailedDescription);
         return project;
     }
 
@@ -38,11 +40,14 @@ public class LifeProject : ModelBase, ITenantOwned
         DateTime dueDate,
         string contributionStartYm,
         Guid? chartAccountId,
-        LifeProjectScope? scope = null)
+        LifeProjectScope? scope = null,
+        string? detailedDescription = null)
     {
         var errors = new Dictionary<string, string[]>();
         if (string.IsNullOrWhiteSpace(name)) errors["name"] = ["Nome do projeto é obrigatório."];
         if (goalAmount <= 0) errors["goalAmount"] = ["Meta deve ser maior que zero."];
+        if (detailedDescription is { Length: > 4000 })
+            errors["detailedDescription"] = ["Descrição detalhada pode ter no máximo 4000 caracteres."];
         if (errors.Count > 0)
             throw new ValidationException(errors);
 
@@ -51,6 +56,7 @@ public class LifeProject : ModelBase, ITenantOwned
         Competence.RangeInclusive(startYm, dueYm);
 
         Name = name.Trim();
+        DetailedDescription = string.IsNullOrWhiteSpace(detailedDescription) ? null : detailedDescription.Trim();
         GoalAmount = decimal.Round(goalAmount, 2);
         DueDate = Competence.ToUtc(dueDate);
         ContributionStartYm = startYm;

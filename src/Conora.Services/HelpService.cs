@@ -81,7 +81,7 @@ public sealed class HelpService
             "Painel do mês: receitas, despesas, resultado, alertas e projetos de vida. Em grupo familiar, os totais somam os dois membros.",
             [
                 new("Atalhos", "Raio-X, Patrimônio, Projetos de vida e Lançar."),
-                new("Projetos de vida", "Três barras horizontais: Curto, Médio e Longo. O progresso agrega os projetos cuja conta do plano está naquele grupo. Clique abre a lista filtrada."),
+                new("Projetos de vida", "Três barras horizontais: Curto, Médio e Longo. O progresso agrega os projetos daquele horizonte. Clique abre o dashboard filtrado."),
                 new("Receitas", "Soma da renda gastável do diagnóstico e receitas extras do mês."),
                 new("Despesas", "Despesas, contribuições e compras no cartão na competência."),
                 new("Resultado", "Receitas menos despesas do mês."),
@@ -168,7 +168,9 @@ public sealed class HelpService
         new("projetos", "Projetos de vida",
             "Metas com prazo, início do aporte e conta do plano. Pessoal ou do grupo familiar.",
             [
+                new("Dashboard", "Barras por horizonte, filtro Todos/Curto/Médio/Longo e lista. Clique no card abre o detalhe."),
                 new("Nome", "Nome do objetivo."),
+                new("Descrição detalhada", "Texto livre do projeto (opcional). Aparece no detalhe e em preview no dashboard."),
                 new("Conta do plano", "Define o horizonte (curto/médio/longo). Só contas de Projetos de vida ainda sem projeto."),
                 new("Meta", "Valor que você quer atingir."),
                 new("Prazo", "Competência alvo. Obrigatório e não pode ser antes do início do aporte."),
@@ -176,10 +178,10 @@ public sealed class HelpService
                 new("Parcela sugerida", "Preview só leitura: meta ÷ meses (início até o prazo, inclusive)."),
                 new("Orçamento gerado", "Ao criar ou alterar, o Conora grava essa parcela em cada mês do intervalo. Excluir o projeto remove essas linhas."),
                 new("Progresso", "Acumulado / meta. Só leitura."),
-                new("Filtro da lista", "Pela Home, Curto/Médio/Longo abre a lista com ?horizonte=."),
+                new("Filtro da lista", "Na Home, as barras Curto/Médio/Longo abrem o dashboard já filtrado."),
                 new("Escopo pessoal", "Só você vê e edita."),
                 new("Escopo do grupo", "Aparece para os dois; só o dono edita ou apaga. Exige grupo ativo."),
-                new("Aporte", "Lançamento que sai da sua conta e aumenta o acumulado.")
+                new("Aporte", "Lançamento que sai da sua conta e aumenta o acumulado. Feito no detalhe do projeto.")
             ]),
 
         new("patrimonio", "Patrimônio",

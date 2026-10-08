@@ -86,7 +86,8 @@ public sealed class LifeProjectService
             request.DueDate,
             request.ContributionStartYm,
             chartAccountId,
-            request.Scope);
+            request.Scope,
+            request.DetailedDescription);
         _repo.Add(project);
         await _uow.SaveChangesAsync(ct);
         await SyncBudgetLinesAsync(project, previousAccountId: null, previousMonths: null, ct);
@@ -120,7 +121,8 @@ public sealed class LifeProjectService
             request.DueDate,
             request.ContributionStartYm,
             chartAccountId,
-            request.Scope);
+            request.Scope,
+            request.DetailedDescription);
         await _uow.SaveChangesAsync(ct);
         await SyncBudgetLinesAsync(project, previousAccountId, previousMonths, ct);
         return await GetAsync(id, ct);
@@ -203,6 +205,7 @@ public sealed class LifeProjectService
         return new(
             p.Id,
             p.Name,
+            p.DetailedDescription,
             p.GoalAmount,
             p.DueDate,
             p.ContributionStartYm,
@@ -211,7 +214,33 @@ public sealed class LifeProjectService
             p.Scope,
             p.UsuarioId == self,
             p.ChartAccountId,
-            accountName);
+            accountName,
+            ResolveHorizon(p.ChartAccountId, accounts));
+    }
+
+    private static string? ResolveHorizon(Guid? chartAccountId, IReadOnlyDictionary<Guid, ChartAccountResponse> accounts)
+    {
+        if (chartAccountId is not Guid id)
+            return null;
+
+        ChartAccountResponse? current = accounts.GetValueOrDefault(id);
+        while (current is not null)
+        {
+            if (current.Code is "LIFE_SHORT" or "LIFE_MID" or "LIFE_LONG")
+            {
+                return current.Code switch
+                {
+                    "LIFE_SHORT" => "short",
+                    "LIFE_MID" => "mid",
+                    "LIFE_LONG" => "long",
+                    _ => null
+                };
+            }
+
+            current = current.ParentId is Guid parentId ? accounts.GetValueOrDefault(parentId) : null;
+        }
+
+        return null;
     }
 
     private async Task EnsureAccountFreeAsync(Guid chartAccountId, Guid? ignoreProjectId, CancellationToken ct)

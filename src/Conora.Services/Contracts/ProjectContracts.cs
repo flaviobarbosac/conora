@@ -8,13 +8,15 @@ public sealed record LifeProjectRequest(
     DateTime DueDate,
     string ContributionStartYm,
     LifeProjectScope Scope = LifeProjectScope.Personal,
-    Guid? ChartAccountId = null);
+    Guid? ChartAccountId = null,
+    string? DetailedDescription = null);
 
 public sealed record ProjectContributionRequest(decimal Amount, DateTime OccurredAt, Guid? AccountId = null, string? Description = null);
 
 public sealed record LifeProjectResponse(
     Guid Id,
     string Name,
+    string? DetailedDescription,
     decimal GoalAmount,
     DateTime DueDate,
     string ContributionStartYm,
@@ -23,4 +25,5 @@ public sealed record LifeProjectResponse(
     LifeProjectScope Scope,
     bool IsOwner,
     Guid? ChartAccountId,
-    string? ChartAccountName);
+    string? ChartAccountName,
+    string? Horizon);

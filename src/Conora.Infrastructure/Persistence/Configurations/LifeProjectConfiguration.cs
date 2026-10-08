@@ -12,6 +12,7 @@ public class LifeProjectConfiguration : IEntityTypeConfiguration<LifeProject>
         builder.HasKey(e => e.Id);
         builder.Property(e => e.UsuarioId).IsRequired();
         builder.Property(e => e.Name).IsRequired().HasMaxLength(120);
+        builder.Property(e => e.DetailedDescription).HasMaxLength(4000);
         builder.Property(e => e.GoalAmount).HasPrecision(18, 2);
         builder.Property(e => e.AccumulatedAmount).HasPrecision(18, 2);
         builder.Property(e => e.DueDate).IsRequired();
