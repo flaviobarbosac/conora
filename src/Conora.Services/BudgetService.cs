@@ -175,10 +175,8 @@ public sealed class BudgetService
         }
 
         var detailLines = BuildDetailLines(plannedPairs, actuals, accounts);
-        var mode = budgets.FirstOrDefault()?.Mode ?? BudgetMode.Simple;
-        var displayLines = mode == BudgetMode.Simple
-            ? AggregateByGroup(detailLines)
-            : detailLines;
+        var mode = BudgetMode.Detailed;
+        var displayLines = detailLines;
 
         var sections = ExpenseSections.Select(section =>
         {
@@ -293,8 +291,8 @@ public sealed class BudgetService
         var ym = Competence.Require(competenceYm);
         await _months.EnsureOpenAsync(ym, ct);
 
-        var budget = await GetOrCreateBudgetAsync(ym, request.Mode, ct);
-        budget.SetMode(request.Mode);
+        var budget = await GetOrCreateBudgetAsync(ym, BudgetMode.Detailed, ct);
+        budget.SetMode(BudgetMode.Detailed);
 
         foreach (var input in request.Lines.GroupBy(l => l.ChartAccountId).Select(g => g.Last()))
         {
@@ -337,8 +335,8 @@ public sealed class BudgetService
                        ?? throw new NotFoundException($"Não há orçamento em {previousYm} para copiar.");
         var previousLines = await _repo.ListAsync<BudgetLine>(l => l.BudgetId == previous.Id, ct);
 
-        var budget = await GetOrCreateBudgetAsync(ym, previous.Mode, ct);
-        budget.SetMode(previous.Mode);
+        var budget = await GetOrCreateBudgetAsync(ym, BudgetMode.Detailed, ct);
+        budget.SetMode(BudgetMode.Detailed);
         foreach (var line in previousLines)
             await SetLineAsync(budget, line.ChartAccountId, line.PlannedAmount, ct);
 
@@ -418,24 +416,6 @@ public sealed class BudgetService
             .OrderBy(l => l.Section)
             .ThenBy(l => l.GroupName)
             .ThenBy(l => l.ChartAccountName)
-            .ToList();
-    }
-
-    private static List<BudgetLineResponse> AggregateByGroup(IReadOnlyList<BudgetLineResponse> detail)
-    {
-        return detail
-            .GroupBy(l => (l.Section, l.GroupName, l.ParentId))
-            .Select(g =>
-            {
-                var planned = g.Sum(x => x.PlannedAmount);
-                var actual = g.Sum(x => x.ActualAmount);
-                var (percent, status) = Evaluate(planned, actual);
-                return new BudgetLineResponse(
-                    g.Key.ParentId, g.Key.GroupName, g.Key.ParentId, g.Key.GroupName, g.Key.Section,
-                    ChartAccountLevel.Group, planned, actual, planned - actual, percent, status, IsGroup: true);
-            })
-            .OrderBy(l => l.Section)
-            .ThenBy(l => l.GroupName)
             .ToList();
     }
 

@@ -150,4 +150,28 @@ public class FinanceDomainTests
         Assert.Equal(5, Competence.RangeInclusive(project.ContributionStartYm, Competence.From(project.DueDate)).Count);
         Assert.Throws<ValidationException>(() => project.Update("Reserva", 1200m, due, "2027-04", project.ChartAccountId));
     }
+
+    [Fact]
+    public void Life_project_allows_multiple_projects_on_same_chart_account()
+    {
+        var due = new DateTime(2027, 6, 1, 0, 0, 0, DateTimeKind.Utc);
+        var accountId = Guid.NewGuid();
+        var first = LifeProject.Create("Viagem", 5000m, due, "2026-10", accountId);
+        var second = LifeProject.Create("Reserva", 1200m, due, "2026-10", accountId);
+        Assert.Equal(accountId, first.ChartAccountId);
+        Assert.Equal(accountId, second.ChartAccountId);
+        Assert.NotEqual(first.Name, second.Name);
+    }
+
+    [Fact]
+    public void Life_project_contribution_never_goes_below_zero()
+    {
+        var due = new DateTime(2027, 6, 1, 0, 0, 0, DateTimeKind.Utc);
+        var project = LifeProject.Create("Reserva", 1200m, due, "2026-10", Guid.NewGuid());
+        project.ApplyContribution(100m);
+        project.ApplyContribution(-250m);
+        Assert.Equal(0m, project.AccumulatedAmount);
+        project.ApplyContribution(80m);
+        Assert.Equal(80m, project.AccumulatedAmount);
+    }
 }

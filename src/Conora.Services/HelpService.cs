@@ -32,7 +32,7 @@ public sealed class HelpService
         new("raio-x", "Raio-X",
             "Visão do mês: previsto, realizado e variação, na ordem do plano de contas. Começa fechado nas contas sintéticas; o + abre grupos e depois os lançamentos."),
         new("orcamento-cadastro", "Orçamento (cadastro)",
-            "Tela para definir o planejado do mês (modo simples ou detalhado), salvar, copiar o mês anterior e ver o ano."),
+            "Tela para informar o valor planejado de cada conta, salvar, copiar o mês anterior e ver o ano."),
         new("inicio-aporte", "Início do aporte",
             "Primeira competência em que o projeto entra no orçamento. Padrão: mês seguinte. Pode ser qualquer mês entre o atual e o prazo."),
         new("parcela-sugerida", "Parcela sugerida",
@@ -119,10 +119,10 @@ public sealed class HelpService
             "Cadastro do planejado do mês.",
             [
                 new("Renda gastável", "Soma dos líquidos do diagnóstico do mês (base do percentual dos blocos)."),
-                new("Modo simples", "Uma linha por grupo (Habitação, Alimentação, etc.)."),
-                new("Modo detalhado", "Cada conta analítica."),
+                new("Contas", "Cada conta analítica, na ordem do plano: seções fixas e, dentro delas, grupos e itens em ordem alfabética. Grupos começam fechados."),
+                new("Busca", "Filtra a lista pelo nome da conta e abre o ramo encontrado."),
                 new("Salvar", "Grava os valores planejados da competência."),
-                new("Copiar mês anterior", "Traz o modo e os planejados do mês passado."),
+                new("Copiar mês anterior", "Traz os planejados do mês passado."),
                 new("Visão do ano", "Planejado e realizado de janeiro a dezembro.")
             ]),
 
@@ -270,7 +270,6 @@ public sealed class HelpService
             [
                 new("Tema", "Claro ou escuro; fica neste aparelho. Também pode trocar pelo menu da conta."),
                 new("Menu lateral", "Expandido ou só ícones no desktop."),
-                new("Modo padrão do orçamento", "Simples ou detalhado quando o mês ainda não tem orçamento."),
                 new("Nome de exibição", "Como você aparece no grupo e nos avisos; gravado na conta.")
             ])
     ];

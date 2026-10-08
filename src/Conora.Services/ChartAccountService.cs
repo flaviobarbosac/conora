@@ -99,10 +99,11 @@ public sealed class ChartAccountService
                  && (!analyticalOnly || c.Level == ChartAccountLevel.Analytical),
             ct);
 
+        var nameOrder = StringComparer.Create(System.Globalization.CultureInfo.GetCultureInfo("pt-BR"), ignoreCase: true);
         return items
             .OrderBy(c => c.Section)
-            .ThenBy(c => c.SortOrder)
-            .ThenBy(c => c.Name)
+            .ThenBy(c => c.Level == ChartAccountLevel.Root ? 0 : 1)
+            .ThenBy(c => c.Name, nameOrder)
             .Select(ToResponse)
             .ToList();
     }
