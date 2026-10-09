@@ -37,7 +37,7 @@ resource "aws_budgets_budget" "monthly" {
   time_unit    = "MONTHLY"
 
   dynamic "notification" {
-    for_each = [50, 75, 90]
+    for_each = [50, 70, 90]
     content {
       comparison_operator        = "GREATER_THAN"
       threshold                  = notification.value

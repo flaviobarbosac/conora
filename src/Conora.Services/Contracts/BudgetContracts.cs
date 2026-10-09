@@ -58,3 +58,20 @@ public sealed record BudgetYearResponse(
     IReadOnlyList<string> Months,
     IReadOnlyList<BudgetYearLineResponse> Lines,
     IReadOnlyList<BudgetYearMonthCell> Totals);
+
+/// <param name="Overwrite">When false, skip accounts that already have planned &gt; 0 in the target month.</param>
+public sealed record CopyPreviousBudgetRequest(bool Overwrite = false);
+
+/// <summary>Copies the planned amount into the next N-1 months (total N including start). Optional amount overrides the start month.</summary>
+public sealed record RepeatBudgetRequest(
+    Guid ChartAccountId,
+    int MonthCount,
+    bool Overwrite = false,
+    decimal? PlannedAmount = null);
+
+/// <summary>Splits <paramref name="TotalAmount"/> across <paramref name="InstallmentCount"/> months starting at the route competence.</summary>
+public sealed record InstallmentBudgetRequest(
+    Guid ChartAccountId,
+    decimal TotalAmount,
+    int InstallmentCount,
+    bool Overwrite = false);

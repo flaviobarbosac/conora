@@ -166,6 +166,7 @@ app.MapDashboardEndpoints();
 app.MapMemberEndpoints();
 app.MapFamilyEndpoints();
 app.MapPlanEndpoints();
+app.MapFeedbackEndpoints();
 app.MapHelpEndpoints();
 app.MapAiEndpoints();
 app.MapWhatsAppEndpoints();

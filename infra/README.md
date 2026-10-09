@@ -90,4 +90,4 @@ O `.env` e `.env.app` são gerados só na EC2 por `generate-env.sh`.
 
 ## Orçamento
 
-Budget mensal de USD 90 com alertas em 50/75/90% via SNS e e-mail para `flavio@redfivesistemas.com.br`.
+Budget mensal de USD 90 com alertas em 50/70/90% via SNS e e-mail para `flavio@redfivesistemas.com.br`.

@@ -100,8 +100,6 @@ public sealed class HelpService
                 new("Conta do plano", "Busca e agrupa por seção e grupo. O lançamento entra na conta analítica."),
                 new("Insert (web)", "No computador, Insert abre o formulário de novo lançamento. Não vale no app nativo. Não dispara se o foco estiver em um campo de texto."),
                 new("Excluir", "Lixeira vermelha. Pede confirmação."),
-                new("Parcelas", "Divide o valor em partes iguais, uma por mês (ex.: R$ 300 em 3 → R$ 100 × 3)."),
-                new("Repetir por meses", "Repete o valor cheio a cada mês. Não use junto com parcelas. Não é a parcela sugerida do projeto de vida."),
                 new("Competência", "Mês em que o lançamento entra no orçamento e nos relatórios.")
             ]),
 
@@ -121,9 +119,11 @@ public sealed class HelpService
                 new("Renda gastável", "Soma dos líquidos do diagnóstico do mês (base do percentual dos blocos)."),
                 new("Contas", "Cada conta analítica, na ordem do plano: seções fixas e, dentro delas, grupos e itens em ordem alfabética. Grupos começam fechados."),
                 new("Busca", "Filtra a lista pelo nome da conta e abre o ramo encontrado."),
-                new("Salvar", "Grava os valores planejados da competência."),
-                new("Copiar mês anterior", "Traz os planejados do mês passado."),
-                new("Visão do ano", "Planejado e realizado de janeiro a dezembro.")
+                new("Salvar", "Grava os valores planejados da competência. Cancelar descarta o rascunho."),
+                new("Copiar mês anterior", "Traz os planejados do mês passado. Pergunta antes de sobrescrever."),
+                new("Repetir", "Na visão do ano da conta: copia o previsto cheio para os meses seguintes."),
+                new("Parcelar", "Na visão do ano da conta: divide o valor total a partir deste mês."),
+                new("Visão do ano", "Planejado e realizado de janeiro a dezembro. Toque no nome da conta.")
             ]),
 
         new("contas", "Contas",

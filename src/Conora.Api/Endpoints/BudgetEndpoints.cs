@@ -18,8 +18,26 @@ public static class BudgetEndpoints
         group.MapPut("/{competenceYm}", async (string competenceYm, UpsertBudgetRequest request, BudgetService service, CancellationToken ct) =>
             Results.Ok(await service.UpsertAsync(competenceYm, request, ct)));
 
-        group.MapPost("/{competenceYm}/copy-previous", async (string competenceYm, BudgetService service, CancellationToken ct) =>
-            Results.Ok(await service.CopyFromPreviousAsync(competenceYm, ct)));
+        group.MapPost("/{competenceYm}/copy-previous", async (
+            string competenceYm,
+            CopyPreviousBudgetRequest? request,
+            BudgetService service,
+            CancellationToken ct) =>
+            Results.Ok(await service.CopyFromPreviousAsync(competenceYm, request, ct)));
+
+        group.MapPost("/{competenceYm}/repeat", async (
+            string competenceYm,
+            RepeatBudgetRequest request,
+            BudgetService service,
+            CancellationToken ct) =>
+            Results.Ok(await service.RepeatAsync(competenceYm, request, ct)));
+
+        group.MapPost("/{competenceYm}/installments", async (
+            string competenceYm,
+            InstallmentBudgetRequest request,
+            BudgetService service,
+            CancellationToken ct) =>
+            Results.Ok(await service.InstallmentAsync(competenceYm, request, ct)));
 
         group.MapDelete("/{competenceYm}/lines/{ChartAccountId:guid}", async (string competenceYm, Guid ChartAccountId, BudgetService service, CancellationToken ct) =>
             Results.Ok(await service.DeleteLineAsync(competenceYm, ChartAccountId, ct)));

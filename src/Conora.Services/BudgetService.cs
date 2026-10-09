@@ -336,11 +336,15 @@ public sealed class BudgetService
         return await GetAsync(ym, ct);
     }
 
-    public async Task<BudgetResponse> CopyFromPreviousAsync(string competenceYm, CancellationToken ct)
+    public async Task<BudgetResponse> CopyFromPreviousAsync(
+        string competenceYm,
+        CopyPreviousBudgetRequest? request,
+        CancellationToken ct)
     {
         await _plan.EnsureWritableAsync(ct);
         var ym = Competence.Require(competenceYm);
         await _months.EnsureOpenAsync(ym, ct);
+        var overwrite = request?.Overwrite ?? false;
 
         var previousYm = Competence.AddMonths(ym, -1);
         var previous = await _repo.FirstOrDefaultAsync<Budget>(b => b.CompetenceYm == previousYm, ct, track: false)
@@ -350,10 +354,89 @@ public sealed class BudgetService
         var budget = await GetOrCreateBudgetAsync(ym, BudgetMode.Detailed, ct);
         budget.SetMode(BudgetMode.Detailed);
         foreach (var line in previousLines)
+        {
+            if (!overwrite && await GetPlannedAsync(budget.Id, line.ChartAccountId, ct) > 0)
+                continue;
             await SetLineAsync(budget, line.ChartAccountId, line.PlannedAmount, ct);
+        }
 
         await _uow.SaveChangesAsync(ct);
         return await GetAsync(ym, ct);
+    }
+
+    /// <summary>Repeats the current month's planned amount for an account across the next months (including start).</summary>
+    public async Task<BudgetResponse> RepeatAsync(string competenceYm, RepeatBudgetRequest request, CancellationToken ct)
+    {
+        await _plan.EnsureWritableAsync(ct);
+        var startYm = Competence.Require(competenceYm);
+        if (request.MonthCount is < 2 or > 120)
+            throw new ValidationException("monthCount", "Informe entre 2 e 120 meses.");
+
+        var account = await _chartAccounts.RequireAnalyticalAsync(request.ChartAccountId, ct);
+        if (!BudgetSections.Contains(account.Section))
+            throw new ValidationException("chartAccountId", $"A conta '{account.Name}' não aceita orçamento.");
+
+        await _months.EnsureOpenAsync(startYm, ct);
+        var startBudget = await GetOrCreateBudgetAsync(startYm, BudgetMode.Detailed, ct);
+        var amount = request.PlannedAmount is decimal explicitAmount
+            ? decimal.Round(explicitAmount, 2)
+            : await GetPlannedAsync(startBudget.Id, request.ChartAccountId, ct);
+        if (amount <= 0)
+            throw new ValidationException("chartAccountId", "Informe um previsto neste mês antes de repetir.");
+
+        if (request.PlannedAmount is not null)
+            await SetLineAsync(startBudget, request.ChartAccountId, amount, ct);
+
+        for (var i = 1; i < request.MonthCount; i++)
+        {
+            var ym = Competence.AddMonths(startYm, i);
+            await _months.EnsureOpenAsync(ym, ct);
+            var budget = await GetOrCreateBudgetAsync(ym, BudgetMode.Detailed, ct);
+            if (!request.Overwrite && await GetPlannedAsync(budget.Id, request.ChartAccountId, ct) > 0)
+                continue;
+            await SetLineAsync(budget, request.ChartAccountId, amount, ct);
+        }
+
+        await _uow.SaveChangesAsync(ct);
+        return await GetAsync(startYm, ct);
+    }
+
+    /// <summary>Splits a total into monthly planned amounts starting at the competence.</summary>
+    public async Task<BudgetResponse> InstallmentAsync(
+        string competenceYm,
+        InstallmentBudgetRequest request,
+        CancellationToken ct)
+    {
+        await _plan.EnsureWritableAsync(ct);
+        var startYm = Competence.Require(competenceYm);
+        if (request.InstallmentCount is < 2 or > 120)
+            throw new ValidationException("installmentCount", "Informe entre 2 e 120 parcelas.");
+        if (request.TotalAmount <= 0)
+            throw new ValidationException("totalAmount", "Informe um valor total maior que zero.");
+
+        var account = await _chartAccounts.RequireAnalyticalAsync(request.ChartAccountId, ct);
+        if (!BudgetSections.Contains(account.Section))
+            throw new ValidationException("chartAccountId", $"A conta '{account.Name}' não aceita orçamento.");
+
+        var total = decimal.Round(request.TotalAmount, 2);
+        var each = decimal.Round(total / request.InstallmentCount, 2);
+        var allocated = 0m;
+
+        for (var i = 0; i < request.InstallmentCount; i++)
+        {
+            var ym = Competence.AddMonths(startYm, i);
+            await _months.EnsureOpenAsync(ym, ct);
+            var value = i == request.InstallmentCount - 1 ? total - allocated : each;
+            allocated += value;
+
+            var budget = await GetOrCreateBudgetAsync(ym, BudgetMode.Detailed, ct);
+            if (!request.Overwrite && await GetPlannedAsync(budget.Id, request.ChartAccountId, ct) > 0)
+                continue;
+            await SetLineAsync(budget, request.ChartAccountId, value, ct);
+        }
+
+        await _uow.SaveChangesAsync(ct);
+        return await GetAsync(startYm, ct);
     }
 
     public async Task SyncPlannedTitheAsync(string competenceYm, decimal totalTithe, CancellationToken ct)
@@ -485,6 +568,13 @@ public sealed class BudgetService
             _repo.Add(BudgetLine.Create(budget.Id, chartAccountId, planned));
         else
             line.SetPlanned(planned);
+    }
+
+    private async Task<decimal> GetPlannedAsync(Guid budgetId, Guid chartAccountId, CancellationToken ct)
+    {
+        var line = await _repo.FirstOrDefaultAsync<BudgetLine>(
+            l => l.BudgetId == budgetId && l.ChartAccountId == chartAccountId, ct, track: false);
+        return line?.PlannedAmount ?? 0;
     }
 
     private static decimal Project(string ym, decimal actual)
