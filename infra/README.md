@@ -1,14 +1,18 @@
-# Conora infra (DEV)
+# Conora infra (produção)
 
-Terraform + Docker para o ambiente DEV do Conora na AWS.
+A AWS desta conta é produção. Desenvolvimento é só o repo, com Postgres e Mailpit no Docker local. O front local (`npm run dev`) fala com `http://localhost:5080`, nunca com `api.conora.com.br`.
+
+Push em `develop` não faz deploy. O deploy de produção sobe sozinho quando um pull request é mergeado em `main` (API, worker e migrações no startup da API). O front tem o mesmo gatilho no repositório `conora-front`.
+
+O prefixo dos recursos continua `dev` (`conora-dev-*`, secrets `conora/dev/*`). Não renomear para `prod`: o Terraform recriaria RDS, EC2 e secrets.
 
 | Item          | Valor                                    |
 |---------------|------------------------------------------|
 | Conta AWS     | **371664303999** (gate no Terraform e nos scripts) |
 | Região        | sa-east-1                                |
-| Ambiente      | dev                                      |
+| Papel         | produção (prefixo de recurso: `dev`)     |
 | Domínio       | conora.com.br (`api.conora.com.br` = API; `conora.com.br/app/` = front) |
-| Compute       | 1x EC2 t4g.small (arm64) com Docker: rabbitmq, redis, conora-api, conora-worker, caddy |
+| Compute       | 1x EC2 t4g.small (arm64) com Docker: conora-api, conora-worker, caddy |
 | Banco         | RDS PostgreSQL 16 db.t4g.micro           |
 
 ## Estrutura
@@ -16,7 +20,7 @@ Terraform + Docker para o ambiente DEV do Conora na AWS.
 ```
 infra/
   terraform/bootstrap/   bucket de state (S3) + lock (DynamoDB)
-  terraform/             módulo DEV (vpc, ec2, rds, ecr, route53, ses, secrets, ssm, iam, oidc, budget)
+  terraform/             stack de produção (vpc, ec2, rds, ecr, route53, ses, secrets, iam, oidc, budget)
   terraform/templates/   ec2-user-data.sh, deploy.sh (host)
   docker/                docker-compose.aws.yml, Caddyfile
   scripts/               deploy-ssm, push-images, generate-env, fix-route53-dns, SES, Registro.br
@@ -83,10 +87,16 @@ Build com `VITE_API_URL=https://api.conora.com.br`. Publicar o `dist/` em `s3://
 
 ## Segredos
 
-Secrets Manager: `conora/dev/app-core` (connection string, JWT) e `conora/dev/integrations`
-(Google, Gemini, e-mail SES SMTP, WhatsApp, RabbitMQ, Redis). SSM Parameter Store: `/conora/dev/`.
-O Terraform não sobrescreve os valores depois de criados (`ignore_changes`); edite no console/CLI.
-O `.env` e `.env.app` são gerados só na EC2 por `generate-env.sh`.
+São de produção. O ambiente local não lê o Secrets Manager.
+
+| Secret | Conteúdo | Onde vale |
+|---|---|---|
+| `conora/dev/app-core` | connection string do RDS e JWT | só na EC2, via `generate-env.sh` |
+| `conora/dev/integrations` | Google, SMTP do SES. Gemini e WhatsApp estão vazios | só na EC2 |
+
+O Terraform não sobrescreve o valor do secret depois de criado (`ignore_changes`). O `.env` e o `.env.app` nascem só na EC2 e não entram no git. Chaves antigas de Redis e RabbitMQ no secret podem continuar lá; o `generate-env.sh` não as usa.
+
+Local: `appsettings.Development.json` aponta para `localhost:5433` (usuário `conora` do Docker). A API em Development recusa qualquer outro host.
 
 ## Orçamento
 

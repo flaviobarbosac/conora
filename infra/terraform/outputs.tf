@@ -47,10 +47,6 @@ output "config_bucket" {
   value = aws_s3_bucket.config.bucket
 }
 
-output "ssm_prefix" {
-  value = "${local.ssm_prefix}/"
-}
-
 output "secrets_prefix" {
   value = "${var.project}/${var.environment}/"
 }

@@ -20,8 +20,9 @@ variable "project" {
 }
 
 variable "environment" {
-  type    = string
-  default = "dev"
+  type        = string
+  default     = "dev"
+  description = "Resource-name prefix of the only AWS stack. That stack is production (conora.com.br). Do not rename it: Terraform would replace RDS, EC2 and secrets."
 }
 
 variable "domain" {

@@ -7,6 +7,4 @@ locals {
 
   ses_domain    = var.domain
   ses_smtp_host = "email-smtp.${var.aws_region}.amazonaws.com"
-
-  ssm_prefix = "/${var.project}/${var.environment}"
 }

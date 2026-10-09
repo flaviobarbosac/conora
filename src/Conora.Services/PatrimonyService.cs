@@ -42,8 +42,8 @@ public sealed class PatrimonyService
 
         var assetsInUse = responses.Where(i => i.Section == ChartSection.Asset && i.GroupName == "Bens de Uso").Sum(i => i.Amount);
         var assetsNotInUse = responses.Where(i => i.Section == ChartSection.Asset && i.GroupName == "Bens de Não Uso").Sum(i => i.Amount);
-        var assets = responses.Where(i => i.Section == ChartSection.Asset).Sum(i => i.Amount) + accountsBalance;
-        var liabilities = responses.Where(i => i.Section == ChartSection.Liability).Sum(i => i.Amount) + unpaid;
+        var assets = responses.Where(i => i.Section == ChartSection.Asset).Sum(i => i.Amount);
+        var liabilities = responses.Where(i => i.Section == ChartSection.Liability).Sum(i => i.Amount);
 
         var groups = responses
             .GroupBy(i => (i.Section, i.GroupName))

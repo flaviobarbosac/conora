@@ -44,13 +44,12 @@ aws ecr get-login-password --region "$${REGION}" \
   | docker login --username AWS --password-stdin "$${ACCOUNT}.dkr.ecr.$${REGION}.amazonaws.com"
 
 # Infra services and Caddy first; app images may not exist yet on a fresh account.
-docker compose pull rabbitmq redis caddy || true
-docker compose up -d rabbitmq redis
+docker compose pull caddy || true
 # Recreate Caddy so a changed Caddyfile (bind mount) is actually loaded.
-docker compose up -d --force-recreate caddy
+docker compose up -d --remove-orphans --force-recreate caddy
 
 if docker compose pull conora-api conora-worker; then
-  docker compose up -d --force-recreate conora-api conora-worker
+  docker compose up -d --remove-orphans --force-recreate conora-api conora-worker
 else
   echo "WARN: conora-api / conora-worker images not in ECR yet (run infra/scripts/push-images.ps1)."
 fi

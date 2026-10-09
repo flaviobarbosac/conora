@@ -1,8 +1,6 @@
 using Conora.Domain.Entities;
 using Conora.Domain.Exceptions;
 using Conora.Domain.Ports;
-using MassTransit;
-using MassTransit.EntityFrameworkCoreIntegration;
 using Microsoft.EntityFrameworkCore;
 using Npgsql;
 
@@ -10,8 +8,6 @@ namespace Conora.Infrastructure.Persistence;
 
 public class AppDbContext : DbContext
 {
-    public const string ArchitectureSchema = "architecture";
-
     private readonly ITenantContext? _tenant;
 
     public AppDbContext(DbContextOptions<AppDbContext> options, ITenantContext? tenant = null) : base(options)
@@ -77,11 +73,6 @@ public class AppDbContext : DbContext
         TenantFilter<ImportPreviewRow>(modelBuilder);
         TenantFilter<WhatsAppLink>(modelBuilder);
         TenantFilter<WhatsAppDraft>(modelBuilder);
-
-        modelBuilder.AddTransactionalOutboxEntities();
-        modelBuilder.Entity<InboxState>().ToTable("InboxState", ArchitectureSchema);
-        modelBuilder.Entity<OutboxMessage>().ToTable("OutboxMessage", ArchitectureSchema);
-        modelBuilder.Entity<OutboxState>().ToTable("OutboxState", ArchitectureSchema);
     }
 
     public override async Task<int> SaveChangesAsync(CancellationToken cancellationToken = default)

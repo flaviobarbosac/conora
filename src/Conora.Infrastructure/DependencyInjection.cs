@@ -1,11 +1,9 @@
 using Conora.Domain.Ports;
 using Conora.Infrastructure.Email;
-using Conora.Infrastructure.Messaging;
 using Conora.Infrastructure.Persistence;
 using Conora.Infrastructure.Security;
 using Conora.Infrastructure.Telemetry;
 using Microsoft.EntityFrameworkCore;
-using Microsoft.Extensions.Caching.StackExchangeRedis;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using HealthCheckResult = Microsoft.Extensions.Diagnostics.HealthChecks.HealthCheckResult;
@@ -28,17 +26,6 @@ public static class DependencyInjection
             });
         });
 
-        services.AddStackExchangeRedisCache(options =>
-        {
-            options.InstanceName = "conora:";
-        });
-
-        services.AddOptions<RedisCacheOptions>()
-            .PostConfigure<IConfiguration>((options, config) =>
-            {
-                options.Configuration = RequireConnection(config, "Redis");
-            });
-
         services.AddSingleton<IDomainMetrics, DomainMetrics>();
         services.AddSingleton<IPasswordHasher, AspNetPasswordHasher>();
         services.AddSingleton<ITokenService, JwtTokenService>();
@@ -52,12 +39,9 @@ public static class DependencyInjection
             client.BaseAddress = new Uri("https://graph.facebook.com/v21.0/");
             client.Timeout = TimeSpan.FromSeconds(20);
         });
-        services.AddMessaging(configuration);
-
         var health = services.AddHealthChecks()
             .AddCheck("self", () => HealthCheckResult.Healthy(), tags: new[] { "live" })
-            .AddNpgSql(_ => RequireConnection(configuration, "Postgres"), name: "postgres", tags: new[] { "ready" })
-            .AddRedis(_ => RequireConnection(configuration, "Redis"), name: "redis", tags: new[] { "ready" });
+            .AddNpgSql(_ => RequireConnection(configuration, "Postgres"), name: "postgres", tags: new[] { "ready" });
 
         return services;
     }

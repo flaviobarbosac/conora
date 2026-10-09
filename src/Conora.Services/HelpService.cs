@@ -81,7 +81,7 @@ public sealed class HelpService
             "Painel do mês: receitas, despesas, resultado, alertas e projetos de vida. Em grupo familiar, os totais somam os dois membros.",
             [
                 new("Atalhos", "Raio-X, Patrimônio, Projetos de vida e Lançar."),
-                new("Projetos de vida", "Três barras horizontais: Curto, Médio e Longo. O progresso agrega os projetos daquele horizonte. Clique abre o dashboard filtrado."),
+                new("Projetos de vida", "Três barras: verde curto, amarelo médio, vermelho longo. O vermelho do projeto é o prazo (ou meta ultrapassada), não um alerta de erro. Clique abre o dashboard filtrado."),
                 new("Receitas", "Soma da renda gastável do diagnóstico e receitas extras do mês."),
                 new("Despesas", "Despesas, contribuições e compras no cartão na competência."),
                 new("Resultado", "Receitas menos despesas do mês."),
@@ -168,7 +168,7 @@ public sealed class HelpService
         new("projetos", "Projetos de vida",
             "Metas com prazo, início do aporte e conta do plano. Pessoal ou do grupo familiar.",
             [
-                new("Dashboard", "Barras por horizonte, filtro Todos/Curto/Médio/Longo e lista. Clique no card abre o detalhe."),
+                new("Dashboard", "Barras por horizonte: verde curto, amarelo médio, vermelho longo. Acima da meta também fica vermelho, com o texto Acima da meta. Clique no card abre o detalhe."),
                 new("Nome", "Nome do objetivo."),
                 new("Descrição detalhada", "Texto livre do projeto (opcional). Aparece no detalhe e em preview no dashboard."),
                 new("Conta do plano", "Define o horizonte (curto/médio/longo). Só contas de Projetos de vida ainda sem projeto."),

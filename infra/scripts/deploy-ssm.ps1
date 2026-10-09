@@ -2,7 +2,7 @@
 <#
   Deploys the Conora stack to the EC2 host through SSM.
   1. Uploads compose/Caddyfile/generate-env.sh (and optionally the front build) to the config bucket.
-  2. Runs deploy.sh (rendered by Terraform, stored in the bucket) on the instance.
+  2. Renders deploy.sh from the Terraform template, uploads it, and runs it on the instance.
   Secrets are materialized only on the instance, never uploaded.
 
   Usage:
@@ -23,7 +23,7 @@ $ErrorActionPreference = 'Stop'
 $ExpectedAccount = '371664303999'
 
 if ($Environment -ne 'dev') {
-    throw "Environment '$Environment' is not provisioned. Only 'dev' exists in account $ExpectedAccount."
+    throw "Environment '$Environment' is not provisioned. The production stack uses the resource prefix 'dev' in account $ExpectedAccount. Do not create a second prefix."
 }
 
 # Locally a named profile may be used; in GitHub Actions credentials come from OIDC.
@@ -45,10 +45,26 @@ if (-not $InstanceId) {
 }
 
 $DockerDir = Join-Path $PSScriptRoot '..\docker'
+$TerraformDir = Join-Path $PSScriptRoot '..\terraform'
 Write-Host "Uploading config to s3://$Bucket ..." -ForegroundColor Cyan
 aws s3 cp (Join-Path $DockerDir 'docker-compose.aws.yml') "s3://$Bucket/docker-compose.yml" | Out-Null
 aws s3 cp (Join-Path $DockerDir 'Caddyfile') "s3://$Bucket/Caddyfile" | Out-Null
 aws s3 cp (Join-Path $PSScriptRoot 'generate-env.sh') "s3://$Bucket/generate-env.sh" | Out-Null
+
+$deployTemplate = Get-Content (Join-Path $TerraformDir 'templates\deploy.sh') -Raw
+$deployScript = $deployTemplate.Replace('$${', '${').
+    Replace('${aws_region}', $Region).
+    Replace('${config_bucket}', $Bucket).
+    Replace('${account_id}', $Account).
+    Replace('${project}', 'conora').
+    Replace('${environment}', $Environment).
+    Replace('${api_fqdn}', 'api.conora.com.br').
+    Replace('${domain}', 'conora.com.br')
+$deployFile = [System.IO.Path]::GetTempFileName()
+$utf8Deploy = New-Object System.Text.UTF8Encoding $false
+[System.IO.File]::WriteAllText($deployFile, $deployScript, $utf8Deploy)
+aws s3 cp $deployFile "s3://$Bucket/deploy.sh" | Out-Null
+Remove-Item $deployFile -Force
 
 if ($FrontDist) {
     Write-Host "Syncing front build $FrontDist -> s3://$Bucket/front/ ..." -ForegroundColor Cyan
@@ -64,7 +80,7 @@ if (Test-Path $PublicSite) {
 }
 
 Write-Host "Deploying on $InstanceId ..." -ForegroundColor Cyan
-$remote = "aws s3 cp s3://$Bucket/deploy.sh /tmp/conora-deploy.sh --region $Region && bash /tmp/conora-deploy.sh && mkdir -p /opt/conora/public && aws s3 sync s3://$Bucket/public/ /opt/conora/public/ --delete --region $Region && aws s3 cp s3://$Bucket/front/index.html /opt/conora/app/index.html --region $Region 2>/dev/null; cd /opt/conora && docker compose up -d --force-recreate caddy"
+$remote = "aws s3 cp s3://$Bucket/deploy.sh /tmp/conora-deploy.sh --region $Region && bash /tmp/conora-deploy.sh && mkdir -p /opt/conora/public && aws s3 sync s3://$Bucket/public/ /opt/conora/public/ --delete --region $Region && aws s3 cp s3://$Bucket/front/index.html /opt/conora/app/index.html --region $Region 2>/dev/null; cd /opt/conora && docker compose up -d --remove-orphans --force-recreate caddy"
 $paramsFile = [System.IO.Path]::GetTempFileName()
 $utf8NoBom = New-Object System.Text.UTF8Encoding $false
 [System.IO.File]::WriteAllText($paramsFile, (@{ commands = @($remote) } | ConvertTo-Json -Compress), $utf8NoBom)

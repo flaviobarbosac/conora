@@ -21,6 +21,21 @@ using Serilog;
 
 var builder = WebApplication.CreateBuilder(args);
 
+if (builder.Environment.IsDevelopment())
+{
+    var postgres = builder.Configuration.GetConnectionString("Postgres") ?? "";
+    var host = postgres.Split(';', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+        .Select(part => part.Split('=', 2, StringSplitOptions.TrimEntries))
+        .Where(pair => pair.Length == 2 && pair[0].Equals("Host", StringComparison.OrdinalIgnoreCase))
+        .Select(pair => pair[1])
+        .FirstOrDefault();
+    if (host is not ("localhost" or "127.0.0.1"))
+    {
+        throw new InvalidOperationException(
+            "Development só usa o Postgres local (localhost:5433). O banco da AWS é produção.");
+    }
+}
+
 builder.Host.UseSerilog((context, configuration) =>
 {
     configuration

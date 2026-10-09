@@ -28,12 +28,9 @@ esc() { printf '%s' "$1" | sed 's/\$/$$/g'; }
 
 DB_CONNECTION=$(esc "$(get_app .connectionString)")
 JWT_KEY=$(esc "$(get_app .jwtKey)")
-RABBITMQ_USER=$(get_int .rabbitmq.user)
-RABBITMQ_PASS=$(esc "$(get_int .rabbitmq.password)")
-REDIS_PASSWORD=$(esc "$(get_int .redis.password)")
 
-if [ -z "$DB_CONNECTION" ] || [ -z "$JWT_KEY" ] || [ -z "$RABBITMQ_PASS" ] || [ -z "$REDIS_PASSWORD" ]; then
-  echo "ERROR: ${SECRET_PREFIX} secrets are missing required keys (connectionString, jwtKey, rabbitmq, redis)." >&2
+if [ -z "$DB_CONNECTION" ] || [ -z "$JWT_KEY" ]; then
+  echo "ERROR: ${SECRET_PREFIX}/app-core is missing connectionString or jwtKey." >&2
   exit 1
 fi
 
@@ -42,17 +39,12 @@ umask 077
 cat > "${OUT_DIR}/.env" <<EOF
 ECR_API=${ECR_HOST}/conora-${ENV_NAME}-api
 ECR_WORKER=${ECR_HOST}/conora-${ENV_NAME}-worker
-RABBITMQ_USER=${RABBITMQ_USER}
-RABBITMQ_PASS=${RABBITMQ_PASS}
-REDIS_PASSWORD=${REDIS_PASSWORD}
 EOF
 
 cat > "${OUT_DIR}/.env.app" <<EOF
 ASPNETCORE_ENVIRONMENT=${ASPNET_ENV}
 ASPNETCORE_URLS=http://+:8080
 ConnectionStrings__Postgres=${DB_CONNECTION}
-ConnectionStrings__Redis=redis:6379,password=${REDIS_PASSWORD},abortConnect=false
-ConnectionStrings__RabbitMq=amqp://${RABBITMQ_USER}:${RABBITMQ_PASS}@rabbitmq:5672
 Jwt__Key=${JWT_KEY}
 Google__ClientId=$(get_int .google.clientId)
 Gemini__ApiKey=$(esc "$(get_int .gemini.apiKey)")
@@ -70,14 +62,13 @@ WhatsApp__AccessToken=$(esc "$(get_int .whatsapp.accessToken)")
 WhatsApp__PhoneNumberId=$(get_int .whatsapp.phoneNumberId)
 Cors__Origins__0=https://${DOMAIN}
 Cors__Origins__1=http://${DOMAIN}
-Cors__Origins__2=http://localhost:5173
 OpenTelemetry__OtlpEndpoint=
 EOF
 
 # Allow provisional access via the instance public IP (same-origin front+API on :80).
 if PUBLIC_IP=$(curl -fsS --connect-timeout 2 -H "X-aws-ec2-metadata-token: $(curl -fsS -X PUT --connect-timeout 2 -H 'X-aws-ec2-metadata-token-ttl-seconds: 60' http://169.254.169.254/latest/api/token)" http://169.254.169.254/latest/meta-data/public-ipv4 2>/dev/null); then
   if [ -n "$PUBLIC_IP" ]; then
-    printf 'Cors__Origins__3=http://%s\n' "$PUBLIC_IP" >> "${OUT_DIR}/.env.app"
+    printf 'Cors__Origins__2=http://%s\n' "$PUBLIC_IP" >> "${OUT_DIR}/.env.app"
   fi
 fi
 

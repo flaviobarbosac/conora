@@ -2,13 +2,13 @@
 
 API REST em .NET 10. Camadas Domain, Infrastructure, Repository, Services, Api e Worker.
 
-## Subir Postgres, Redis, RabbitMQ e Mailpit
+## Subir Postgres e Mailpit
 
 ```bash
 docker compose up -d
 ```
 
-Banco: `conora` em `localhost:5433`. Redis em `localhost:6380`. RabbitMQ em `localhost:5673` (UI `15673`). Mailpit em `localhost:8026`.
+Banco: `conora` em `localhost:5433`. Mailpit em `localhost:8026`.
 
 ## Rodar a API
 

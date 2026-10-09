@@ -3,16 +3,6 @@ resource "random_password" "jwt" {
   special = false
 }
 
-resource "random_password" "rabbitmq" {
-  length  = 24
-  special = false
-}
-
-resource "random_password" "redis" {
-  length  = 24
-  special = false
-}
-
 locals {
   # Npgsql connection string (ConnectionStrings:Postgres)
   db_connection_string = join("", [
@@ -51,13 +41,6 @@ locals {
       accessToken   = var.whatsapp_access_token
       phoneNumberId = var.whatsapp_phone_number_id
     }
-    rabbitmq = {
-      user     = "conora"
-      password = random_password.rabbitmq.result
-    }
-    redis = {
-      password = random_password.redis.result
-    }
   })
 }
 
@@ -78,7 +61,7 @@ resource "aws_secretsmanager_secret_version" "app_core" {
 
 resource "aws_secretsmanager_secret" "integrations" {
   name                    = "${var.project}/${var.environment}/integrations"
-  description             = "Conora ${var.environment} - Google, Gemini, e-mail, WhatsApp, RabbitMQ, Redis"
+  description             = "Conora ${var.environment} - Google, Gemini, e-mail, WhatsApp"
   recovery_window_in_days = 7
 }
 
