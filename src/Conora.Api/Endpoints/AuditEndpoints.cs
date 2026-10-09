@@ -14,7 +14,7 @@ public static class AuditEndpoints
             var filter = new AuditEventFilter(entityName, entityId, skip, take);
             var result = await service.QueryAsync(filter, ct);
             return Results.Ok(result);
-        }).WithTags("Audit");
+        }).WithTags("Audit").RequireAuthorization();
 
         return app;
     }

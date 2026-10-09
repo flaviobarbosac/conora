@@ -18,16 +18,12 @@ services:
       timeout: 5s
       retries: 10
 
-  redis:
-    image: redis:7-alpine
-    container_name: conora-redis
+  mailpit:
+    image: axllent/mailpit:latest
+    container_name: conora-mailpit
     ports:
-      - "6380:6379"
-    healthcheck:
-      test: ["CMD", "redis-cli", "ping"]
-      interval: 5s
-      timeout: 5s
-      retries: 10
+      - "1026:1025"
+      - "8026:8025"
 
 volumes:
   conora_postgres_data:

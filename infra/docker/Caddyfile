@@ -1,0 +1,60 @@
+{
+	email flavio@redfivesistemas.com.br
+}
+
+# Public site at apex; SPA under /app/; API fallback for other paths.
+conora.com.br {
+	encode zstd gzip
+
+	handle /privacidade {
+		root * /srv/public
+		rewrite * /privacidade.html
+		file_server
+	}
+
+	handle /termos {
+		root * /srv/public
+		rewrite * /termos.html
+		file_server
+	}
+
+	handle /site.css {
+		root * /srv/public
+		file_server
+	}
+
+	handle_path /app* {
+		root * /srv/app
+		try_files {path} /index.html
+		file_server
+	}
+
+	handle / {
+		root * /srv/public
+		try_files /index.html
+		file_server
+	}
+
+	handle {
+		reverse_proxy conora-api:8080 {
+			flush_interval -1
+			transport http {
+				read_timeout 0
+				write_timeout 0
+			}
+		}
+	}
+}
+
+# API: https://api.conora.com.br
+api.conora.com.br {
+	encode zstd gzip
+
+	reverse_proxy conora-api:8080 {
+		flush_interval -1
+		transport http {
+			read_timeout 0
+			write_timeout 0
+		}
+	}
+}

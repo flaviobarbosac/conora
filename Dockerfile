@@ -22,11 +22,8 @@ RUN dotnet publish src/Conora.Api/Conora.Api.csproj \
 FROM mcr.microsoft.com/dotnet/aspnet:10.0 AS runtime
 WORKDIR /app
 
-RUN adduser --disabled-password --gecos "" appuser \
-    && chown -R appuser:appuser /app
-USER appuser
-
-COPY --from=build /app/publish .
+COPY --chown=$APP_UID:$APP_UID --from=build /app/publish .
+USER $APP_UID
 
 ENV ASPNETCORE_URLS=http://+:8080
 ENV DOTNET_EnableDiagnostics=0

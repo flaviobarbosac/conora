@@ -8,9 +8,10 @@ public class UserTests
     [Fact]
     public void Create_normalizes_email_to_lowercase()
     {
-        var user = User.Create("Ana", "Ana@Example.com");
+        var user = User.Create("Ana", "Ana@Example.com", "529.982.247-25");
 
         Assert.Equal("ana@example.com", user.Email);
+        Assert.Equal("52998224725", user.Cpf);
     }
 
     [Theory]

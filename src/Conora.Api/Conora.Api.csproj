@@ -3,11 +3,14 @@
   <PropertyGroup>
     <RootNamespace>Conora.Api</RootNamespace>
     <UserSecretsId>conora-api-secrets</UserSecretsId>
-    <InvariantGlobalization>true</InvariantGlobalization>
+    <!-- pt-BR culture is required for chart sorting and WhatsApp money formatting -->
+    <InvariantGlobalization>false</InvariantGlobalization>
   </PropertyGroup>
 
   <ItemGroup>
+    <PackageReference Include="Microsoft.AspNetCore.Authentication.JwtBearer" Version="10.0.0" />
     <PackageReference Include="Microsoft.AspNetCore.OpenApi" Version="10.0.0" />
+    <PackageReference Include="Serilog.AspNetCore" Version="9.0.0" />
     <PackageReference Include="Microsoft.EntityFrameworkCore.Design" Version="10.0.0">
       <PrivateAssets>all</PrivateAssets>
       <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>

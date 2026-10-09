@@ -1,0 +1,36 @@
+name: Fix Route53 DNS
+
+on:
+  workflow_dispatch:
+
+permissions:
+  id-token: write
+  contents: read
+
+env:
+  AWS_REGION: sa-east-1
+
+jobs:
+  fix-dns:
+    runs-on: ubuntu-latest
+    environment: production
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_GITHUB_ACTIONS_ROLE_ARN }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Diagnose and restore Route53
+        run: |
+          chmod +x infra/scripts/fix-route53-dns.sh
+          infra/scripts/fix-route53-dns.sh
+
+      - name: Upload DNS summary
+        uses: actions/upload-artifact@v4
+        with:
+          name: dns-fix-out
+          path: /tmp/dns-out/
+          if-no-files-found: warn
