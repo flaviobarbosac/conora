@@ -20,6 +20,16 @@ public sealed class BudgetService
         ChartSection.Discount
     ];
 
+    /** Cash-flow sections shown in budget/Raio-X (receita + despesa). */
+    private static readonly ChartSection[] BudgetSections =
+    [
+        ChartSection.Income,
+        ChartSection.Discount,
+        ChartSection.LifeProject,
+        ChartSection.Essential,
+        ChartSection.Social
+    ];
+
     private readonly IFinanceRepository _repo;
     private readonly IUnitOfWork _uow;
     private readonly PlanService _plan;
@@ -72,7 +82,8 @@ public sealed class BudgetService
                 .Where(e => userIds.Contains(e.UsuarioId)
                             && e.CompetenceYm == ym
                             && e.OccurredAt <= until
-                            && (e.Type == EntryType.Expense
+                            && (e.Type == EntryType.Income
+                                || e.Type == EntryType.Expense
                                 || e.Type == EntryType.Contribution
                                 || e.Type == EntryType.ProjectContribution)
                             && e.ChartAccountId != null)
@@ -81,7 +92,8 @@ public sealed class BudgetService
             : await _repo.QueryAsync<Entry, AccountSum>(q => q
                 .Where(e => e.CompetenceYm == ym
                             && e.OccurredAt <= until
-                            && (e.Type == EntryType.Expense
+                            && (e.Type == EntryType.Income
+                                || e.Type == EntryType.Expense
                                 || e.Type == EntryType.Contribution
                                 || e.Type == EntryType.ProjectContribution)
                             && e.ChartAccountId != null)
@@ -178,7 +190,7 @@ public sealed class BudgetService
         var mode = BudgetMode.Detailed;
         var displayLines = detailLines;
 
-        var sections = ExpenseSections.Select(section =>
+        var sections = BudgetSections.Select(section =>
         {
             var sectionLines = displayLines.Where(l => l.Section == section).ToList();
             var planned = sectionLines.Sum(l => l.PlannedAmount);
@@ -297,8 +309,8 @@ public sealed class BudgetService
         foreach (var input in request.Lines.GroupBy(l => l.ChartAccountId).Select(g => g.Last()))
         {
             var account = await _chartAccounts.RequireAnalyticalAsync(input.ChartAccountId, ct);
-            if (!ExpenseSections.Contains(account.Section))
-                throw new ValidationException("lines", $"A conta '{account.Name}' não aceita orçamento de despesa.");
+            if (!BudgetSections.Contains(account.Section))
+                throw new ValidationException("lines", $"A conta '{account.Name}' não aceita orçamento (somente receita e despesa).");
 
             await SetLineAsync(budget, input.ChartAccountId, decimal.Round(input.PlannedAmount, 2), ct);
         }
