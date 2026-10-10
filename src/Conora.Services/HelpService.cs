@@ -30,7 +30,7 @@ public sealed class HelpService
         new("competencia", "Competência",
             "Mês de referência no formato ano-mês (ex.: 2026-10). Orçamento, Raio-X, lançamentos e diagnóstico usam a competência."),
         new("raio-x", "Raio-X",
-            "Visão do mês: previsto, realizado e variação, na ordem do plano de contas. Começa fechado nas contas sintéticas; o + abre grupos e depois os lançamentos."),
+            "Visão do mês: previsto, realizado e % do previsto, na ordem do plano de contas. Começa fechado nas contas sintéticas; o + abre grupos e depois os lançamentos."),
         new("orcamento-cadastro", "Orçamento (cadastro)",
             "Tela para informar o valor planejado de cada conta, salvar, copiar o mês anterior e ver o ano."),
         new("inicio-aporte", "Início do aporte",
@@ -50,7 +50,7 @@ public sealed class HelpService
         new("investimento", "Investimento (bloco)",
             "Linhas de curto, médio e longo prazo no orçamento (reserva, consórcio, previdência)."),
         new("projeto-de-vida", "Projeto de vida",
-            "Objetivo com meta, prazo, início do aporte e conta do plano. Só um projeto ativo por conta. Progresso = acumulado / meta (só leitura)."),
+            "Objetivo com meta, prazo, início do aporte e conta do plano. Vários projetos podem usar a mesma conta. Progresso = acumulado / meta (só leitura)."),
         new("tenant", "Sua conta (isolamento)",
             "Cada pessoa tem login e dados próprios. Contas bancárias, cartões e lançamentos são individuais. No grupo familiar, só algumas telas mostram a soma dos dois — sem misturar o dinheiro de cada um."),
         new("grupo-familiar", "Grupo familiar",
@@ -78,13 +78,15 @@ public sealed class HelpService
             ]),
 
         new("inicio", "Início",
-            "Painel do mês: receitas, despesas, resultado, alertas e projetos de vida. Em grupo familiar, os totais somam os dois membros.",
+            "Painel do mês: saldo, previsão, visão macro, atalhos e totais do dia a dia. Em grupo familiar, os totais somam os dois membros.",
             [
-                new("Atalhos", "Raio-X, Patrimônio, Projetos de vida e Lançar."),
-                new("Projetos de vida", "Três barras: verde curto, amarelo médio, vermelho longo. O vermelho do projeto é o prazo (ou meta ultrapassada), não um alerta de erro. Clique abre o dashboard filtrado."),
-                new("Receitas", "Soma da renda gastável do diagnóstico e receitas extras do mês."),
-                new("Despesas", "Despesas, contribuições e compras no cartão na competência."),
-                new("Resultado", "Receitas menos despesas do mês."),
+                new("Foto do dia", "Saldo atual das contas e previsão do mês (resultado orçado ou realizado)."),
+                new("Visão macro", "Dois cartões: orçamento (previsto × realizado por bloco) e patrimônio (ativo e passivo)."),
+                new("Atalhos", "Projetos de vida e Lançar."),
+                new("Projetos de vida", "Três barras: verde curto, amarelo médio, azul longo. Vermelho só quando o acumulado passa a meta (Acima da meta). Clique abre a lista filtrada."),
+                new("Já recebido", "Receitas já lançadas na competência, quando o mês já tem movimento."),
+                new("Despesas", "Despesas, contribuições e demais saídas da competência."),
+                new("Cartão no mês", "Compras no cartão na competência."),
                 new("Alertas", "Avisos de orçamento, limite de cartão e mês negativo.")
             ]),
 
@@ -99,6 +101,7 @@ public sealed class HelpService
                 new("Conta de destino", "Só em transferência: conta que recebe."),
                 new("Conta do plano", "Busca e agrupa por seção e grupo. O lançamento entra na conta analítica."),
                 new("Insert (web)", "No computador, Insert abre o formulário de novo lançamento. Não vale no app nativo. Não dispara se o foco estiver em um campo de texto."),
+                new("Editar", "Clique na linha de despesa, receita ou transferência para abrir o formulário preenchido. Salvar grava; Cancelar (ou Fechar) descarta o rascunho. O tipo não muda na edição."),
                 new("Excluir", "Lixeira vermelha. Pede confirmação."),
                 new("Competência", "Mês em que o lançamento entra no orçamento e nos relatórios.")
             ]),
@@ -106,20 +109,24 @@ public sealed class HelpService
         new("raio-x", "Raio-X",
             "Listagem do mês na ordem do plano de contas. Só visão — o cadastro do planejado fica em Orçamento.",
             [
-                new("Estado inicial", "Tudo fechado: só as contas sintéticas (raiz) aparecem, com previsto, realizado e variação."),
+                new("Indicadores", "No topo, em grade 2×2: receita recebida, descontos realizados, renda gastável e patrimônio líquido. Toque destaca a seção na lista."),
+                new("Período", "1, 2, 6 ou 12 meses até a competência escolhida."),
+                new("Estado inicial", "Tudo fechado: só as contas sintéticas (raiz) aparecem, com previsto, realizado e % do previsto."),
                 new("Expandir", "O + abre o grupo (2º nível). Outro + abre os lançamentos daquele ramo."),
                 new("Totais", "Sintéticas e grupos somam as contas de baixo."),
-                new("Lançamento", "Clique na linha do lançamento para abrir o registro em Lançamentos, na mesma competência e conta."),
-                new("Receita", "No topo: receita prevista e recebida do diagnóstico.")
+                new("% do previsto", "Com orçamento, mostra o progresso. Sem orçamento lançado, aparece 0% em amarelo. Legenda: Amarelo = sem orçamento lançado."),
+                new("Lançamento", "Clique só na linha do lançamento para abri-lo em edição em Lançamentos. Clicar na categoria sem lançamento não sai do Raio-X.")
             ]),
 
         new("orcamento", "Orçamento",
             "Cadastro do planejado do mês.",
             [
                 new("Renda gastável", "Soma dos líquidos do diagnóstico do mês (base do percentual dos blocos)."),
+                new("Receita", "Também recebe valor planejado, além das despesas e dos outros blocos."),
                 new("Contas", "Cada conta analítica, na ordem do plano: seções fixas e, dentro delas, grupos e itens em ordem alfabética. Grupos começam fechados."),
                 new("Busca", "Filtra a lista pelo nome da conta e abre o ramo encontrado."),
-                new("Salvar", "Grava os valores planejados da competência. Cancelar descarta o rascunho."),
+                new("% do previsto", "Sem valor planejado, mostra 0% em amarelo. Legenda: Amarelo = sem orçamento lançado."),
+                new("Salvar", "Grava os valores planejados da competência. Cancelar descarta o rascunho. Um aviso confirma quando gravou."),
                 new("Copiar mês anterior", "Traz os planejados do mês passado. Pergunta antes de sobrescrever."),
                 new("Repetir", "Na visão do ano da conta: copia o previsto cheio para os meses seguintes."),
                 new("Parcelar", "Na visão do ano da conta: divide o valor total a partir deste mês."),
@@ -157,6 +164,7 @@ public sealed class HelpService
         new("plano-de-contas", "Plano de contas",
             "O lançamento entra na conta analítica. As contas de cima (Receita, Desconto, Essencial…) só somam.",
             [
+                new("Filtro", "Ao abrir, Todos fica selecionado e todas as seções aparecem. Escolher uma categoria mostra só aquela seção."),
                 new("Numeração", "Número só de tela (1, 1.1, 2.1), gerado pelo sistema. Você não edita. Criar ou excluir uma conta renumera os irmãos. Não altera lançamentos."),
                 new("Conta sintética", "As sete contas de cima e os grupos (Habitação, Curto prazo…). Não recebem valor."),
                 new("Conta analítica", "Linha que recebe o lançamento (Salário, Aluguel…)."),
@@ -168,17 +176,17 @@ public sealed class HelpService
         new("projetos", "Projetos de vida",
             "Metas com prazo, início do aporte e conta do plano. Pessoal ou do grupo familiar.",
             [
-                new("Dashboard", "Barras por horizonte: verde curto, amarelo médio, vermelho longo. Acima da meta também fica vermelho, com o texto Acima da meta. Clique no card abre o detalhe."),
+                new("Dashboard", "Barras por horizonte: verde curto, amarelo médio, azul longo. Acima da meta fica vermelho, com o texto Acima da meta. Clique no card abre o detalhe."),
                 new("Nome", "Nome do objetivo."),
                 new("Descrição detalhada", "Texto livre do projeto (opcional). Aparece no detalhe e em preview no dashboard."),
-                new("Conta do plano", "Define o horizonte (curto/médio/longo). Só contas de Projetos de vida ainda sem projeto."),
+                new("Conta do plano", "Define o horizonte (curto/médio/longo). Contas de Projetos de vida; vários projetos podem usar a mesma conta."),
                 new("Meta", "Valor que você quer atingir."),
                 new("Prazo", "Competência alvo. Obrigatório e não pode ser antes do início do aporte."),
                 new("Início do aporte", "Primeiro mês no orçamento. Padrão: mês seguinte. Faixa: mês atual até o prazo."),
                 new("Parcela sugerida", "Preview só leitura: meta ÷ meses (início até o prazo, inclusive)."),
                 new("Orçamento gerado", "Ao criar ou alterar, o Conora grava essa parcela em cada mês do intervalo. Excluir o projeto remove essas linhas."),
                 new("Progresso", "Acumulado / meta. Só leitura."),
-                new("Filtro da lista", "Na Home, as barras Curto/Médio/Longo abrem o dashboard já filtrado."),
+                new("Filtro da lista", "Na própria tela: Todos, Curto, Médio e Longo. Na Home, as barras abrem o filtro correspondente."),
                 new("Escopo pessoal", "Só você vê e edita."),
                 new("Escopo do grupo", "Aparece para os dois; só o dono edita ou apaga. Exige grupo ativo."),
                 new("Aporte", "Lançamento que sai da sua conta e aumenta o acumulado. Feito no detalhe do projeto.")
@@ -262,6 +270,7 @@ public sealed class HelpService
                 new("Menu da conta", "Avatar no topo: Perfil, tema (Claro/Escuro), Plano, Central de ajuda e Sair."),
                 new("Recolher menu", "No desktop largo, deixa só os ícones para ganhar espaço."),
                 new("Tema", "No menu da conta: se o tema atual for claro, aparece Escuro — e o contrário."),
+                new("Salvar", "Ao gravar um cadastro ou lançamento, um aviso confirma que salvou."),
                 new("Versão", "Número do app no rodapé do menu (ex.: 0.1.2).")
             ]),
 

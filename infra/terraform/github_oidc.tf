@@ -29,9 +29,13 @@ resource "aws_iam_role" "github_actions" {
           "token.actions.githubusercontent.com:aud" = "sts.amazonaws.com"
         }
         StringLike = {
+          # GitHub now puts the owner id and repository id in the subject:
+          # repo:owner@OWNER_ID/repo@REPO_ID:environment:production
           "token.actions.githubusercontent.com:sub" = [
             "repo:${var.github_actions_repo_api}:*",
-            "repo:${var.github_actions_repo_front}:*"
+            "repo:${var.github_actions_repo_front}:*",
+            "repo:flaviobarbosac@112890739/conora@1407231035:*",
+            "repo:flaviobarbosac@112890739/conora-front@1407248515:*"
           ]
         }
       }
