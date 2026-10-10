@@ -1,11 +1,11 @@
-using Conora.Domain.Exceptions;
+﻿using Conora.Domain.Exceptions;
 
 namespace Conora.Domain.Entities;
 
 public class PatrimonyItem : ModelBase, ITenantOwned
 {
     public Guid UsuarioId { get; set; }
-    public Guid ChartAccountId { get; private set; }
+    public Guid CategoryId { get; private set; }
     public string Name { get; private set; } = default!;
     public decimal Amount { get; private set; }
 
@@ -13,9 +13,9 @@ public class PatrimonyItem : ModelBase, ITenantOwned
     {
     }
 
-    public static PatrimonyItem Create(Guid chartAccountId, string name, decimal amount)
+    public static PatrimonyItem Create(Guid categoryId, string name, decimal amount)
     {
-        var item = new PatrimonyItem { ChartAccountId = chartAccountId };
+        var item = new PatrimonyItem { CategoryId = categoryId };
         item.SetName(name);
         item.SetAmount(amount);
         return item;
@@ -37,4 +37,6 @@ public class PatrimonyItem : ModelBase, ITenantOwned
 
         Amount = decimal.Round(amount, 2);
     }
+
+    public void SetCategory(Guid categoryId) => CategoryId = categoryId;
 }

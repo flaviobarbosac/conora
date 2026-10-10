@@ -1,23 +1,26 @@
-using Conora.Domain.Entities;
+﻿using Conora.Domain.Entities;
 using Conora.Domain.Enums;
 
 namespace Conora.Domain.Services;
 
 /// <summary>Assigns hierarchical display numbers (1, 1.1, 2.1) for on-screen identification only.</summary>
-public static class ChartAccountDisplayNumbers
+public static class CategoryDisplayNumbers
 {
-    private static readonly ChartSection[] SectionOrder =
+    private static readonly CategorySection[] SectionOrder =
     [
-        ChartSection.Income,
-        ChartSection.Discount,
-        ChartSection.LifeProject,
-        ChartSection.Essential,
-        ChartSection.Social,
-        ChartSection.Asset,
-        ChartSection.Liability
+        CategorySection.Budget,
+        CategorySection.Income,
+        CategorySection.Expense,
+        CategorySection.Discount,
+        CategorySection.LifeProject,
+        CategorySection.Essential,
+        CategorySection.Social,
+        CategorySection.Patrimony,
+        CategorySection.Asset,
+        CategorySection.Liability
     ];
 
-    public static void Apply(IReadOnlyList<ChartAccount> accounts)
+    public static void Apply(IReadOnlyList<Category> accounts)
     {
         var children = accounts
             .GroupBy(c => c.ParentId ?? Guid.Empty)
@@ -41,9 +44,9 @@ public static class ChartAccountDisplayNumbers
     }
 
     private static void Assign(
-        ChartAccount node,
+        Category node,
         string number,
-        IReadOnlyDictionary<Guid, List<ChartAccount>> children)
+        IReadOnlyDictionary<Guid, List<Category>> children)
     {
         node.SetDisplayNumber(number);
         if (!children.TryGetValue(node.Id, out var kids) || kids.Count == 0)

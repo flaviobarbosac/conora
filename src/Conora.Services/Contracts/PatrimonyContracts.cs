@@ -1,21 +1,21 @@
-using Conora.Domain.Enums;
+﻿using Conora.Domain.Enums;
 
 namespace Conora.Services.Contracts;
 
-public sealed record PatrimonyItemRequest(Guid ChartAccountId, string Name, decimal Amount);
+public sealed record PatrimonyItemRequest(Guid CategoryId, string Name, decimal Amount);
 
-public sealed record UpdatePatrimonyItemRequest(string Name, decimal Amount);
+public sealed record UpdatePatrimonyItemRequest(Guid CategoryId, string Name, decimal Amount);
 
 public sealed record PatrimonyItemResponse(
     Guid Id,
-    Guid ChartAccountId,
-    string ChartAccountName,
+    Guid CategoryId,
+    string CategoryName,
     string Name,
-    ChartSection Section,
+    CategorySection Section,
     string GroupName,
     decimal Amount);
 
-public sealed record PatrimonyGroupTotal(string GroupName, ChartSection Section, decimal Amount);
+public sealed record PatrimonyGroupTotal(string GroupName, CategorySection Section, decimal Amount);
 
 public sealed record PatrimonySummaryResponse(
     decimal AccountsBalance,

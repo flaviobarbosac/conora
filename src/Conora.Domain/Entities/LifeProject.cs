@@ -1,4 +1,4 @@
-using Conora.Domain.Enums;
+﻿using Conora.Domain.Enums;
 using Conora.Domain.Exceptions;
 using Conora.Domain.Services;
 
@@ -14,7 +14,7 @@ public class LifeProject : ModelBase, ITenantOwned
     public string ContributionStartYm { get; private set; } = default!;
     public decimal AccumulatedAmount { get; private set; }
     public LifeProjectScope Scope { get; private set; } = LifeProjectScope.Personal;
-    public Guid? ChartAccountId { get; private set; }
+    public Guid? CategoryId { get; private set; }
 
     private LifeProject()
     {
@@ -25,12 +25,12 @@ public class LifeProject : ModelBase, ITenantOwned
         decimal goalAmount,
         DateTime dueDate,
         string contributionStartYm,
-        Guid? chartAccountId,
+        Guid? categoryId,
         LifeProjectScope scope = LifeProjectScope.Personal,
         string? detailedDescription = null)
     {
         var project = new LifeProject { Scope = scope };
-        project.Update(name, goalAmount, dueDate, contributionStartYm, chartAccountId, scope, detailedDescription);
+        project.Update(name, goalAmount, dueDate, contributionStartYm, categoryId, scope, detailedDescription);
         return project;
     }
 
@@ -39,7 +39,7 @@ public class LifeProject : ModelBase, ITenantOwned
         decimal goalAmount,
         DateTime dueDate,
         string contributionStartYm,
-        Guid? chartAccountId,
+        Guid? categoryId,
         LifeProjectScope? scope = null,
         string? detailedDescription = null)
     {
@@ -60,7 +60,7 @@ public class LifeProject : ModelBase, ITenantOwned
         GoalAmount = decimal.Round(goalAmount, 2);
         DueDate = Competence.ToUtc(dueDate);
         ContributionStartYm = startYm;
-        ChartAccountId = chartAccountId;
+        CategoryId = categoryId;
         if (scope is not null)
             Scope = scope.Value;
     }

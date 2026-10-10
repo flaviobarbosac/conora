@@ -1,7 +1,7 @@
-namespace Conora.Services.Contracts;
+﻿namespace Conora.Services.Contracts;
 
 /// <summary>Severity: Ok | Attention (>=70%) | Limit (=100%) | Exceeded (>100%) | Info.</summary>
-public sealed record AlertResponse(string Code, string Severity, string Message, Guid? ChartAccountId = null, decimal? Percent = null);
+public sealed record AlertResponse(string Code, string Severity, string Message, Guid? CategoryId = null, decimal? Percent = null);
 
 public sealed record DashboardResponse(
     string CompetenceYm,
@@ -16,11 +16,11 @@ public sealed record DashboardResponse(
     decimal AccountsBalance,
     IReadOnlyList<AlertResponse> Alerts);
 
-public sealed record ChartAccountTotalResponse(Guid? ChartAccountId, string ChartAccountName, decimal Amount);
+public sealed record CategoryTotalResponse(Guid? CategoryId, string CategoryName, decimal Amount);
 
 public sealed record MonthlyReportResponse(
     DashboardResponse Summary,
-    IReadOnlyList<ChartAccountTotalResponse> ByAccount,
+    IReadOnlyList<CategoryTotalResponse> ByAccount,
     string PreviousYm,
     decimal PreviousExpenseTotal,
     decimal ExpenseDelta,

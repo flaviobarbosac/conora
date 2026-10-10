@@ -10,7 +10,7 @@ public sealed class HelpService
         new(1, "diagnosticar", "Diagnosticar",
             "Descubra para onde seu dinheiro vai hoje. Informe a renda bruta, o INSS e o IR para ver a renda gastável do mês."),
         new(2, "organizar", "Organizar",
-            "Cadastre suas contas, cartões e o plano de contas. Cada centavo precisa ter um lugar para ser registrado."),
+            "Cadastre suas contas, cartões e as categorias (Orçamento e Patrimônio). Cada centavo precisa ter um lugar para ser registrado."),
         new(3, "planejar", "Planejar",
             "Em Orçamento, defina o planejado do mês (simples ou detalhado). O Raio-X só acompanha previsto × realizado."),
         new(4, "registrar", "Registrar",
@@ -30,7 +30,7 @@ public sealed class HelpService
         new("competencia", "Competência",
             "Mês de referência no formato ano-mês (ex.: 2026-10). Orçamento, Raio-X, lançamentos e diagnóstico usam a competência."),
         new("raio-x", "Raio-X",
-            "Visão do mês: previsto, realizado e % do previsto, na ordem do plano de contas. Começa fechado nas contas sintéticas; o + abre grupos e depois os lançamentos."),
+            "Visão do mês: previsto, realizado e % do previsto. Na raiz mostra Receita, Despesa e Patrimônio; o clique desce a cadeia até o item lançado."),
         new("orcamento-cadastro", "Orçamento (cadastro)",
             "Tela para informar o valor planejado de cada conta, salvar, copiar o mês anterior e ver o ano."),
         new("inicio-aporte", "Início do aporte",
@@ -38,7 +38,7 @@ public sealed class HelpService
         new("parcela-sugerida", "Parcela sugerida",
             "Meta dividida pelos meses do início do aporte até o prazo (inclusive). Esse valor vira uma linha de orçamento em cada mês."),
         new("horizonte", "Horizonte",
-            "Curto, médio ou longo prazo. Vem da conta do plano (grupo pai), não de um campo no projeto."),
+            "Curto, médio ou longo prazo. Vem da categoria (grupo pai), não de um campo no projeto."),
         new("planejado", "Planejado",
             "Quanto você pretende gastar (ou investir) naquela linha no mês."),
         new("realizado", "Realizado",
@@ -78,15 +78,12 @@ public sealed class HelpService
             ]),
 
         new("inicio", "Início",
-            "Painel do mês: saldo, previsão, visão macro, atalhos e totais do dia a dia. Em grupo familiar, os totais somam os dois membros.",
+            "Painel do mês: pizzas de receita e despesa, comparação em barra, e os blocos Orçamento, Patrimônio e Projeto de vida. Em grupo familiar, os totais somam os dois membros.",
             [
-                new("Foto do dia", "Saldo atual das contas e previsão do mês (resultado orçado ou realizado)."),
-                new("Visão macro", "Dois cartões: orçamento (previsto × realizado por bloco) e patrimônio (ativo e passivo)."),
-                new("Atalhos", "Projetos de vida e Lançar."),
+                new("Receita e despesa", "Duas pizzas com legenda: detalhamento da renda e da despesa realizadas no mês."),
+                new("Comparativo", "Barra horizontal com o total de receita frente ao total de despesa."),
+                new("Visão macro", "Três blocos: orçamento (previsto × realizado), patrimônio (ativo e passivo) e projeto de vida (horizontes)."),
                 new("Projetos de vida", "Três barras: verde curto, amarelo médio, azul longo. Vermelho só quando o acumulado passa a meta (Acima da meta). Clique abre a lista filtrada."),
-                new("Já recebido", "Receitas já lançadas na competência, quando o mês já tem movimento."),
-                new("Despesas", "Despesas, contribuições e demais saídas da competência."),
-                new("Cartão no mês", "Compras no cartão na competência."),
                 new("Alertas", "Avisos de orçamento, limite de cartão e mês negativo.")
             ]),
 
@@ -107,15 +104,16 @@ public sealed class HelpService
             ]),
 
         new("raio-x", "Raio-X",
-            "Listagem do mês na ordem do plano de contas. Só visão — o cadastro do planejado fica em Orçamento.",
+            "Listagem do mês na ordem das categorias. Só visão — o cadastro do planejado fica em Orçamento.",
             [
-                new("Indicadores", "No topo, em grade 2×2: receita recebida, descontos realizados, renda gastável e patrimônio líquido. Toque destaca a seção na lista."),
+                new("Indicadores", "No topo: receita recebida, descontos realizados e renda gastável. Toque destaca a seção na lista."),
+                new("Patrimônio", "Card com ativo, passivo e patrimônio líquido (resultado, não conta)."),
+                new("Projeto de vida", "Quanto foi separado no período, com atalho para Projetos."),
                 new("Período", "1, 2, 6 ou 12 meses até a competência escolhida."),
-                new("Estado inicial", "Tudo fechado: só as contas sintéticas (raiz) aparecem, com previsto, realizado e % do previsto."),
-                new("Expandir", "O + abre o grupo (2º nível). Outro + abre os lançamentos daquele ramo."),
-                new("Totais", "Sintéticas e grupos somam as contas de baixo."),
-                new("% do previsto", "Com orçamento, mostra o progresso. Sem orçamento lançado, aparece 0% em amarelo. Legenda: Amarelo = sem orçamento lançado."),
-                new("Lançamento", "Clique só na linha do lançamento para abri-lo em edição em Lançamentos. Clicar na categoria sem lançamento não sai do Raio-X.")
+                new("Estado inicial", "Só o primeiro nível: Receita, Despesa e Patrimônio."),
+                new("Navegar", "Clique desce a cadeia de contas. Só o item lançado (lançamento, projeto ou patrimônio) abre a tela de registro."),
+                new("Totais", "Cada linha soma as contas de baixo."),
+                new("% do previsto", "Com orçamento, mostra o progresso. Sem orçamento lançado, aparece 0% em amarelo. Legenda: Amarelo = sem orçamento lançado.")
             ]),
 
         new("orcamento", "Orçamento",
@@ -161,16 +159,17 @@ public sealed class HelpService
                 new("Fatura", "Total do mês; pagar gera lançamento de pagamento (não conta como despesa de novo).")
             ]),
 
-        new("plano-de-contas", "Plano de contas",
-            "O lançamento entra na conta analítica. As contas de cima (Receita, Desconto, Essencial…) só somam.",
+        new("categorias", "Categorias",
+            "Orçamento (o que entra e sai no mês) e Patrimônio (o que você tem e o que deve). O lançamento entra na categoria analítica; as de cima só somam.",
             [
-                new("Filtro", "Ao abrir, Todos fica selecionado e todas as seções aparecem. Escolher uma categoria mostra só aquela seção."),
-                new("Numeração", "Número só de tela (1, 1.1, 2.1), gerado pelo sistema. Você não edita. Criar ou excluir uma conta renumera os irmãos. Não altera lançamentos."),
-                new("Conta sintética", "As sete contas de cima e os grupos (Habitação, Curto prazo…). Não recebem valor."),
-                new("Conta analítica", "Linha que recebe o lançamento (Salário, Aluguel…)."),
-                new("Padrão", "Conta do sistema: não renomeia nem exclui."),
-                new("Sua conta", "Analítica que você cria sob um grupo ou sob a conta, quando não há grupo."),
-                new("Desativar", "Tira a conta dos seletores e mantém o histórico.")
+                new("Tipo", "Combo selecionável (Orçamento, Essencial, Cuidados pessoais…). Digite para achar e filtre a árvore."),
+                new("Buscar", "Campo ao lado do tipo: digite o nome (aluguel, salário…) para achar a categoria."),
+                new("Numeração", "Número só de tela (1, 1.1, 2.1), gerado pelo sistema. Você não edita. Criar ou excluir renumera os irmãos. Não altera lançamentos."),
+                new("Categoria sintética", "Orçamento, Despesa, Patrimônio e os grupos (Habitação, Curto prazo…). Não recebem valor."),
+                new("Categoria analítica", "Linha que recebe o lançamento (Salário, Aluguel…)."),
+                new("Padrão", "Categoria do sistema: não renomeia nem exclui."),
+                new("Sua categoria", "Analítica que você cria sob Receita, Descontos, Projeto de vida, Essencial, Social, Ativo ou Passivo."),
+                new("Desativar", "Tira a categoria dos seletores e mantém o histórico.")
             ]),
 
         new("projetos", "Projetos de vida",
@@ -266,7 +265,7 @@ public sealed class HelpService
             "Navegação e aparência do aplicativo.",
             [
                 new("Menu principal", "Início, Lançamentos, Raio-X, Orçamento e Relatórios."),
-                new("Cadastros", "Guia recolhida no menu: Contas, Cartões, Plano de contas, Projetos, Patrimônio e Membros."),
+                new("Cadastros", "Guia recolhida no menu: Contas, Cartões, Categorias, Projetos, Patrimônio e Membros."),
                 new("Menu da conta", "Avatar no topo: Perfil, tema (Claro/Escuro), Plano, Central de ajuda e Sair."),
                 new("Recolher menu", "No desktop largo, deixa só os ícones para ganhar espaço."),
                 new("Tema", "No menu da conta: se o tema atual for claro, aparece Escuro — e o contrário."),

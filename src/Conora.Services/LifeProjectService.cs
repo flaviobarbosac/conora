@@ -1,4 +1,4 @@
-using Conora.Domain.Entities;
+﻿using Conora.Domain.Entities;
 using Conora.Domain.Enums;
 using Conora.Domain.Exceptions;
 using Conora.Domain.Ports;
@@ -15,7 +15,7 @@ public sealed class LifeProjectService
     private readonly PlanService _plan;
     private readonly EntryService _entries;
     private readonly FamilyGroupService _family;
-    private readonly ChartAccountService _chartAccounts;
+    private readonly CategoryService _categories;
     private readonly BudgetService _budgets;
     private readonly ITenantContext _tenant;
 
@@ -25,7 +25,7 @@ public sealed class LifeProjectService
         PlanService plan,
         EntryService entries,
         FamilyGroupService family,
-        ChartAccountService chartAccounts,
+        CategoryService categories,
         BudgetService budgets,
         ITenantContext tenant)
     {
@@ -34,7 +34,7 @@ public sealed class LifeProjectService
         _plan = plan;
         _entries = entries;
         _family = family;
-        _chartAccounts = chartAccounts;
+        _categories = categories;
         _budgets = budgets;
         _tenant = tenant;
     }
@@ -49,7 +49,7 @@ public sealed class LifeProjectService
                 p => peers.Contains(p.UsuarioId) && p.UsuarioId != self && p.Scope == LifeProjectScope.Group, ct)
             : [];
 
-        var accounts = (await _chartAccounts.ListAsync(ChartSection.LifeProject, true, false, ct))
+        var accounts = (await _categories.ListAsync(CategorySection.LifeProject, true, false, ct))
             .ToDictionary(c => c.Id);
         return own.Concat(groupProjects)
             .OrderBy(p => p.DueDate)
@@ -62,7 +62,7 @@ public sealed class LifeProjectService
     {
         var self = _tenant.UsuarioId ?? throw new ForbiddenException("Usuário não autenticado.");
         var project = await RequireVisibleAsync(id, ct, track: false);
-        var accounts = (await _chartAccounts.ListAsync(ChartSection.LifeProject, true, false, ct))
+        var accounts = (await _categories.ListAsync(CategorySection.LifeProject, true, false, ct))
             .ToDictionary(c => c.Id);
         return ToResponse(project, self, accounts);
     }
@@ -77,19 +77,19 @@ public sealed class LifeProjectService
                 throw new ValidationException("scope", "Sem grupo ativo não dá para marcar o projeto como do grupo.");
         }
 
-        var chartAccountId = await RequireLifeProjectAccountAsync(request.ChartAccountId, ct);
+        var categoryId = await RequireLifeProjectAccountAsync(request.CategoryId, ct);
         EnsureContributionWindow(request.ContributionStartYm, request.DueDate, previousStartYm: null);
         var project = LifeProject.Create(
             request.Name,
             decimal.Round(request.GoalAmount, 2),
             request.DueDate,
             request.ContributionStartYm,
-            chartAccountId,
+            categoryId,
             request.Scope,
             request.DetailedDescription);
         _repo.Add(project);
         await _uow.SaveChangesAsync(ct);
-        await RebuildBudgetForAccountAsync(project.ChartAccountId, MonthsOf(project), ct);
+        await RebuildBudgetForAccountAsync(project.CategoryId, MonthsOf(project), ct);
         return await GetAsync(project.Id, ct);
     }
 
@@ -109,21 +109,21 @@ public sealed class LifeProjectService
                 throw new ValidationException("scope", "Sem grupo ativo não dá para marcar o projeto como do grupo.");
         }
 
-        var chartAccountId = await RequireLifeProjectAccountAsync(request.ChartAccountId, ct);
+        var categoryId = await RequireLifeProjectAccountAsync(request.CategoryId, ct);
         EnsureContributionWindow(request.ContributionStartYm, request.DueDate, project.ContributionStartYm);
-        var previousAccountId = project.ChartAccountId;
+        var previousAccountId = project.CategoryId;
         var previousMonths = MonthsOf(project);
         project.Update(
             request.Name,
             decimal.Round(request.GoalAmount, 2),
             request.DueDate,
             request.ContributionStartYm,
-            chartAccountId,
+            categoryId,
             request.Scope,
             request.DetailedDescription);
         await _uow.SaveChangesAsync(ct);
         await RebuildBudgetForAccountAsync(previousAccountId, previousMonths, ct);
-        await RebuildBudgetForAccountAsync(project.ChartAccountId, MonthsOf(project), ct);
+        await RebuildBudgetForAccountAsync(project.CategoryId, MonthsOf(project), ct);
         return await GetAsync(id, ct);
     }
 
@@ -138,7 +138,7 @@ public sealed class LifeProjectService
         if (await _repo.AnyAsync<Entry>(e => e.LifeProjectId == id, ct))
             throw new ValidationException("id", "Projeto com aportes não pode ser excluído.");
 
-        var accountId = project.ChartAccountId;
+        var accountId = project.CategoryId;
         var months = MonthsOf(project);
         _repo.SoftDelete(project);
         await _uow.SaveChangesAsync(ct);
@@ -152,8 +152,8 @@ public sealed class LifeProjectService
         if (request.AccountId is null)
             throw new ValidationException("accountId", "Escolha a conta bancária de origem.");
 
-        var chartAccountId = request.ChartAccountId ?? project.ChartAccountId;
-        chartAccountId = await RequireLifeProjectAccountAsync(chartAccountId, ct);
+        var categoryId = request.CategoryId ?? project.CategoryId;
+        categoryId = await RequireLifeProjectAccountAsync(categoryId, ct);
 
         await _entries.CreateAsync(new CreateEntryRequest(
             EntryType.ProjectContribution,
@@ -161,20 +161,20 @@ public sealed class LifeProjectService
             request.OccurredAt,
             string.IsNullOrWhiteSpace(request.Description) ? "Aporte em projeto de vida" : request.Description,
             AccountId: request.AccountId,
-            ChartAccountId: chartAccountId,
+            CategoryId: categoryId,
             LifeProjectId: id), ct);
 
         return await GetAsync(id, ct);
     }
 
-    private async Task<Guid> RequireLifeProjectAccountAsync(Guid? chartAccountId, CancellationToken ct)
+    private async Task<Guid> RequireLifeProjectAccountAsync(Guid? categoryId, CancellationToken ct)
     {
-        if (chartAccountId is null)
-            throw new ValidationException("chartAccountId", "Escolha a conta do plano de contas para o projeto.");
+        if (categoryId is null)
+            throw new ValidationException("categoryId", "Escolha a conta do plano de contas para o projeto.");
 
-        var account = await _chartAccounts.RequireAnalyticalAsync(chartAccountId.Value, ct);
-        if (account.Section != ChartSection.LifeProject)
-            throw new ValidationException("chartAccountId", "O projeto só aceita contas da seção Projetos de vida.");
+        var account = await _categories.RequireAnalyticalAsync(categoryId.Value, ct);
+        if (account.Section != CategorySection.LifeProject)
+            throw new ValidationException("categoryId", "O projeto só aceita contas da seção Projetos de vida.");
 
         return account.Id;
     }
@@ -196,13 +196,11 @@ public sealed class LifeProjectService
     private static LifeProjectResponse ToResponse(
         LifeProject p,
         Guid self,
-        IReadOnlyDictionary<Guid, ChartAccountResponse> accounts)
+        IReadOnlyDictionary<Guid, CategoryResponse> accounts)
     {
         string? accountName = null;
-        if (p.ChartAccountId is Guid aid && accounts.TryGetValue(aid, out var account))
-            accountName = string.IsNullOrWhiteSpace(account.DisplayNumber)
-                ? account.Name
-                : $"{account.DisplayNumber} {account.Name}";
+        if (p.CategoryId is Guid aid && accounts.TryGetValue(aid, out var account))
+            accountName = account.Name;
 
         return new(
             p.Id,
@@ -215,17 +213,17 @@ public sealed class LifeProjectService
             p.GoalAmount <= 0 ? 0 : Math.Min(100m, decimal.Round(p.AccumulatedAmount / p.GoalAmount * 100, 1)),
             p.Scope,
             p.UsuarioId == self,
-            p.ChartAccountId,
+            p.CategoryId,
             accountName,
-            ResolveHorizon(p.ChartAccountId, accounts));
+            ResolveHorizon(p.CategoryId, accounts));
     }
 
-    private static string? ResolveHorizon(Guid? chartAccountId, IReadOnlyDictionary<Guid, ChartAccountResponse> accounts)
+    private static string? ResolveHorizon(Guid? categoryId, IReadOnlyDictionary<Guid, CategoryResponse> accounts)
     {
-        if (chartAccountId is not Guid id)
+        if (categoryId is not Guid id)
             return null;
 
-        ChartAccountResponse? current = accounts.GetValueOrDefault(id);
+        CategoryResponse? current = accounts.GetValueOrDefault(id);
         while (current is not null)
         {
             if (current.Code is "LIFE_SHORT" or "LIFE_MID" or "LIFE_LONG")
@@ -259,17 +257,17 @@ public sealed class LifeProjectService
         => Competence.RangeInclusive(project.ContributionStartYm, Competence.From(project.DueDate));
 
     /// <summary>
-    /// Rebuilds planned BudgetLines for a chart account by summing monthly parcels of all active projects on it.
+    /// Rebuilds planned BudgetLines for a category by summing monthly parcels of all active projects on it.
     /// </summary>
     private async Task RebuildBudgetForAccountAsync(
-        Guid? chartAccountId,
+        Guid? categoryId,
         IReadOnlyList<string>? seedMonths,
         CancellationToken ct)
     {
-        if (chartAccountId is not Guid accountId)
+        if (categoryId is not Guid accountId)
             return;
 
-        var projects = await _repo.ListAsync<LifeProject>(p => p.ChartAccountId == accountId, ct);
+        var projects = await _repo.ListAsync<LifeProject>(p => p.CategoryId == accountId, ct);
         var plannedByMonth = new Dictionary<string, decimal>(StringComparer.Ordinal);
         foreach (var item in projects)
         {

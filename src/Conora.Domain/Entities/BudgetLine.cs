@@ -1,4 +1,4 @@
-using Conora.Domain.Exceptions;
+﻿using Conora.Domain.Exceptions;
 
 namespace Conora.Domain.Entities;
 
@@ -6,16 +6,16 @@ public class BudgetLine : ModelBase, ITenantOwned
 {
     public Guid UsuarioId { get; set; }
     public Guid BudgetId { get; private set; }
-    public Guid ChartAccountId { get; private set; }
+    public Guid CategoryId { get; private set; }
     public decimal PlannedAmount { get; private set; }
 
     private BudgetLine()
     {
     }
 
-    public static BudgetLine Create(Guid budgetId, Guid chartAccountId, decimal plannedAmount)
+    public static BudgetLine Create(Guid budgetId, Guid categoryId, decimal plannedAmount)
     {
-        var line = new BudgetLine { BudgetId = budgetId, ChartAccountId = chartAccountId };
+        var line = new BudgetLine { BudgetId = budgetId, CategoryId = categoryId };
         line.SetPlanned(plannedAmount);
         return line;
     }

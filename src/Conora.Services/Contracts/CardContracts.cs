@@ -1,4 +1,4 @@
-using Conora.Domain.Enums;
+﻿using Conora.Domain.Enums;
 
 namespace Conora.Services.Contracts;
 
@@ -15,7 +15,7 @@ public sealed record CardResponse(
     decimal AvailableLimit);
 
 public sealed record CardPurchaseRequest(
-    decimal Amount, DateTime PurchasedAt, int Installments, Guid ChartAccountId, string Description);
+    decimal Amount, DateTime PurchasedAt, int Installments, Guid CategoryId, string Description);
 
 public sealed record CardPurchaseResponse(
     Guid Id,
@@ -23,7 +23,7 @@ public sealed record CardPurchaseResponse(
     decimal Amount,
     DateTime PurchasedAt,
     int Installments,
-    Guid ChartAccountId,
+    Guid CategoryId,
     string Description,
     string CompetenceYm,
     string FirstInvoiceYm);

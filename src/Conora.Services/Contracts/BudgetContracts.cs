@@ -1,19 +1,19 @@
-using Conora.Domain.Enums;
+﻿using Conora.Domain.Enums;
 
 namespace Conora.Services.Contracts;
 
-public sealed record BudgetLineInput(Guid ChartAccountId, decimal PlannedAmount);
+public sealed record BudgetLineInput(Guid CategoryId, decimal PlannedAmount);
 
 public sealed record UpsertBudgetRequest(BudgetMode Mode, IReadOnlyList<BudgetLineInput> Lines);
 
 /// <summary>Status follows the fixed rule: under 70% Ok, 70-99% Attention, 100% Limit, above 100% Exceeded.</summary>
 public sealed record BudgetLineResponse(
-    Guid? ChartAccountId,
-    string ChartAccountName,
+    Guid? CategoryId,
+    string CategoryName,
     Guid? ParentId,
     string GroupName,
-    ChartSection Section,
-    ChartAccountLevel Level,
+    CategorySection Section,
+    CategoryLevel Level,
     decimal PlannedAmount,
     decimal ActualAmount,
     decimal Remaining,
@@ -24,7 +24,7 @@ public sealed record BudgetLineResponse(
 public sealed record BudgetIncomeSourceResponse(Guid Id, string Name, decimal NetSpendable);
 
 public sealed record BudgetSectionResponse(
-    ChartSection Section,
+    CategorySection Section,
     string Name,
     decimal PlannedAmount,
     decimal ActualAmount,
@@ -47,10 +47,10 @@ public sealed record BudgetResponse(
 public sealed record BudgetYearMonthCell(string CompetenceYm, decimal PlannedAmount, decimal ActualAmount);
 
 public sealed record BudgetYearLineResponse(
-    Guid? ChartAccountId,
-    string ChartAccountName,
+    Guid? CategoryId,
+    string CategoryName,
     string GroupName,
-    ChartSection Section,
+    CategorySection Section,
     IReadOnlyList<BudgetYearMonthCell> Months);
 
 public sealed record BudgetYearResponse(
@@ -64,14 +64,14 @@ public sealed record CopyPreviousBudgetRequest(bool Overwrite = false);
 
 /// <summary>Copies the planned amount into the next N-1 months (total N including start). Optional amount overrides the start month.</summary>
 public sealed record RepeatBudgetRequest(
-    Guid ChartAccountId,
+    Guid CategoryId,
     int MonthCount,
     bool Overwrite = false,
     decimal? PlannedAmount = null);
 
 /// <summary>Splits <paramref name="TotalAmount"/> across <paramref name="InstallmentCount"/> months starting at the route competence.</summary>
 public sealed record InstallmentBudgetRequest(
-    Guid ChartAccountId,
+    Guid CategoryId,
     decimal TotalAmount,
     int InstallmentCount,
     bool Overwrite = false);

@@ -1,4 +1,4 @@
-using Conora.Domain.Entities;
+﻿using Conora.Domain.Entities;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
 
@@ -13,8 +13,8 @@ public class PatrimonyItemConfiguration : IEntityTypeConfiguration<PatrimonyItem
         builder.Property(e => e.UsuarioId).IsRequired();
         builder.Property(e => e.Name).IsRequired().HasMaxLength(120);
         builder.Property(e => e.Amount).HasPrecision(18, 2);
-        builder.HasIndex(e => new { e.UsuarioId, e.ChartAccountId })
+        builder.HasIndex(e => new { e.UsuarioId, e.CategoryId })
             .HasFilter("\"DeletedAt\" IS NULL")
-            .HasDatabaseName("IX_patrimony_items_UsuarioId_ChartAccount");
+            .HasDatabaseName("IX_patrimony_items_UsuarioId_Category");
     }
 }

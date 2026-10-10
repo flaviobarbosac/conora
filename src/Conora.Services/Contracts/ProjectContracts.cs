@@ -1,4 +1,4 @@
-using Conora.Domain.Enums;
+﻿using Conora.Domain.Enums;
 
 namespace Conora.Services.Contracts;
 
@@ -8,14 +8,14 @@ public sealed record LifeProjectRequest(
     DateTime DueDate,
     string ContributionStartYm,
     LifeProjectScope Scope = LifeProjectScope.Personal,
-    Guid? ChartAccountId = null,
+    Guid? CategoryId = null,
     string? DetailedDescription = null);
 
 public sealed record ProjectContributionRequest(
     decimal Amount,
     DateTime OccurredAt,
     Guid? AccountId = null,
-    Guid? ChartAccountId = null,
+    Guid? CategoryId = null,
     string? Description = null);
 
 public sealed record LifeProjectResponse(
@@ -29,6 +29,6 @@ public sealed record LifeProjectResponse(
     decimal ProgressPercent,
     LifeProjectScope Scope,
     bool IsOwner,
-    Guid? ChartAccountId,
-    string? ChartAccountName,
+    Guid? CategoryId,
+    string? CategoryName,
     string? Horizon);

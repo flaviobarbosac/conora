@@ -1,4 +1,4 @@
-using Conora.Domain;
+﻿using Conora.Domain;
 using Conora.Domain.Entities;
 using Conora.Domain.Exceptions;
 using Conora.Domain.Ports;
@@ -21,7 +21,7 @@ public sealed class AuthService
     private readonly ITokenService _tokens;
     private readonly IGoogleTokenValidator _google;
     private readonly IEmailSender _email;
-    private readonly ChartAccountService _chartAccounts;
+    private readonly CategoryService _categories;
     private readonly ILogger<AuthService> _logger;
 
     public AuthService(
@@ -35,7 +35,7 @@ public sealed class AuthService
         ITokenService tokens,
         IGoogleTokenValidator google,
         IEmailSender email,
-        ChartAccountService chartAccounts,
+        CategoryService categories,
         ILogger<AuthService> logger)
     {
         _users = users;
@@ -48,7 +48,7 @@ public sealed class AuthService
         _tokens = tokens;
         _google = google;
         _email = email;
-        _chartAccounts = chartAccounts;
+        _categories = categories;
         _logger = logger;
     }
 
@@ -136,7 +136,7 @@ public sealed class AuthService
     {
         _users.Add(user);
         _tenant.Set(user.Id);
-        _chartAccounts.AddDefaults();
+        _categories.AddDefaults();
         return await PersistSessionAsync(user, action, notifyWelcome: true, ct);
     }
 
