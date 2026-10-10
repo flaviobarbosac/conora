@@ -5,6 +5,7 @@ using Conora.Repository.Interface;
 using Conora.Services.Common;
 using Conora.Services.Contracts;
 using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.Logging;
 
 namespace Conora.Services;
 
@@ -19,6 +20,7 @@ public sealed class FamilyGroupService
     private readonly IConfiguration _config;
     private readonly IAuditEventRepository _audits;
     private readonly ICorrelationContext _correlation;
+    private readonly ILogger<FamilyGroupService> _logger;
 
     public FamilyGroupService(
         IFamilyGroupRepository family,
@@ -27,7 +29,8 @@ public sealed class FamilyGroupService
         IEmailSender email,
         IConfiguration config,
         IAuditEventRepository audits,
-        ICorrelationContext correlation)
+        ICorrelationContext correlation,
+        ILogger<FamilyGroupService> logger)
     {
         _family = family;
         _uow = uow;
@@ -36,6 +39,7 @@ public sealed class FamilyGroupService
         _config = config;
         _audits = audits;
         _correlation = correlation;
+        _logger = logger;
     }
 
     public Guid RequireUserId() => _tenant.UsuarioId ?? throw new ForbiddenException("Usuário não autenticado.");
@@ -138,11 +142,19 @@ public sealed class FamilyGroupService
 
         var returnTo = Uri.EscapeDataString($"/grupo/convite/{invite.Token}");
         var link = $"{PublicWebBase()}/app/register?email={Uri.EscapeDataString(email)}&returnTo={returnTo}";
-        await _email.SendAsync(
-            email,
-            $"{me.Name} convidou você para o grupo no Conora",
-            $"Olá,\n\n{me.Name} convidou você para compartilhar o orçamento familiar no Conora.\n\nCrie sua conta neste link (use este e-mail): {link}\n\nSe já tiver conta, entre e abra: {PublicWebBase()}/app/grupo/convite/{invite.Token}\n\nO convite vale até {invite.ExpiresAt:dd/MM/yyyy HH:mm} UTC.\n",
-            ct);
+        try
+        {
+            await _email.SendAsync(
+                email,
+                $"{me.Name} convidou você para o grupo no Conora",
+                $"Olá,\n\n{me.Name} convidou você para compartilhar o orçamento familiar no Conora.\n\nCrie sua conta neste link (use este e-mail): {link}\n\nSe já tiver conta, entre e abra: {PublicWebBase()}/app/grupo/convite/{invite.Token}\n\nO convite vale até {invite.ExpiresAt:dd/MM/yyyy HH:mm} UTC.\n",
+                ct);
+        }
+        catch (Exception ex)
+        {
+            // Invite must persist even when SES is in sandbox / SMTP fails.
+            _logger.LogWarning(ex, "Family invite e-mail failed for {Email}; invite kept.", email);
+        }
 
         AuditRecorder.Record(_audits, _correlation, "FamilyInvite", invite.Id, "FamilyInviteSent", new { email });
         await _uow.SaveChangesAsync(ct);
@@ -239,11 +251,18 @@ public sealed class FamilyGroupService
         var inviter = await _family.FindUserByIdAsync(invite.InviterUsuarioId, ct);
         if (inviter is not null)
         {
-            await _email.SendAsync(
-                inviter.Email,
-                $"{user.Name} entrou no seu grupo no Conora",
-                $"Olá,\n\n{user.Name} ({user.Email}) aceitou seu convite e agora faz parte do grupo familiar no Conora.\n",
-                ct);
+            try
+            {
+                await _email.SendAsync(
+                    inviter.Email,
+                    $"{user.Name} entrou no seu grupo no Conora",
+                    $"Olá,\n\n{user.Name} ({user.Email}) aceitou seu convite e agora faz parte do grupo familiar no Conora.\n",
+                    ct);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogWarning(ex, "Invite-accepted e-mail failed for {Email}.", inviter.Email);
+            }
         }
 
         AuditRecorder.Record(_audits, _correlation, "FamilyInvite", invite.Id, "FamilyInviteAccepted", new { invite.Email, self });

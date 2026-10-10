@@ -31,8 +31,11 @@ jobs:
       - name: Restore
         run: dotnet restore Conora.slnx
 
-      - name: Test
+      - name: Unit tests
         run: dotnet test tests/Conora.UnitTests/Conora.UnitTests.csproj --configuration Release --no-restore
+
+      - name: Integration tests
+        run: dotnet test tests/Conora.IntegrationTests/Conora.IntegrationTests.csproj --configuration Release --no-restore
 
       - name: Configure AWS credentials
         uses: aws-actions/configure-aws-credentials@v4

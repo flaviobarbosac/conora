@@ -67,6 +67,10 @@ public sealed class UserService
 
     public async Task<UserResponse> GetByIdAsync(Guid id, CancellationToken ct)
     {
+        var self = _tenant.UsuarioId ?? throw new ForbiddenException("Usuário não autenticado.");
+        if (id != self)
+            throw new UserNotFoundException(id);
+
         var user = await _users.GetByIdAsync(id, ct);
         if (user is null)
             throw new UserNotFoundException(id);

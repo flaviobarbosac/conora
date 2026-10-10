@@ -45,8 +45,9 @@ public sealed class LifeProjectService
         var own = await _repo.ListAsync<LifeProject>(null, ct);
         var peers = await _family.GetReadableUsuarioIdsAsync(ct);
         var groupProjects = peers.Count > 1
-            ? await _repo.ListAnyTenantAsync<LifeProject>(
-                p => peers.Contains(p.UsuarioId) && p.UsuarioId != self && p.Scope == LifeProjectScope.Group, ct)
+            ? await _repo.ListForUsuariosAsync<LifeProject>(
+                peers,
+                p => p.UsuarioId != self && p.Scope == LifeProjectScope.Group, ct)
             : [];
 
         var accounts = (await _categories.ListAsync(CategorySection.LifeProject, true, false, ct))
@@ -186,9 +187,11 @@ public sealed class LifeProjectService
         if (own is not null)
             return own;
 
-        var project = await _repo.FirstOrDefaultAnyTenantAsync<LifeProject>(p => p.Id == id, ct)
+        var peers = await _family.GetReadableUsuarioIdsAsync(ct);
+        var project = await _repo.FirstOrDefaultForUsuariosAsync<LifeProject>(peers, p => p.Id == id, ct)
                       ?? throw new NotFoundException("Projeto de vida", id);
-        if (project.Scope != LifeProjectScope.Group || !await _family.IsInSameGroupAsync(project.UsuarioId, ct))
+        if (project.UsuarioId != self
+            && (project.Scope != LifeProjectScope.Group || !await _family.IsInSameGroupAsync(project.UsuarioId, ct)))
             throw new NotFoundException("Projeto de vida", id);
         return project;
     }

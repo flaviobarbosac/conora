@@ -92,14 +92,38 @@ public class AppDbContext : DbContext
 
     private void StampTenant()
     {
-        foreach (var entry in ChangeTracker.Entries<ITenantOwned>().Where(e => e.State == EntityState.Added))
+        if (_tenant?.UsuarioId is not Guid tid)
         {
-            if (_tenant?.UsuarioId is not Guid tid)
+            if (ChangeTracker.Entries<ITenantOwned>().Any(e => e.State is EntityState.Added or EntityState.Modified))
                 throw new UnauthorizedAccessException("Tenant não autenticado para carimbar UsuarioId.");
+            return;
+        }
 
-            if (entry.Entity.UsuarioId != Guid.Empty && entry.Entity.UsuarioId != tid)
+        foreach (var entry in ChangeTracker.Entries<ITenantOwned>())
+        {
+            if (entry.State == EntityState.Added)
+            {
+                if (entry.Entity.UsuarioId != Guid.Empty && entry.Entity.UsuarioId != tid)
+                    throw new UnauthorizedAccessException("Operação fora do tenant autenticado.");
+
+                entry.Entity.UsuarioId = tid;
+                continue;
+            }
+
+            if (entry.State != EntityState.Modified)
+                continue;
+
+            var original = entry.Property(nameof(ITenantOwned.UsuarioId)).OriginalValue is Guid originalId
+                ? originalId
+                : entry.Entity.UsuarioId;
+
+            if (entry.Property(nameof(ITenantOwned.UsuarioId)).IsModified && entry.Entity.UsuarioId != original)
+                throw new UnauthorizedAccessException("UsuarioId do tenant não pode ser alterado.");
+
+            if (original != tid || entry.Entity.UsuarioId != tid)
                 throw new UnauthorizedAccessException("Operação fora do tenant autenticado.");
 
+            entry.Property(nameof(ITenantOwned.UsuarioId)).IsModified = false;
             entry.Entity.UsuarioId = tid;
         }
     }

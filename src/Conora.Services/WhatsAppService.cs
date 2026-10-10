@@ -71,7 +71,7 @@ public sealed partial class WhatsAppService
         await _plan.EnsureWritableAsync(ct);
         var phone = WhatsAppLink.NormalizePhone(request.Phone);
 
-        var owner = await _repo.FirstOrDefaultAnyTenantAsync<WhatsAppLink>(l => l.PhoneE164 == phone, ct);
+        var owner = await _repo.FirstOrDefaultGlobalByKeyAsync<WhatsAppLink>(l => l.PhoneE164 == phone, ct);
         if (owner is not null && owner.UsuarioId != _tenant.UsuarioId)
             throw new ValidationException("phone", "Este telefone já está vinculado a outra conta.");
 
@@ -164,7 +164,7 @@ public sealed partial class WhatsAppService
             return null;
 
         var phone = WhatsAppLink.NormalizePhone(fromDigits);
-        var link = await _repo.FirstOrDefaultAnyTenantAsync<WhatsAppLink>(l => l.PhoneE164 == phone, ct);
+        var link = await _repo.FirstOrDefaultGlobalByKeyAsync<WhatsAppLink>(l => l.PhoneE164 == phone, ct);
         if (link is null)
             return new WhatsAppReply(phone, "Este número ainda não está vinculado. Abra o Conora e vincule seu telefone para usar o WhatsApp.");
 
