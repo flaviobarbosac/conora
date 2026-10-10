@@ -368,7 +368,8 @@ public sealed class EntryService
         if (own is not null)
             return own;
 
-        var matches = await _repo.ListAnyTenantAsync<LifeProject>(p => p.Id == projectId, ct, track);
+        var peers = await _family.GetReadableUsuarioIdsAsync(ct);
+        var matches = await _repo.ListForUsuariosAsync<LifeProject>(peers, p => p.Id == projectId, ct, track);
         var project = matches.FirstOrDefault() ?? throw new NotFoundException("Projeto de vida", projectId);
         if (project.Scope != LifeProjectScope.Group || !await _family.IsInSameGroupAsync(project.UsuarioId, ct))
             throw new NotFoundException("Projeto de vida", projectId);

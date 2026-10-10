@@ -1,5 +1,4 @@
-﻿using System.Text;
-using System.Threading.RateLimiting;
+﻿using System.Threading.RateLimiting;
 using Conora.Api.Endpoints;
 using Conora.Api.Exceptions;
 using Conora.Api.Middleware;
@@ -56,16 +55,18 @@ builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
 builder.Services.AddOptions<JwtBearerOptions>(JwtBearerDefaults.AuthenticationScheme)
     .Configure<IConfiguration>((options, configuration) =>
     {
-        // Read the key from the final configuration so test hosts (WebApplicationFactory) override appsettings.
-        var jwtKey = configuration["Jwt:Key"] ?? "conora-dev-jwt-key-must-be-32-chars!";
+        // Read JWT from the final configuration so test hosts (WebApplicationFactory) override appsettings.
+        var jwt = Conora.Infrastructure.Security.JwtSettings.FromConfiguration(configuration);
         options.MapInboundClaims = false;
         options.TokenValidationParameters = new TokenValidationParameters
         {
-            ValidateIssuer = false,
-            ValidateAudience = false,
+            ValidateIssuer = true,
+            ValidIssuer = jwt.Issuer,
+            ValidateAudience = true,
+            ValidAudience = jwt.Audience,
             ValidateLifetime = true,
             ValidateIssuerSigningKey = true,
-            IssuerSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(jwtKey)),
+            IssuerSigningKey = new SymmetricSecurityKey(jwt.KeyBytes),
             NameClaimType = "sub",
             ClockSkew = TimeSpan.FromMinutes(1)
         };

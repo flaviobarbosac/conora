@@ -25,6 +25,8 @@ public sealed class ApiFactory : WebApplicationFactory<Program>, IAsyncLifetime
             {
                 ["ConnectionStrings:Postgres"] = _postgres.GetConnectionString(),
                 ["Jwt:Key"] = "conora-test-jwt-key-must-be-32-chars!",
+                ["Jwt:Issuer"] = "conora-api",
+                ["Jwt:Audience"] = "conora-app",
                 ["Cors:Origins:0"] = "http://localhost:5173",
                 ["Email:SmtpHost"] = ""
             });

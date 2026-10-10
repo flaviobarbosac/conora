@@ -56,22 +56,34 @@ public sealed class FinanceRepository : IFinanceRepository
         where T : ModelBase, ITenantOwned
         => _context.Set<T>().Where(predicate).SumAsync(selector, ct);
 
-    public Task<T?> FirstOrDefaultAnyTenantAsync<T>(Expression<Func<T, bool>> predicate, CancellationToken ct = default)
+    public Task<T?> FirstOrDefaultForUsuariosAsync<T>(
+        IReadOnlyCollection<Guid> allowedUsuarioIds,
+        Expression<Func<T, bool>> predicate,
+        CancellationToken ct = default)
         where T : ModelBase, ITenantOwned
-        => _context.Set<T>().IgnoreQueryFilters().Where(e => e.DeletedAt == null).FirstOrDefaultAsync(predicate, ct);
+        => ForUsuariosQuery<T>(allowedUsuarioIds).FirstOrDefaultAsync(predicate, ct);
 
-    public Task<List<T>> ListAnyTenantAsync<T>(Expression<Func<T, bool>> predicate, CancellationToken ct = default, bool track = false)
+    public Task<List<T>> ListForUsuariosAsync<T>(
+        IReadOnlyCollection<Guid> allowedUsuarioIds,
+        Expression<Func<T, bool>> predicate,
+        CancellationToken ct = default,
+        bool track = false)
         where T : ModelBase, ITenantOwned
     {
-        IQueryable<T> query = _context.Set<T>().IgnoreQueryFilters().Where(e => e.DeletedAt == null);
-        if (!track)
-            query = query.AsNoTracking();
+        IQueryable<T> query = ForUsuariosQuery<T>(allowedUsuarioIds, track);
         return query.Where(predicate).ToListAsync(ct);
     }
 
-    public Task<List<TResult>> QueryAnyTenantAsync<T, TResult>(Func<IQueryable<T>, IQueryable<TResult>> shape, CancellationToken ct = default)
+    public Task<List<TResult>> QueryForUsuariosAsync<T, TResult>(
+        IReadOnlyCollection<Guid> allowedUsuarioIds,
+        Func<IQueryable<T>, IQueryable<TResult>> shape,
+        CancellationToken ct = default)
         where T : ModelBase, ITenantOwned
-        => shape(_context.Set<T>().IgnoreQueryFilters().AsNoTracking().Where(e => e.DeletedAt == null)).ToListAsync(ct);
+        => shape(ForUsuariosQuery<T>(allowedUsuarioIds, track: false)).ToListAsync(ct);
+
+    public Task<T?> FirstOrDefaultGlobalByKeyAsync<T>(Expression<Func<T, bool>> naturalKeyPredicate, CancellationToken ct = default)
+        where T : ModelBase, ITenantOwned
+        => _context.Set<T>().IgnoreQueryFilters().Where(e => e.DeletedAt == null).FirstOrDefaultAsync(naturalKeyPredicate, ct);
 
     public void Add<T>(T entity) where T : ModelBase, ITenantOwned => _context.Set<T>().Add(entity);
 
@@ -84,5 +96,26 @@ public sealed class FinanceRepository : IFinanceRepository
 
         entity.DeletedAt = DateTime.UtcNow;
         entity.Version += 1;
+    }
+
+    private IQueryable<T> ForUsuariosQuery<T>(IReadOnlyCollection<Guid> allowedUsuarioIds, bool track = true)
+        where T : ModelBase, ITenantOwned
+    {
+        EnsureAllowList(allowedUsuarioIds);
+        IQueryable<T> query = _context.Set<T>().IgnoreQueryFilters()
+            .Where(e => e.DeletedAt == null && allowedUsuarioIds.Contains(e.UsuarioId));
+        if (!track)
+            query = query.AsNoTracking();
+        return query;
+    }
+
+    private static void EnsureAllowList(IReadOnlyCollection<Guid> allowedUsuarioIds)
+    {
+        if (allowedUsuarioIds is null || allowedUsuarioIds.Count == 0)
+        {
+            throw new ArgumentException(
+                "Cross-tenant reads require a non-empty allow-list of UsuarioIds.",
+                nameof(allowedUsuarioIds));
+        }
     }
 }

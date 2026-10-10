@@ -9,6 +9,9 @@ public sealed class TenantContext : ITenantContext
 
     public void Set(Guid usuarioId)
     {
+        if (UsuarioId is Guid current && current != usuarioId)
+            throw new InvalidOperationException("Tenant already bound for this request.");
+
         UsuarioId = usuarioId;
     }
 }

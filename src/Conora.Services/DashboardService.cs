@@ -149,12 +149,12 @@ public sealed class DashboardService
         var multi = userIds.Count > 1;
 
         var sources = multi
-            ? await _repo.ListAnyTenantAsync<IncomeSource>(s => userIds.Contains(s.UsuarioId) && s.CompetenceYm == ym, ct)
+            ? await _repo.ListForUsuariosAsync<IncomeSource>(userIds, s => s.CompetenceYm == ym, ct)
             : await _repo.ListAsync<IncomeSource>(s => s.CompetenceYm == ym, ct);
         var sourceIds = sources.Select(s => s.Id).ToHashSet();
         var incomes = multi
-            ? await _repo.ListAnyTenantAsync<Entry>(
-                e => userIds.Contains(e.UsuarioId) && e.CompetenceYm == ym && e.Type == EntryType.Income, ct)
+            ? await _repo.ListForUsuariosAsync<Entry>(
+                userIds, e => e.CompetenceYm == ym && e.Type == EntryType.Income, ct)
             : await _repo.ListAsync<Entry>(e => e.CompetenceYm == ym && e.Type == EntryType.Income, ct);
 
         var extra = incomes.Where(e => e.IncomeSourceId is null || !sourceIds.Contains(e.IncomeSourceId.Value)).Sum(e => e.Amount);
@@ -166,14 +166,14 @@ public sealed class DashboardService
         decimal projects;
         if (multi)
         {
-            expenses = (await _repo.ListAnyTenantAsync<Entry>(
-                e => userIds.Contains(e.UsuarioId) && e.CompetenceYm == ym && e.Type == EntryType.Expense, ct)).Sum(e => e.Amount);
-            contributions = (await _repo.ListAnyTenantAsync<Entry>(
-                e => userIds.Contains(e.UsuarioId) && e.CompetenceYm == ym && e.Type == EntryType.Contribution, ct)).Sum(e => e.Amount);
-            cardPurchases = (await _repo.ListAnyTenantAsync<CardPurchase>(
-                p => userIds.Contains(p.UsuarioId) && p.CompetenceYm == ym, ct)).Sum(p => p.Amount);
-            projects = (await _repo.ListAnyTenantAsync<Entry>(
-                e => userIds.Contains(e.UsuarioId) && e.CompetenceYm == ym && e.Type == EntryType.ProjectContribution, ct)).Sum(e => e.Amount);
+            expenses = (await _repo.ListForUsuariosAsync<Entry>(
+                userIds, e => e.CompetenceYm == ym && e.Type == EntryType.Expense, ct)).Sum(e => e.Amount);
+            contributions = (await _repo.ListForUsuariosAsync<Entry>(
+                userIds, e => e.CompetenceYm == ym && e.Type == EntryType.Contribution, ct)).Sum(e => e.Amount);
+            cardPurchases = (await _repo.ListForUsuariosAsync<CardPurchase>(
+                userIds, p => p.CompetenceYm == ym, ct)).Sum(p => p.Amount);
+            projects = (await _repo.ListForUsuariosAsync<Entry>(
+                userIds, e => e.CompetenceYm == ym && e.Type == EntryType.ProjectContribution, ct)).Sum(e => e.Amount);
         }
         else
         {

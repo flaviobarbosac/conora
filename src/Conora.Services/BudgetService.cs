@@ -78,9 +78,8 @@ public sealed class BudgetService
         var until = ActualUntilUtc(ym);
 
         var entries = multi
-            ? await _repo.QueryAnyTenantAsync<Entry, AccountSum>(q => q
-                .Where(e => userIds.Contains(e.UsuarioId)
-                            && e.CompetenceYm == ym
+            ? await _repo.QueryForUsuariosAsync<Entry, AccountSum>(userIds, q => q
+                .Where(e => e.CompetenceYm == ym
                             && e.OccurredAt <= until
                             && (e.Type == EntryType.Income
                                 || e.Type == EntryType.Expense
@@ -101,8 +100,8 @@ public sealed class BudgetService
                 .Select(g => new AccountSum(g.Key, g.Sum(x => x.Amount))), ct);
 
         var purchases = multi
-            ? await _repo.QueryAnyTenantAsync<CardPurchase, AccountSum>(q => q
-                .Where(p => userIds.Contains(p.UsuarioId) && p.CompetenceYm == ym && p.PurchasedAt <= until)
+            ? await _repo.QueryForUsuariosAsync<CardPurchase, AccountSum>(userIds, q => q
+                .Where(p => p.CompetenceYm == ym && p.PurchasedAt <= until)
                 .GroupBy(p => p.CategoryId)
                 .Select(g => new AccountSum(g.Key, g.Sum(x => x.Amount))), ct)
             : await _repo.QueryAsync<CardPurchase, AccountSum>(q => q
@@ -124,13 +123,13 @@ public sealed class BudgetService
         var multi = userIds.Count > 1;
 
         var budgets = multi
-            ? await _repo.ListAnyTenantAsync<Budget>(b => userIds.Contains(b.UsuarioId) && b.CompetenceYm == ym, ct)
+            ? await _repo.ListForUsuariosAsync<Budget>(userIds, b => b.CompetenceYm == ym, ct)
             : (await _repo.FirstOrDefaultAsync<Budget>(b => b.CompetenceYm == ym, ct, track: false) is { } one ? [one] : []);
         var budgetIds = budgets.Select(b => b.Id).ToList();
         var lines = budgetIds.Count == 0
             ? []
             : multi
-                ? await _repo.ListAnyTenantAsync<BudgetLine>(l => budgetIds.Contains(l.BudgetId), ct)
+                ? await _repo.ListForUsuariosAsync<BudgetLine>(userIds, l => budgetIds.Contains(l.BudgetId), ct)
                 : await _repo.ListAsync<BudgetLine>(l => budgetIds.Contains(l.BudgetId), ct);
 
         var accounts = (await _categories.ListAsync(null, true, false, ct)).ToDictionary(c => c.Id);
@@ -142,7 +141,7 @@ public sealed class BudgetService
             CategoryResponse? account = accounts.GetValueOrDefault(line.CategoryId);
             if (account is null && multi)
             {
-                var remote = await _repo.FirstOrDefaultAnyTenantAsync<Category>(c => c.Id == line.CategoryId, ct);
+                var remote = await _repo.FirstOrDefaultForUsuariosAsync<Category>(userIds, c => c.Id == line.CategoryId, ct);
                 if (remote is not null)
                     account = ToResponse(remote);
             }
@@ -160,10 +159,10 @@ public sealed class BudgetService
 
         var actuals = await GetActualsAsync(ym, ct);
         if (multi)
-            actuals = await RemapActualsAsync(actuals, accounts, ct);
+            actuals = await RemapActualsAsync(actuals, accounts, userIds, ct);
 
         var sources = multi
-            ? (await _repo.ListAnyTenantAsync<IncomeSource>(s => userIds.Contains(s.UsuarioId) && s.CompetenceYm == ym, ct))
+            ? (await _repo.ListForUsuariosAsync<IncomeSource>(userIds, s => s.CompetenceYm == ym, ct))
                 .OrderBy(s => s.Name)
                 .Select(s => new BudgetIncomeSourceResponse(s.Id, s.Name, s.NetSpendable))
                 .ToList()
@@ -232,13 +231,13 @@ public sealed class BudgetService
         foreach (var ym in months)
         {
             var budgets = multi
-                ? await _repo.ListAnyTenantAsync<Budget>(b => userIds.Contains(b.UsuarioId) && b.CompetenceYm == ym, ct)
+                ? await _repo.ListForUsuariosAsync<Budget>(userIds, b => b.CompetenceYm == ym, ct)
                 : (await _repo.FirstOrDefaultAsync<Budget>(b => b.CompetenceYm == ym, ct, track: false) is { } one ? [one] : []);
             var budgetIds = budgets.Select(b => b.Id).ToList();
             var lines = budgetIds.Count == 0
                 ? []
                 : multi
-                    ? await _repo.ListAnyTenantAsync<BudgetLine>(l => budgetIds.Contains(l.BudgetId), ct)
+                    ? await _repo.ListForUsuariosAsync<BudgetLine>(userIds, l => budgetIds.Contains(l.BudgetId), ct)
                     : await _repo.ListAsync<BudgetLine>(l => budgetIds.Contains(l.BudgetId), ct);
 
             var planned = new Dictionary<Guid, decimal>();
@@ -247,7 +246,7 @@ public sealed class BudgetService
                 var localId = line.CategoryId;
                 if (multi && !accounts.ContainsKey(localId))
                 {
-                    var remote = await _repo.FirstOrDefaultAnyTenantAsync<Category>(c => c.Id == line.CategoryId, ct);
+                    var remote = await _repo.FirstOrDefaultForUsuariosAsync<Category>(userIds, c => c.Id == line.CategoryId, ct);
                     var match = remote is null
                         ? null
                         : accounts.Values.FirstOrDefault(c =>
@@ -450,6 +449,7 @@ public sealed class BudgetService
     private async Task<Dictionary<Guid, decimal>> RemapActualsAsync(
         Dictionary<Guid, decimal> actuals,
         Dictionary<Guid, CategoryResponse> accounts,
+        IReadOnlyList<Guid> userIds,
         CancellationToken ct)
     {
         var remapped = new Dictionary<Guid, decimal>();
@@ -461,7 +461,7 @@ public sealed class BudgetService
                 continue;
             }
 
-            var remote = await _repo.FirstOrDefaultAnyTenantAsync<Category>(c => c.Id == accountId, ct);
+            var remote = await _repo.FirstOrDefaultForUsuariosAsync<Category>(userIds, c => c.Id == accountId, ct);
             var local = remote is null
                 ? null
                 : accounts.Values.FirstOrDefault(c =>
@@ -602,9 +602,9 @@ public sealed class BudgetService
         var until = ActualUntilUtc(ym);
         if (multi)
         {
-            return (await _repo.ListAnyTenantAsync<Entry>(
-                e => userIds.Contains(e.UsuarioId)
-                     && e.CompetenceYm == ym
+            return (await _repo.ListForUsuariosAsync<Entry>(
+                userIds,
+                e => e.CompetenceYm == ym
                      && e.Type == EntryType.Income
                      && e.OccurredAt <= until, ct)).Sum(e => e.Amount);
         }

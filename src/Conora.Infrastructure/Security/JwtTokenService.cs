@@ -10,18 +10,16 @@ namespace Conora.Infrastructure.Security;
 
 public sealed class JwtTokenService : ITokenService
 {
-    private readonly byte[] _key;
-    private readonly TimeSpan _accessLifetime;
+    private readonly JwtSettings _settings;
 
     public JwtTokenService(IConfiguration configuration)
     {
-        _key = Encoding.UTF8.GetBytes(configuration["Jwt:Key"] ?? "conora-dev-jwt-key-must-be-32-chars!");
-        _accessLifetime = TimeSpan.FromMinutes(int.TryParse(configuration["Jwt:AccessMinutes"], out var minutes) ? minutes : 15);
+        _settings = JwtSettings.FromConfiguration(configuration);
     }
 
     public TokenPair Issue(Guid userId, string email)
     {
-        var expires = DateTime.UtcNow.Add(_accessLifetime);
+        var expires = DateTime.UtcNow.Add(_settings.AccessLifetime);
         var handler = new JwtSecurityTokenHandler();
         var token = handler.CreateToken(new SecurityTokenDescriptor
         {
@@ -30,8 +28,12 @@ public sealed class JwtTokenService : ITokenService
                 new Claim(JwtRegisteredClaimNames.Sub, userId.ToString()),
                 new Claim(JwtRegisteredClaimNames.Email, email)
             ]),
+            Issuer = _settings.Issuer,
+            Audience = _settings.Audience,
             Expires = expires,
-            SigningCredentials = new SigningCredentials(new SymmetricSecurityKey(_key), SecurityAlgorithms.HmacSha256)
+            SigningCredentials = new SigningCredentials(
+                new SymmetricSecurityKey(_settings.KeyBytes),
+                SecurityAlgorithms.HmacSha256)
         });
 
         var refresh = Convert.ToBase64String(RandomNumberGenerator.GetBytes(64));
@@ -45,11 +47,13 @@ public sealed class JwtTokenService : ITokenService
         {
             var principal = handler.ValidateToken(accessToken, new TokenValidationParameters
             {
-                ValidateIssuer = false,
-                ValidateAudience = false,
+                ValidateIssuer = true,
+                ValidIssuer = _settings.Issuer,
+                ValidateAudience = true,
+                ValidAudience = _settings.Audience,
                 ValidateLifetime = true,
                 ValidateIssuerSigningKey = true,
-                IssuerSigningKey = new SymmetricSecurityKey(_key),
+                IssuerSigningKey = new SymmetricSecurityKey(_settings.KeyBytes),
                 ClockSkew = TimeSpan.FromMinutes(1)
             }, out _);
 

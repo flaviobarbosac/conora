@@ -4,8 +4,10 @@ using Conora.Domain.Entities;
 namespace Conora.Repository.Interface;
 
 /// <summary>
-/// Thin generic data access for the finance domain. All reads go through the AppDbContext
-/// global filter (tenant + soft delete), so callers can never see another tenant's rows.
+/// Thin generic data access for the finance domain. Tenant-scoped reads go through the
+/// AppDbContext global filter. Cross-tenant reads require an explicit allow-list of UsuarioIds
+/// (family peers). The only unscoped escape hatch is <see cref="FirstOrDefaultGlobalByKeyAsync{T}"/>
+/// for inbound webhook routing by natural key.
 /// </summary>
 public interface IFinanceRepository
 {
@@ -31,16 +33,42 @@ public interface IFinanceRepository
     Task<decimal> SumAsync<T>(Expression<Func<T, bool>> predicate, Expression<Func<T, decimal>> selector, CancellationToken ct = default)
         where T : ModelBase, ITenantOwned;
 
-    /// <summary>Cross-tenant lookup. Only for pre-authentication flows (e.g. WhatsApp webhook phone match).</summary>
-    Task<T?> FirstOrDefaultAnyTenantAsync<T>(Expression<Func<T, bool>> predicate, CancellationToken ct = default)
+    /// <summary>
+    /// Cross-tenant lookup restricted to <paramref name="allowedUsuarioIds"/> (non-empty).
+    /// Soft-deleted rows stay excluded.
+    /// </summary>
+    Task<T?> FirstOrDefaultForUsuariosAsync<T>(
+        IReadOnlyCollection<Guid> allowedUsuarioIds,
+        Expression<Func<T, bool>> predicate,
+        CancellationToken ct = default)
         where T : ModelBase, ITenantOwned;
 
-    /// <summary>Cross-tenant list. Soft-deleted rows stay excluded. Used for family group reads.</summary>
-    Task<List<T>> ListAnyTenantAsync<T>(Expression<Func<T, bool>> predicate, CancellationToken ct = default, bool track = false)
+    /// <summary>
+    /// Cross-tenant list restricted to <paramref name="allowedUsuarioIds"/> (non-empty).
+    /// Soft-deleted rows stay excluded.
+    /// </summary>
+    Task<List<T>> ListForUsuariosAsync<T>(
+        IReadOnlyCollection<Guid> allowedUsuarioIds,
+        Expression<Func<T, bool>> predicate,
+        CancellationToken ct = default,
+        bool track = false)
         where T : ModelBase, ITenantOwned;
 
-    /// <summary>Cross-tenant shaped query. Soft-deleted rows stay excluded.</summary>
-    Task<List<TResult>> QueryAnyTenantAsync<T, TResult>(Func<IQueryable<T>, IQueryable<TResult>> shape, CancellationToken ct = default)
+    /// <summary>
+    /// Cross-tenant shaped query. The base query already intersects
+    /// <paramref name="allowedUsuarioIds"/>; soft-deleted rows stay excluded.
+    /// </summary>
+    Task<List<TResult>> QueryForUsuariosAsync<T, TResult>(
+        IReadOnlyCollection<Guid> allowedUsuarioIds,
+        Func<IQueryable<T>, IQueryable<TResult>> shape,
+        CancellationToken ct = default)
+        where T : ModelBase, ITenantOwned;
+
+    /// <summary>
+    /// Unscoped lookup by natural key for inbound webhooks only (e.g. WhatsApp phone).
+    /// Never use for authenticated API paths.
+    /// </summary>
+    Task<T?> FirstOrDefaultGlobalByKeyAsync<T>(Expression<Func<T, bool>> naturalKeyPredicate, CancellationToken ct = default)
         where T : ModelBase, ITenantOwned;
 
     void Add<T>(T entity) where T : ModelBase, ITenantOwned;

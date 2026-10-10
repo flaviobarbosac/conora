@@ -18,4 +18,7 @@ jobs:
           dotnet-version: "10.0.x"
       - run: dotnet restore Conora.slnx
       - run: dotnet build Conora.slnx -c Release --no-restore
-      - run: dotnet test tests/Conora.UnitTests/Conora.UnitTests.csproj -c Release --no-build
+      - name: Unit tests
+        run: dotnet test tests/Conora.UnitTests/Conora.UnitTests.csproj -c Release --no-build --verbosity minimal
+      - name: Integration tests
+        run: dotnet test tests/Conora.IntegrationTests/Conora.IntegrationTests.csproj -c Release --no-build --verbosity minimal
