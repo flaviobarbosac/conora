@@ -253,12 +253,12 @@ public sealed class HelpService
                 new("Status", "Em breve: lançamentos por mensagem no WhatsApp."),
             ]),
 
-        new("ia", "Perguntar à IA",
-            "Tire dúvidas sobre o seu mês com base nos seus dados.",
+        new("ia", "Ian",
+            "Pergunte sobre os seus dados; o Ian monta um relatório com números e gráfico em outra página.",
             [
-                new("Pergunta", "Texto livre sobre orçamento, gastos ou o mês."),
-                new("Competência", "Mês de referência da pergunta (opcional)."),
-                new("Resposta", "Orientação gerada; não substitui o lançamento nem o orçamento.")
+                new("Pergunta", "Texto livre, por exemplo o resumo do mês ou a evolução de um gasto."),
+                new("Relatório", "Página estática com valores em cima e o gráfico escolhido embaixo."),
+                new("PDF", "Na página do relatório, exporta valores e gráfico no mesmo arquivo.")
             ]),
 
         new("menu", "Menu e preferências",
