@@ -1,4 +1,4 @@
-using Conora.Domain.Catalog;
+﻿using Conora.Domain.Catalog;
 using Conora.Domain.Entities;
 using Conora.Domain.Enums;
 using Conora.Domain.Exceptions;
@@ -10,27 +10,61 @@ namespace Conora.UnitTests;
 public class FinanceDomainTests
 {
     [Fact]
-    public void System_chart_has_seven_roots_and_tithe_under_discount()
+    public void System_categories_have_two_masters_and_tithe_under_discount()
     {
-        var roots = SystemChartAccounts.All.Where(c => c.Level == ChartAccountLevel.Root).ToList();
-        Assert.Equal(7, roots.Count);
-        Assert.Contains(SystemChartAccounts.All, c => c.Code == SystemChartAccounts.Tithe);
-        Assert.Equal(ChartSection.Discount, SystemChartAccounts.All.First(c => c.Code == SystemChartAccounts.Tithe).Section);
+        var roots = SystemCategories.All.Where(c => c.Level == CategoryLevel.Root).ToList();
+        Assert.Equal(2, roots.Count);
+        Assert.Contains(roots, c => c.Code == "BUDGET");
+        Assert.Contains(roots, c => c.Code == "PATRIMONY");
+        Assert.DoesNotContain(SystemCategories.All, c => c.Name.Contains("líquido", StringComparison.OrdinalIgnoreCase));
+
+        var income = SystemCategories.All.First(c => c.Code == "INC");
+        Assert.Equal("BUDGET", income.ParentCode);
+        Assert.Equal(CategoryLevel.Group, income.Level);
+
+        var expense = SystemCategories.All.First(c => c.Code == "EXPENSE");
+        Assert.Equal("BUDGET", expense.ParentCode);
+        Assert.Equal("EXPENSE", SystemCategories.All.First(c => c.Code == "DISC").ParentCode);
+        Assert.Equal("PATRIMONY", SystemCategories.All.First(c => c.Code == "ASSET").ParentCode);
+        Assert.Equal("PATRIMONY", SystemCategories.All.First(c => c.Code == "LIAB").ParentCode);
+
+        Assert.Contains(SystemCategories.All, c => c.Code == SystemCategories.Tithe);
+        Assert.Equal(CategorySection.Discount, SystemCategories.All.First(c => c.Code == SystemCategories.Tithe).Section);
     }
 
     [Fact]
-    public void System_chart_account_cannot_be_renamed()
+    public void SyncFromDefinition_reparents_and_renames_orphan_system_group()
     {
-        var account = ChartAccount.CreateSystem(SystemChartAccounts.All.First(c => c.Level == ChartAccountLevel.Analytical), Guid.NewGuid());
+        var expenseId = Guid.NewGuid();
+        var ess = Category.CreateSystem(
+            new SystemCategoryDefinition("ESS", "Essencial", CategoryLevel.Root, CategorySection.Essential, null, 1),
+            parentId: null);
 
-        Assert.Throws<SystemChartAccountProtectedException>(() => account.EnsureNotSystem());
-        Assert.Throws<SystemChartAccountProtectedException>(() => account.Rename("Outro"));
+        Assert.Null(ess.ParentId);
+        Assert.Equal(CategoryLevel.Root, ess.Level);
+
+        ess.SyncFromDefinition(
+            new SystemCategoryDefinition("ESS", "Essencial", CategoryLevel.Group, CategorySection.Essential, "EXPENSE", 2),
+            expenseId);
+
+        Assert.Equal(expenseId, ess.ParentId);
+        Assert.Equal(CategoryLevel.Group, ess.Level);
+        Assert.Equal("Essencial", ess.Name);
+    }
+
+    [Fact]
+    public void System_category_cannot_be_renamed()
+    {
+        var account = Category.CreateSystem(SystemCategories.All.First(c => c.Level == CategoryLevel.Analytical), Guid.NewGuid());
+
+        Assert.Throws<SystemCategoryProtectedException>(() => account.EnsureNotSystem());
+        Assert.Throws<SystemCategoryProtectedException>(() => account.Rename("Outro"));
     }
 
     [Fact]
     public void User_analytical_can_be_renamed()
     {
-        var account = ChartAccount.CreateAnalytical("Extra", Guid.NewGuid(), ChartSection.Essential);
+        var account = Category.CreateAnalytical("Extra", Guid.NewGuid(), CategorySection.Essential);
         account.Rename("Extra 2");
         Assert.Equal("Extra 2", account.Name);
     }
@@ -44,7 +78,7 @@ public class FinanceDomainTests
 
         Assert.Equal(0m, entry.BalanceEffects().Sum(e => e.Delta));
         Assert.False(entry.AffectsMonthlyResult);
-        Assert.Null(entry.ChartAccountId);
+        Assert.Null(entry.CategoryId);
     }
 
     [Fact]
@@ -113,12 +147,12 @@ public class FinanceDomainTests
     [Fact]
     public void Display_numbers_follow_siblings_and_prefix_children()
     {
-        var income = ChartAccount.CreateSystem(SystemChartAccounts.All.First(c => c.Code == "INC"), null);
-        var salary = ChartAccount.CreateAnalytical("Salário", income.Id, ChartSection.Income, 1);
-        var extra = ChartAccount.CreateAnalytical("Extra", income.Id, ChartSection.Income, 2);
-        var discount = ChartAccount.CreateSystem(SystemChartAccounts.All.First(c => c.Code == "DISC"), null);
+        var income = Category.CreateSystem(SystemCategories.All.First(c => c.Code == "INC"), null);
+        var salary = Category.CreateAnalytical("Salário", income.Id, CategorySection.Income, 1);
+        var extra = Category.CreateAnalytical("Extra", income.Id, CategorySection.Income, 2);
+        var discount = Category.CreateSystem(SystemCategories.All.First(c => c.Code == "DISC"), null);
 
-        ChartAccountDisplayNumbers.Apply([income, salary, extra, discount]);
+        CategoryDisplayNumbers.Apply([income, salary, extra, discount]);
 
         Assert.Equal("1", income.DisplayNumber);
         Assert.Equal("1.1", salary.DisplayNumber);
@@ -129,13 +163,13 @@ public class FinanceDomainTests
     [Fact]
     public void Display_numbers_renumber_after_sibling_removed()
     {
-        var income = ChartAccount.CreateSystem(SystemChartAccounts.All.First(c => c.Code == "INC"), null);
-        var first = ChartAccount.CreateAnalytical("A", income.Id, ChartSection.Income, 1);
-        var second = ChartAccount.CreateAnalytical("B", income.Id, ChartSection.Income, 2);
-        var third = ChartAccount.CreateAnalytical("C", income.Id, ChartSection.Income, 3);
-        ChartAccountDisplayNumbers.Apply([income, first, second, third]);
+        var income = Category.CreateSystem(SystemCategories.All.First(c => c.Code == "INC"), null);
+        var first = Category.CreateAnalytical("A", income.Id, CategorySection.Income, 1);
+        var second = Category.CreateAnalytical("B", income.Id, CategorySection.Income, 2);
+        var third = Category.CreateAnalytical("C", income.Id, CategorySection.Income, 3);
+        CategoryDisplayNumbers.Apply([income, first, second, third]);
 
-        ChartAccountDisplayNumbers.Apply([income, second, third]);
+        CategoryDisplayNumbers.Apply([income, second, third]);
 
         Assert.Equal("1.1", second.DisplayNumber);
         Assert.Equal("1.2", third.DisplayNumber);
@@ -148,18 +182,18 @@ public class FinanceDomainTests
         var project = LifeProject.Create("Reserva", 1200m, due, "2026-11", Guid.NewGuid());
         Assert.Equal("2026-11", project.ContributionStartYm);
         Assert.Equal(5, Competence.RangeInclusive(project.ContributionStartYm, Competence.From(project.DueDate)).Count);
-        Assert.Throws<ValidationException>(() => project.Update("Reserva", 1200m, due, "2027-04", project.ChartAccountId));
+        Assert.Throws<ValidationException>(() => project.Update("Reserva", 1200m, due, "2027-04", project.CategoryId));
     }
 
     [Fact]
-    public void Life_project_allows_multiple_projects_on_same_chart_account()
+    public void Life_project_allows_multiple_projects_on_same_category()
     {
         var due = new DateTime(2027, 6, 1, 0, 0, 0, DateTimeKind.Utc);
         var accountId = Guid.NewGuid();
         var first = LifeProject.Create("Viagem", 5000m, due, "2026-10", accountId);
         var second = LifeProject.Create("Reserva", 1200m, due, "2026-10", accountId);
-        Assert.Equal(accountId, first.ChartAccountId);
-        Assert.Equal(accountId, second.ChartAccountId);
+        Assert.Equal(accountId, first.CategoryId);
+        Assert.Equal(accountId, second.CategoryId);
         Assert.NotEqual(first.Name, second.Name);
     }
 

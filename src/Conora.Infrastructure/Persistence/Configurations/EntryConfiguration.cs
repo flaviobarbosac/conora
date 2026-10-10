@@ -1,4 +1,4 @@
-using Conora.Domain.Entities;
+﻿using Conora.Domain.Entities;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
 
@@ -22,6 +22,6 @@ public class EntryConfiguration : IEntityTypeConfiguration<Entry>
         builder.HasIndex(e => new { e.UsuarioId, e.CompetenceYm });
         builder.HasIndex(e => new { e.UsuarioId, e.OccurredAt });
         builder.HasIndex(e => new { e.UsuarioId, e.ImportHash });
-        builder.HasIndex(e => new { e.UsuarioId, e.ChartAccountId });
+        builder.HasIndex(e => new { e.UsuarioId, e.CategoryId });
     }
 }

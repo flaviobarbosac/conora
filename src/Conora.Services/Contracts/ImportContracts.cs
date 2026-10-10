@@ -1,4 +1,4 @@
-using Conora.Domain.Enums;
+﻿using Conora.Domain.Enums;
 
 namespace Conora.Services.Contracts;
 
@@ -20,6 +20,6 @@ public sealed record ImportPreviewResponse(
 
 public sealed record SetImportRowRequest(bool WillImport);
 
-public sealed record CommitImportRequest(Guid AccountId, Guid? DefaultExpenseChartAccountId = null, Guid? DefaultIncomeChartAccountId = null);
+public sealed record CommitImportRequest(Guid AccountId, Guid? DefaultExpenseCategoryId = null, Guid? DefaultIncomeCategoryId = null);
 
 public sealed record CommitImportResponse(Guid BatchId, int Imported, int Skipped);

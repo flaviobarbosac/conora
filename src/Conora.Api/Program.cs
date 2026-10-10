@@ -1,4 +1,4 @@
-using System.Text;
+﻿using System.Text;
 using System.Threading.RateLimiting;
 using Conora.Api.Endpoints;
 using Conora.Api.Exceptions;
@@ -167,7 +167,7 @@ app.MapAuthEndpoints();
 app.MapUserEndpoints();
 app.MapAuditEndpoints();
 app.MapLgpdEndpoints();
-app.MapChartAccountEndpoints();
+app.MapCategoryEndpoints();
 app.MapDiagnosisEndpoints();
 app.MapAccountEndpoints();
 app.MapCreditCardEndpoints();

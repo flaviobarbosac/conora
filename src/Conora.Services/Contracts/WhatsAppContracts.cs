@@ -1,4 +1,4 @@
-using Conora.Domain.Enums;
+﻿using Conora.Domain.Enums;
 
 namespace Conora.Services.Contracts;
 
@@ -8,7 +8,7 @@ public sealed record WhatsAppLinkResponse(string PhoneE164, DateTime LinkedAt);
 
 public sealed record WhatsAppDraftResponse(Guid Id, string PhoneE164, string PayloadJson, WhatsAppDraftStatus Status, DateTime CreatedAt);
 
-public sealed record ConfirmWhatsAppDraftRequest(Guid? AccountId = null, Guid? ChartAccountId = null);
+public sealed record ConfirmWhatsAppDraftRequest(Guid? AccountId = null, Guid? CategoryId = null);
 
 /// <summary>Parsed payload stored in <c>WhatsAppDraft.PayloadJson</c>.</summary>
 public sealed record WhatsAppDraftPayload(EntryType Type, decimal Amount, string Description, DateTime OccurredAt);

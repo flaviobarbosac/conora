@@ -121,7 +121,7 @@ public sealed partial class WhatsAppService
                 payload.OccurredAt,
                 payload.Description,
                 AccountId: request.AccountId,
-                ChartAccountId: request.ChartAccountId), token);
+                CategoryId: request.CategoryId), token);
 
             draft.Confirm();
             AuditRecorder.Record(_audits, _correlation, "WhatsAppDraft", draft.Id, "WhatsAppDraftConfirmed", new { payload.Type, payload.Amount });

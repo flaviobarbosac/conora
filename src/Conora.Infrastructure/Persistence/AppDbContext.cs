@@ -1,4 +1,4 @@
-using Conora.Domain.Entities;
+﻿using Conora.Domain.Entities;
 using Conora.Domain.Exceptions;
 using Conora.Domain.Ports;
 using Microsoft.EntityFrameworkCore;
@@ -22,7 +22,7 @@ public class AppDbContext : DbContext
     public DbSet<EmailSuppression> EmailSuppressions => Set<EmailSuppression>();
 
     // Finance domain (all tenant-owned)
-    public DbSet<ChartAccount> ChartAccounts => Set<ChartAccount>();
+    public DbSet<Category> Categories => Set<Category>();
     public DbSet<IncomeSource> IncomeSources => Set<IncomeSource>();
     public DbSet<Account> Accounts => Set<Account>();
     public DbSet<CreditCard> CreditCards => Set<CreditCard>();
@@ -55,7 +55,7 @@ public class AppDbContext : DbContext
         TenantFilter<AuditEvent>(modelBuilder);
         TenantFilter<RefreshToken>(modelBuilder);
         TenantFilter<LgpdRequest>(modelBuilder);
-        TenantFilter<ChartAccount>(modelBuilder);
+        TenantFilter<Category>(modelBuilder);
         TenantFilter<IncomeSource>(modelBuilder);
         TenantFilter<Account>(modelBuilder);
         TenantFilter<CreditCard>(modelBuilder);

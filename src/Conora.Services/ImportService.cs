@@ -116,7 +116,7 @@ public sealed class ImportService
                 row.MappedDate,
                 row.MappedDescription,
                 accountId: request.AccountId,
-                chartAccountId: isIncome ? request.DefaultIncomeChartAccountId : request.DefaultExpenseChartAccountId,
+                categoryId: isIncome ? request.DefaultIncomeCategoryId : request.DefaultExpenseCategoryId,
                 importHash: row.ImportHash));
         }
 

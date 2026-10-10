@@ -1,4 +1,4 @@
-using Microsoft.Extensions.DependencyInjection;
+﻿using Microsoft.Extensions.DependencyInjection;
 
 namespace Conora.Services;
 
@@ -14,7 +14,7 @@ public static class DependencyInjection
         // Finance domain
         services.AddScoped<PlanService>();
         services.AddScoped<MonthService>();
-        services.AddScoped<ChartAccountService>();
+        services.AddScoped<CategoryService>();
         services.AddScoped<MemberService>();
         services.AddScoped<FamilyGroupService>();
         services.AddScoped<EntryService>();

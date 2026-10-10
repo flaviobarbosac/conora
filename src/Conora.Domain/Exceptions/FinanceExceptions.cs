@@ -1,4 +1,4 @@
-namespace Conora.Domain.Exceptions;
+﻿namespace Conora.Domain.Exceptions;
 
 public sealed class NotFoundException : DomainException
 {
@@ -11,9 +11,9 @@ public sealed class NotFoundException : DomainException
     }
 }
 
-public sealed class SystemChartAccountProtectedException : DomainException
+public sealed class SystemCategoryProtectedException : DomainException
 {
-    public SystemChartAccountProtectedException() : base("Conta padrão do sistema não pode ser alterada ou excluída.")
+    public SystemCategoryProtectedException() : base("Conta padrão do sistema não pode ser alterada ou excluída.")
     {
     }
 }

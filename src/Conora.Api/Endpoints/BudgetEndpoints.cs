@@ -39,8 +39,8 @@ public static class BudgetEndpoints
             CancellationToken ct) =>
             Results.Ok(await service.InstallmentAsync(competenceYm, request, ct)));
 
-        group.MapDelete("/{competenceYm}/lines/{ChartAccountId:guid}", async (string competenceYm, Guid ChartAccountId, BudgetService service, CancellationToken ct) =>
-            Results.Ok(await service.DeleteLineAsync(competenceYm, ChartAccountId, ct)));
+        group.MapDelete("/{competenceYm}/lines/{CategoryId:guid}", async (string competenceYm, Guid CategoryId, BudgetService service, CancellationToken ct) =>
+            Results.Ok(await service.DeleteLineAsync(competenceYm, CategoryId, ct)));
 
         return app;
     }

@@ -1,4 +1,4 @@
-using Conora.Domain.Catalog;
+﻿using Conora.Domain.Catalog;
 using Conora.Domain.Entities;
 using Conora.Domain.Enums;
 using Conora.Domain.Exceptions;
@@ -10,31 +10,31 @@ namespace Conora.Services;
 
 public sealed class BudgetService
 {
-    private sealed record AccountSum(Guid ChartAccountId, decimal Amount);
+    private sealed record AccountSum(Guid CategoryId, decimal Amount);
 
-    private static readonly ChartSection[] ExpenseSections =
+    private static readonly CategorySection[] ExpenseSections =
     [
-        ChartSection.LifeProject,
-        ChartSection.Essential,
-        ChartSection.Social,
-        ChartSection.Discount
+        CategorySection.LifeProject,
+        CategorySection.Essential,
+        CategorySection.Social,
+        CategorySection.Discount
     ];
 
     /** Cash-flow sections shown in budget/Raio-X (receita + despesa). */
-    private static readonly ChartSection[] BudgetSections =
+    private static readonly CategorySection[] BudgetSections =
     [
-        ChartSection.Income,
-        ChartSection.Discount,
-        ChartSection.LifeProject,
-        ChartSection.Essential,
-        ChartSection.Social
+        CategorySection.Income,
+        CategorySection.Discount,
+        CategorySection.LifeProject,
+        CategorySection.Essential,
+        CategorySection.Social
     ];
 
     private readonly IFinanceRepository _repo;
     private readonly IUnitOfWork _uow;
     private readonly PlanService _plan;
     private readonly MonthService _months;
-    private readonly ChartAccountService _chartAccounts;
+    private readonly CategoryService _categories;
     private readonly FamilyGroupService _family;
 
     public BudgetService(
@@ -42,14 +42,14 @@ public sealed class BudgetService
         IUnitOfWork uow,
         PlanService plan,
         MonthService months,
-        ChartAccountService chartAccounts,
+        CategoryService categories,
         FamilyGroupService family)
     {
         _repo = repo;
         _uow = uow;
         _plan = plan;
         _months = months;
-        _chartAccounts = chartAccounts;
+        _categories = categories;
         _family = family;
     }
 
@@ -86,8 +86,8 @@ public sealed class BudgetService
                                 || e.Type == EntryType.Expense
                                 || e.Type == EntryType.Contribution
                                 || e.Type == EntryType.ProjectContribution)
-                            && e.ChartAccountId != null)
-                .GroupBy(e => e.ChartAccountId!.Value)
+                            && e.CategoryId != null)
+                .GroupBy(e => e.CategoryId!.Value)
                 .Select(g => new AccountSum(g.Key, g.Sum(x => x.Amount))), ct)
             : await _repo.QueryAsync<Entry, AccountSum>(q => q
                 .Where(e => e.CompetenceYm == ym
@@ -96,23 +96,23 @@ public sealed class BudgetService
                                 || e.Type == EntryType.Expense
                                 || e.Type == EntryType.Contribution
                                 || e.Type == EntryType.ProjectContribution)
-                            && e.ChartAccountId != null)
-                .GroupBy(e => e.ChartAccountId!.Value)
+                            && e.CategoryId != null)
+                .GroupBy(e => e.CategoryId!.Value)
                 .Select(g => new AccountSum(g.Key, g.Sum(x => x.Amount))), ct);
 
         var purchases = multi
             ? await _repo.QueryAnyTenantAsync<CardPurchase, AccountSum>(q => q
                 .Where(p => userIds.Contains(p.UsuarioId) && p.CompetenceYm == ym && p.PurchasedAt <= until)
-                .GroupBy(p => p.ChartAccountId)
+                .GroupBy(p => p.CategoryId)
                 .Select(g => new AccountSum(g.Key, g.Sum(x => x.Amount))), ct)
             : await _repo.QueryAsync<CardPurchase, AccountSum>(q => q
                 .Where(p => p.CompetenceYm == ym && p.PurchasedAt <= until)
-                .GroupBy(p => p.ChartAccountId)
+                .GroupBy(p => p.CategoryId)
                 .Select(g => new AccountSum(g.Key, g.Sum(x => x.Amount))), ct);
 
         var totals = new Dictionary<Guid, decimal>();
         foreach (var row in entries.Concat(purchases))
-            totals[row.ChartAccountId] = totals.GetValueOrDefault(row.ChartAccountId) + row.Amount;
+            totals[row.CategoryId] = totals.GetValueOrDefault(row.CategoryId) + row.Amount;
 
         return totals;
     }
@@ -133,21 +133,21 @@ public sealed class BudgetService
                 ? await _repo.ListAnyTenantAsync<BudgetLine>(l => budgetIds.Contains(l.BudgetId), ct)
                 : await _repo.ListAsync<BudgetLine>(l => budgetIds.Contains(l.BudgetId), ct);
 
-        var accounts = (await _chartAccounts.ListAsync(null, true, false, ct)).ToDictionary(c => c.Id);
+        var accounts = (await _categories.ListAsync(null, true, false, ct)).ToDictionary(c => c.Id);
         var plannedByCode = new Dictionary<string, decimal>(StringComparer.OrdinalIgnoreCase);
         var accountIdByCode = new Dictionary<string, Guid>(StringComparer.OrdinalIgnoreCase);
 
         foreach (var line in lines)
         {
-            ChartAccountResponse? account = accounts.GetValueOrDefault(line.ChartAccountId);
+            CategoryResponse? account = accounts.GetValueOrDefault(line.CategoryId);
             if (account is null && multi)
             {
-                var remote = await _repo.FirstOrDefaultAnyTenantAsync<ChartAccount>(c => c.Id == line.ChartAccountId, ct);
+                var remote = await _repo.FirstOrDefaultAnyTenantAsync<Category>(c => c.Id == line.CategoryId, ct);
                 if (remote is not null)
                     account = ToResponse(remote);
             }
 
-            var key = account?.Code ?? account?.Name ?? line.ChartAccountId.ToString();
+            var key = account?.Code ?? account?.Name ?? line.CategoryId.ToString();
             plannedByCode[key] = plannedByCode.GetValueOrDefault(key) + line.PlannedAmount;
             if (account is not null)
             {
@@ -176,13 +176,13 @@ public sealed class BudgetService
         var plannedPairs = plannedByCode.Select(kv =>
         {
             var id = accountIdByCode.GetValueOrDefault(kv.Key);
-            return (ChartAccountId: id == Guid.Empty ? Guid.NewGuid() : id, Planned: kv.Value);
+            return (CategoryId: id == Guid.Empty ? Guid.NewGuid() : id, Planned: kv.Value);
         }).ToList();
 
-        foreach (var pair in plannedPairs.Where(p => !accounts.ContainsKey(p.ChartAccountId)))
+        foreach (var pair in plannedPairs.Where(p => !accounts.ContainsKey(p.CategoryId)))
         {
-            accounts[pair.ChartAccountId] = new ChartAccountResponse(
-                pair.ChartAccountId, null, "—", null, null, ChartAccountLevel.Analytical, ChartSection.Social,
+            accounts[pair.CategoryId] = new CategoryResponse(
+                pair.CategoryId, null, "—", null, null, CategoryLevel.Analytical, CategorySection.Social,
                 false, true, 0, true);
         }
 
@@ -197,7 +197,7 @@ public sealed class BudgetService
             var actual = sectionLines.Sum(l => l.ActualAmount);
             decimal? pct = spendable > 0 ? decimal.Round(actual / spendable * 100, 1) : null;
             return new BudgetSectionResponse(
-                section, SystemChartAccounts.SectionLabel(section), planned, actual, pct, sectionLines);
+                section, SystemCategories.SectionLabel(section), planned, actual, pct, sectionLines);
         }).ToList();
 
         var totalPlanned = displayLines.Sum(l => l.PlannedAmount);
@@ -223,7 +223,7 @@ public sealed class BudgetService
             throw new ValidationException("year", "Ano inválido.");
 
         var months = Enumerable.Range(1, 12).Select(m => $"{year}-{m:D2}").ToList();
-        var accounts = (await _chartAccounts.ListAsync(null, true, true, ct)).ToDictionary(c => c.Id);
+        var accounts = (await _categories.ListAsync(null, true, true, ct)).ToDictionary(c => c.Id);
         var plannedByMonth = new Dictionary<string, Dictionary<Guid, decimal>>();
         var actualByMonth = new Dictionary<string, Dictionary<Guid, decimal>>();
 
@@ -244,10 +244,10 @@ public sealed class BudgetService
             var planned = new Dictionary<Guid, decimal>();
             foreach (var line in lines)
             {
-                var localId = line.ChartAccountId;
+                var localId = line.CategoryId;
                 if (multi && !accounts.ContainsKey(localId))
                 {
-                    var remote = await _repo.FirstOrDefaultAnyTenantAsync<ChartAccount>(c => c.Id == line.ChartAccountId, ct);
+                    var remote = await _repo.FirstOrDefaultAnyTenantAsync<Category>(c => c.Id == line.CategoryId, ct);
                     var match = remote is null
                         ? null
                         : accounts.Values.FirstOrDefault(c =>
@@ -273,7 +273,7 @@ public sealed class BudgetService
             .Select(id =>
             {
                 var account = accounts.GetValueOrDefault(id);
-                var section = account?.Section ?? ChartSection.Social;
+                var section = account?.Section ?? CategorySection.Social;
                 var group = account?.ParentId is Guid pid && parents.TryGetValue(pid, out var parent)
                     ? parent.Name
                     : account?.Name ?? "—";
@@ -286,7 +286,7 @@ public sealed class BudgetService
             })
             .OrderBy(l => l.Section)
             .ThenBy(l => l.GroupName)
-            .ThenBy(l => l.ChartAccountName)
+            .ThenBy(l => l.CategoryName)
             .ToList();
 
         var totals = months.Select(ym => new BudgetYearMonthCell(
@@ -306,20 +306,20 @@ public sealed class BudgetService
         var budget = await GetOrCreateBudgetAsync(ym, BudgetMode.Detailed, ct);
         budget.SetMode(BudgetMode.Detailed);
 
-        foreach (var input in request.Lines.GroupBy(l => l.ChartAccountId).Select(g => g.Last()))
+        foreach (var input in request.Lines.GroupBy(l => l.CategoryId).Select(g => g.Last()))
         {
-            var account = await _chartAccounts.RequireAnalyticalAsync(input.ChartAccountId, ct);
+            var account = await _categories.RequireAnalyticalAsync(input.CategoryId, ct);
             if (!BudgetSections.Contains(account.Section))
                 throw new ValidationException("lines", $"A conta '{account.Name}' não aceita orçamento (somente receita e despesa).");
 
-            await SetLineAsync(budget, input.ChartAccountId, decimal.Round(input.PlannedAmount, 2), ct);
+            await SetLineAsync(budget, input.CategoryId, decimal.Round(input.PlannedAmount, 2), ct);
         }
 
         await _uow.SaveChangesAsync(ct);
         return await GetAsync(ym, ct);
     }
 
-    public async Task<BudgetResponse> DeleteLineAsync(string competenceYm, Guid chartAccountId, CancellationToken ct)
+    public async Task<BudgetResponse> DeleteLineAsync(string competenceYm, Guid categoryId, CancellationToken ct)
     {
         await _plan.EnsureWritableAsync(ct);
         var ym = Competence.Require(competenceYm);
@@ -328,8 +328,8 @@ public sealed class BudgetService
         var budget = await _repo.FirstOrDefaultAsync<Budget>(b => b.CompetenceYm == ym, ct)
                      ?? throw new NotFoundException($"Orçamento de {ym} não encontrado.");
         var line = await _repo.FirstOrDefaultAsync<BudgetLine>(
-                       l => l.BudgetId == budget.Id && l.ChartAccountId == chartAccountId, ct)
-                   ?? throw new NotFoundException("Linha de orçamento", chartAccountId);
+                       l => l.BudgetId == budget.Id && l.CategoryId == categoryId, ct)
+                   ?? throw new NotFoundException("Linha de orçamento", categoryId);
 
         _repo.SoftDelete(line);
         await _uow.SaveChangesAsync(ct);
@@ -355,9 +355,9 @@ public sealed class BudgetService
         budget.SetMode(BudgetMode.Detailed);
         foreach (var line in previousLines)
         {
-            if (!overwrite && await GetPlannedAsync(budget.Id, line.ChartAccountId, ct) > 0)
+            if (!overwrite && await GetPlannedAsync(budget.Id, line.CategoryId, ct) > 0)
                 continue;
-            await SetLineAsync(budget, line.ChartAccountId, line.PlannedAmount, ct);
+            await SetLineAsync(budget, line.CategoryId, line.PlannedAmount, ct);
         }
 
         await _uow.SaveChangesAsync(ct);
@@ -372,29 +372,29 @@ public sealed class BudgetService
         if (request.MonthCount is < 2 or > 120)
             throw new ValidationException("monthCount", "Informe entre 2 e 120 meses.");
 
-        var account = await _chartAccounts.RequireAnalyticalAsync(request.ChartAccountId, ct);
+        var account = await _categories.RequireAnalyticalAsync(request.CategoryId, ct);
         if (!BudgetSections.Contains(account.Section))
-            throw new ValidationException("chartAccountId", $"A conta '{account.Name}' não aceita orçamento.");
+            throw new ValidationException("categoryId", $"A conta '{account.Name}' não aceita orçamento.");
 
         await _months.EnsureOpenAsync(startYm, ct);
         var startBudget = await GetOrCreateBudgetAsync(startYm, BudgetMode.Detailed, ct);
         var amount = request.PlannedAmount is decimal explicitAmount
             ? decimal.Round(explicitAmount, 2)
-            : await GetPlannedAsync(startBudget.Id, request.ChartAccountId, ct);
+            : await GetPlannedAsync(startBudget.Id, request.CategoryId, ct);
         if (amount <= 0)
-            throw new ValidationException("chartAccountId", "Informe um previsto neste mês antes de repetir.");
+            throw new ValidationException("categoryId", "Informe um previsto neste mês antes de repetir.");
 
         if (request.PlannedAmount is not null)
-            await SetLineAsync(startBudget, request.ChartAccountId, amount, ct);
+            await SetLineAsync(startBudget, request.CategoryId, amount, ct);
 
         for (var i = 1; i < request.MonthCount; i++)
         {
             var ym = Competence.AddMonths(startYm, i);
             await _months.EnsureOpenAsync(ym, ct);
             var budget = await GetOrCreateBudgetAsync(ym, BudgetMode.Detailed, ct);
-            if (!request.Overwrite && await GetPlannedAsync(budget.Id, request.ChartAccountId, ct) > 0)
+            if (!request.Overwrite && await GetPlannedAsync(budget.Id, request.CategoryId, ct) > 0)
                 continue;
-            await SetLineAsync(budget, request.ChartAccountId, amount, ct);
+            await SetLineAsync(budget, request.CategoryId, amount, ct);
         }
 
         await _uow.SaveChangesAsync(ct);
@@ -414,9 +414,9 @@ public sealed class BudgetService
         if (request.TotalAmount <= 0)
             throw new ValidationException("totalAmount", "Informe um valor total maior que zero.");
 
-        var account = await _chartAccounts.RequireAnalyticalAsync(request.ChartAccountId, ct);
+        var account = await _categories.RequireAnalyticalAsync(request.CategoryId, ct);
         if (!BudgetSections.Contains(account.Section))
-            throw new ValidationException("chartAccountId", $"A conta '{account.Name}' não aceita orçamento.");
+            throw new ValidationException("categoryId", $"A conta '{account.Name}' não aceita orçamento.");
 
         var total = decimal.Round(request.TotalAmount, 2);
         var each = decimal.Round(total / request.InstallmentCount, 2);
@@ -430,9 +430,9 @@ public sealed class BudgetService
             allocated += value;
 
             var budget = await GetOrCreateBudgetAsync(ym, BudgetMode.Detailed, ct);
-            if (!request.Overwrite && await GetPlannedAsync(budget.Id, request.ChartAccountId, ct) > 0)
+            if (!request.Overwrite && await GetPlannedAsync(budget.Id, request.CategoryId, ct) > 0)
                 continue;
-            await SetLineAsync(budget, request.ChartAccountId, value, ct);
+            await SetLineAsync(budget, request.CategoryId, value, ct);
         }
 
         await _uow.SaveChangesAsync(ct);
@@ -442,14 +442,14 @@ public sealed class BudgetService
     public async Task SyncPlannedTitheAsync(string competenceYm, decimal totalTithe, CancellationToken ct)
     {
         var ym = Competence.Require(competenceYm);
-        var tithe = await _chartAccounts.GetByCodeAsync(SystemChartAccounts.Tithe, ct);
+        var tithe = await _categories.GetByCodeAsync(SystemCategories.Tithe, ct);
         var budget = await GetOrCreateBudgetAsync(ym, BudgetMode.Simple, ct);
         await SetLineAsync(budget, tithe.Id, Math.Max(0, decimal.Round(totalTithe, 2)), ct);
     }
 
     private async Task<Dictionary<Guid, decimal>> RemapActualsAsync(
         Dictionary<Guid, decimal> actuals,
-        Dictionary<Guid, ChartAccountResponse> accounts,
+        Dictionary<Guid, CategoryResponse> accounts,
         CancellationToken ct)
     {
         var remapped = new Dictionary<Guid, decimal>();
@@ -461,7 +461,7 @@ public sealed class BudgetService
                 continue;
             }
 
-            var remote = await _repo.FirstOrDefaultAnyTenantAsync<ChartAccount>(c => c.Id == accountId, ct);
+            var remote = await _repo.FirstOrDefaultAnyTenantAsync<Category>(c => c.Id == accountId, ct);
             var local = remote is null
                 ? null
                 : accounts.Values.FirstOrDefault(c =>
@@ -474,13 +474,13 @@ public sealed class BudgetService
     }
 
     private static List<BudgetLineResponse> BuildDetailLines(
-        IReadOnlyList<(Guid ChartAccountId, decimal Planned)> lines,
+        IReadOnlyList<(Guid CategoryId, decimal Planned)> lines,
         Dictionary<Guid, decimal> actuals,
-        Dictionary<Guid, ChartAccountResponse> accounts)
+        Dictionary<Guid, CategoryResponse> accounts)
     {
         var planned = new Dictionary<Guid, decimal>();
-        foreach (var (chartAccountId, amount) in lines)
-            planned[chartAccountId] = planned.GetValueOrDefault(chartAccountId) + amount;
+        foreach (var (categoryId, amount) in lines)
+            planned[categoryId] = planned.GetValueOrDefault(categoryId) + amount;
 
         var parents = accounts.Values.ToDictionary(a => a.Id);
         var responses = new List<BudgetLineResponse>();
@@ -492,30 +492,26 @@ public sealed class BudgetService
                 continue;
 
             var account = accounts.GetValueOrDefault(id);
-            var section = account?.Section ?? ChartSection.Social;
+            var section = account?.Section ?? CategorySection.Social;
             var group = account?.ParentId is Guid pid && parents.TryGetValue(pid, out var parent)
                 ? parent.Name
                 : account?.Name ?? "—";
-            var name = account is null
-                ? "—"
-                : string.IsNullOrWhiteSpace(account.DisplayNumber)
-                    ? account.Name
-                    : $"{account.DisplayNumber} {account.Name}";
+            var name = account?.Name ?? "—";
             var (percent, status) = Evaluate(plan, actual);
             responses.Add(new BudgetLineResponse(
-                id, name, account?.ParentId, group, section, ChartAccountLevel.Analytical,
+                id, name, account?.ParentId, group, section, CategoryLevel.Analytical,
                 plan, actual, plan - actual, percent, status, IsGroup: false));
         }
 
         return responses
             .OrderBy(l => l.Section)
             .ThenBy(l => l.GroupName)
-            .ThenBy(l => l.ChartAccountName)
+            .ThenBy(l => l.CategoryName)
             .ToList();
     }
 
     public async Task UpsertPlannedForAccountAsync(
-        Guid chartAccountId,
+        Guid categoryId,
         IReadOnlyList<string> months,
         decimal planned,
         CancellationToken ct)
@@ -523,13 +519,13 @@ public sealed class BudgetService
         foreach (var ym in months)
         {
             var budget = await GetOrCreateBudgetAsync(ym, BudgetMode.Detailed, ct);
-            await SetLineAsync(budget, chartAccountId, planned, ct);
+            await SetLineAsync(budget, categoryId, planned, ct);
         }
 
         await _uow.SaveChangesAsync(ct);
     }
 
-    public async Task ClearPlannedForAccountAsync(Guid chartAccountId, IReadOnlyList<string> months, CancellationToken ct)
+    public async Task ClearPlannedForAccountAsync(Guid categoryId, IReadOnlyList<string> months, CancellationToken ct)
     {
         if (months.Count == 0)
             return;
@@ -541,7 +537,7 @@ public sealed class BudgetService
                 continue;
 
             var line = await _repo.FirstOrDefaultAsync<BudgetLine>(
-                l => l.BudgetId == budget.Id && l.ChartAccountId == chartAccountId, ct);
+                l => l.BudgetId == budget.Id && l.CategoryId == categoryId, ct);
             if (line is not null)
                 _repo.SoftDelete(line);
         }
@@ -560,20 +556,20 @@ public sealed class BudgetService
         return budget;
     }
 
-    private async Task SetLineAsync(Budget budget, Guid chartAccountId, decimal planned, CancellationToken ct)
+    private async Task SetLineAsync(Budget budget, Guid categoryId, decimal planned, CancellationToken ct)
     {
         var line = await _repo.FirstOrDefaultAsync<BudgetLine>(
-            l => l.BudgetId == budget.Id && l.ChartAccountId == chartAccountId, ct);
+            l => l.BudgetId == budget.Id && l.CategoryId == categoryId, ct);
         if (line is null)
-            _repo.Add(BudgetLine.Create(budget.Id, chartAccountId, planned));
+            _repo.Add(BudgetLine.Create(budget.Id, categoryId, planned));
         else
             line.SetPlanned(planned);
     }
 
-    private async Task<decimal> GetPlannedAsync(Guid budgetId, Guid chartAccountId, CancellationToken ct)
+    private async Task<decimal> GetPlannedAsync(Guid budgetId, Guid categoryId, CancellationToken ct)
     {
         var line = await _repo.FirstOrDefaultAsync<BudgetLine>(
-            l => l.BudgetId == budgetId && l.ChartAccountId == chartAccountId, ct, track: false);
+            l => l.BudgetId == budgetId && l.CategoryId == categoryId, ct, track: false);
         return line?.PlannedAmount ?? 0;
     }
 
@@ -618,6 +614,6 @@ public sealed class BudgetService
             e => e.Amount, ct);
     }
 
-    private static ChartAccountResponse ToResponse(ChartAccount c)
+    private static CategoryResponse ToResponse(Category c)
         => new(c.Id, c.ParentId, c.Name, c.Code, c.DisplayNumber, c.Level, c.Section, c.IsSystem, c.IsActive, c.SortOrder, c.AcceptsPosting);
 }

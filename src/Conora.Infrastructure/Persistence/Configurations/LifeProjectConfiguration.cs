@@ -1,4 +1,4 @@
-using Conora.Domain.Entities;
+﻿using Conora.Domain.Entities;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
 
@@ -19,7 +19,7 @@ public class LifeProjectConfiguration : IEntityTypeConfiguration<LifeProject>
         builder.Property(e => e.ContributionStartYm).IsRequired().HasMaxLength(7);
         builder.Property(e => e.Scope).HasConversion<string>().HasMaxLength(20);
         builder.HasIndex(e => e.UsuarioId);
-        builder.HasIndex(e => new { e.UsuarioId, e.ChartAccountId })
-            .HasDatabaseName("IX_life_projects_UsuarioId_ChartAccountId");
+        builder.HasIndex(e => new { e.UsuarioId, e.CategoryId })
+            .HasDatabaseName("IX_life_projects_UsuarioId_CategoryId");
     }
 }

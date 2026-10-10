@@ -1,4 +1,4 @@
-using Conora.Domain.Exceptions;
+﻿using Conora.Domain.Exceptions;
 using Conora.Domain.Services;
 
 namespace Conora.Domain.Entities;
@@ -10,7 +10,7 @@ public class CardPurchase : ModelBase, ITenantOwned
     public decimal Amount { get; private set; }
     public DateTime PurchasedAt { get; private set; }
     public int Installments { get; private set; }
-    public Guid ChartAccountId { get; private set; }
+    public Guid CategoryId { get; private set; }
     public string Description { get; private set; } = default!;
 
     /// <summary>Budget competence = purchase month (spec v1.1 §2).</summary>
@@ -28,7 +28,7 @@ public class CardPurchase : ModelBase, ITenantOwned
         decimal amount,
         DateTime purchasedAt,
         int installments,
-        Guid chartAccountId,
+        Guid categoryId,
         string description)
     {
         var errors = new Dictionary<string, string[]>();
@@ -46,7 +46,7 @@ public class CardPurchase : ModelBase, ITenantOwned
             Amount = decimal.Round(amount, 2),
             PurchasedAt = date,
             Installments = installments,
-            ChartAccountId = chartAccountId,
+            CategoryId = categoryId,
             Description = description.Trim(),
             CompetenceYm = purchaseYm,
             FirstInvoiceYm = date.Day > card.ClosingDay ? Competence.AddMonths(purchaseYm, 1) : purchaseYm
