@@ -118,7 +118,7 @@ public sealed class DashboardService
         var sb = new StringBuilder();
         sb.AppendLine("Item;Valor");
         void Line(string label, decimal value) => sb.AppendLine($"{label};{value.ToString("0.00", CultureInfo.InvariantCulture)}");
-        Line("Receita", s.IncomeTotal);
+        Line("Renda", s.IncomeTotal);
         Line("Despesa", s.ExpenseTotal);
         Line("Resultado", s.Result);
         Line("Contribuicoes/Doacoes", s.ContributionsTotal);

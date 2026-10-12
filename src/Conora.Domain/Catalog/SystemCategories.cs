@@ -36,8 +36,8 @@ public static class SystemCategories
         Root("BUDGET", "Orçamento", CategorySection.Budget);
         Root("PATRIMONY", "Patrimônio", CategorySection.Patrimony);
 
-        // Orçamento → Receita
-        Group("INC", "Receita", CategorySection.Income, "BUDGET");
+        // Orçamento → Renda
+        Group("INC", "Renda", CategorySection.Income, "BUDGET");
         Leaf("INC_SALARY", "Salário", CategorySection.Income, "INC");
         Leaf("INC_ROLE", "Função", CategorySection.Income, "INC");
         Leaf("INC_SENIORITY", "Adicional por tempo de serviço", CategorySection.Income, "INC");
@@ -62,7 +62,7 @@ public static class SystemCategories
         Leaf(Tithe, "Dízimos", CategorySection.Discount, "DISC");
         Leaf(Offerings, "Ofertas", CategorySection.Discount, "DISC");
 
-        Group("LIFE", "Projeto de vida", CategorySection.LifeProject, "EXPENSE");
+        Group("LIFE", "Projetos de vida", CategorySection.LifeProject, "EXPENSE");
         Group("LIFE_SHORT", "Curto prazo", CategorySection.LifeProject, "LIFE");
         Leaf("LIFE_RESERVE", "Reserva de emergência", CategorySection.LifeProject, "LIFE_SHORT");
         Leaf("LIFE_US", "Viagem para EUA", CategorySection.LifeProject, "LIFE_SHORT");
@@ -183,9 +183,9 @@ public static class SystemCategories
         CategorySection.Budget => "Orçamento",
         CategorySection.Expense => "Despesa",
         CategorySection.Patrimony => "Patrimônio",
-        CategorySection.Income => "Receita",
+        CategorySection.Income => "Renda",
         CategorySection.Discount => "Descontos",
-        CategorySection.LifeProject => "Projeto de vida",
+        CategorySection.LifeProject => "Projetos de vida",
         CategorySection.Essential => "Essencial",
         CategorySection.Social => "Social",
         CategorySection.Asset => "Ativo",

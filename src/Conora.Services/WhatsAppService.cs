@@ -35,6 +35,7 @@ public sealed partial class WhatsAppService
     private readonly BudgetService _budgets;
     private readonly IGeminiClient _gemini;
     private readonly IWhatsAppMessenger _messenger;
+    private readonly ReceiptIntakeService _receipts;
 
     public WhatsAppService(
         IFinanceRepository repo,
@@ -46,7 +47,8 @@ public sealed partial class WhatsAppService
         EntryService entries,
         BudgetService budgets,
         IGeminiClient gemini,
-        IWhatsAppMessenger messenger)
+        IWhatsAppMessenger messenger,
+        ReceiptIntakeService receipts)
     {
         _repo = repo;
         _audits = audits;
@@ -58,6 +60,7 @@ public sealed partial class WhatsAppService
         _budgets = budgets;
         _gemini = gemini;
         _messenger = messenger;
+        _receipts = receipts;
     }
 
     public async Task<WhatsAppLinkResponse?> GetLinkAsync(CancellationToken ct)
@@ -141,9 +144,14 @@ public sealed partial class WhatsAppService
     /// <summary>Handles a Cloud API webhook body, creates entries when needed, and sends WhatsApp replies.</summary>
     public async Task HandleWebhookAsync(string body, CancellationToken ct)
     {
-        foreach (var (from, text) in ExtractMessages(body))
+        foreach (var message in ExtractInbound(body))
         {
-            var reply = await HandleMessageAsync(from, text, ct);
+            WhatsAppReply? reply = message.Kind switch
+            {
+                InboundKind.Text => await HandleMessageAsync(message.From, message.Text!, ct),
+                InboundKind.Image => await HandleImageAsync(message.From, message.MediaId!, ct),
+                _ => null
+            };
             if (reply is null)
                 continue;
 
@@ -158,6 +166,55 @@ public sealed partial class WhatsAppService
         }
     }
 
+    public async Task<WhatsAppReply?> HandleImageAsync(string fromDigits, string mediaId, CancellationToken ct)
+    {
+        var phone = WhatsAppLink.NormalizePhone(fromDigits);
+        var link = await _repo.FirstOrDefaultGlobalByKeyAsync<WhatsAppLink>(l => l.PhoneE164 == phone, ct);
+        if (link is null)
+            return new WhatsAppReply(phone, "Este número ainda não está vinculado. Abra o Conora e vincule seu telefone para usar o WhatsApp.");
+
+        _tenant.Set(link.UsuarioId);
+
+        try
+        {
+            await _plan.EnsureWritableAsync(ct);
+            var media = await _messenger.DownloadMediaAsync(mediaId, ct);
+            if (media is null)
+                return new WhatsAppReply(phone, "Não consegui baixar a foto do cupom. Tente de novo.");
+
+            var intake = await _receipts.CreateFromBytesAsync(media.Value.Bytes, media.Value.MimeType, ReceiptChannel.WhatsApp, ct, phone);
+
+            // Wait briefly for background OCR (same process).
+            for (var i = 0; i < 20; i++)
+            {
+                await Task.Delay(500, ct);
+                intake = await _receipts.GetAsync(intake.Id, ct);
+                if (intake.Status is not ReceiptIntakeStatus.Processing)
+                    break;
+            }
+
+            if (intake.Status == ReceiptIntakeStatus.Failed)
+                return new WhatsAppReply(phone, intake.FailureReason ?? "Não consegui ler o cupom.");
+
+            if (intake.NeedsClassification || intake.Status == ReceiptIntakeStatus.NeedsClassification)
+                return new WhatsAppReply(phone, await BuildClassificationListAsync(intake.ExtractedName, ct));
+
+            return new WhatsAppReply(phone, BuildConfirmPrompt(intake));
+        }
+        catch (PlanReadOnlyException ex)
+        {
+            return new WhatsAppReply(phone, ex.Message);
+        }
+        catch (OperationCanceledException)
+        {
+            throw;
+        }
+        catch (Exception)
+        {
+            return new WhatsAppReply(phone, "Não consegui processar a foto. Tente de novo em instantes.");
+        }
+    }
+
     public async Task<WhatsAppReply?> HandleMessageAsync(string fromDigits, string text, CancellationToken ct)
     {
         if (string.IsNullOrWhiteSpace(text))
@@ -169,6 +226,14 @@ public sealed partial class WhatsAppService
             return new WhatsAppReply(phone, "Este número ainda não está vinculado. Abra o Conora e vincule seu telefone para usar o WhatsApp.");
 
         _tenant.Set(link.UsuarioId);
+
+        var activeReceipt = await _receipts.FindActiveWhatsAppAsync(phone, ct);
+        if (activeReceipt is not null)
+        {
+            var receiptReply = await HandleReceiptReplyAsync(activeReceipt, text.Trim(), ct);
+            if (receiptReply is not null)
+                return receiptReply;
+        }
 
         if (IsQuery(text))
             return new WhatsAppReply(phone, await AnswerBudgetAsync(ct));
@@ -209,6 +274,68 @@ public sealed partial class WhatsAppService
         {
             return new WhatsAppReply(phone, "Não consegui preparar o rascunho. Tente de novo em instantes.");
         }
+    }
+
+    private async Task<WhatsAppReply?> HandleReceiptReplyAsync(ReceiptIntake intake, string text, CancellationToken ct)
+    {
+        var phone = intake.PhoneE164 ?? "";
+        if (intake.WhatsAppAwaiting == WhatsAppReceiptAwaiting.Classification)
+        {
+            if (!int.TryParse(text, NumberStyles.Integer, CultureInfo.InvariantCulture, out var index) || index < 1)
+                return new WhatsAppReply(phone, "Responda com o número da conta da lista.");
+
+            var categories = await _receipts.ListClassifiableCategoriesAsync(ct);
+            if (index > categories.Count)
+                return new WhatsAppReply(phone, "Número inválido. Escolha um da lista.");
+
+            var chosen = categories[index - 1];
+            if (string.IsNullOrWhiteSpace(chosen.Code))
+                return new WhatsAppReply(phone, "Essa conta não tem código de sistema. Escolha outra.");
+
+            var updated = await _receipts.ClassifyAsync(intake.Id, new ClassifyReceiptRequest(chosen.Code), ct);
+            return new WhatsAppReply(phone, BuildConfirmPrompt(updated));
+        }
+
+        if (intake.WhatsAppAwaiting == WhatsAppReceiptAwaiting.Confirm)
+        {
+            if (text is "1" or "sim" or "Sim" or "SIM")
+            {
+                await _receipts.ConfirmAsync(intake.Id, new ConfirmReceiptRequest(), ct);
+                return new WhatsAppReply(phone, "Lançamento confirmado.");
+            }
+
+            if (text is "2" or "alterar" or "Alterar")
+            {
+                await _receipts.ReopenClassificationAsync(intake.Id, ct);
+                return new WhatsAppReply(phone, await BuildClassificationListAsync(intake.ExtractedName, ct));
+            }
+
+            return new WhatsAppReply(phone, "Responda 1 para confirmar ou 2 para alterar a conta.");
+        }
+
+        return null;
+    }
+
+    private async Task<string> BuildClassificationListAsync(string? supplierName, CancellationToken ct)
+    {
+        var categories = await _receipts.ListClassifiableCategoriesAsync(ct);
+        var br = new CultureInfo("pt-BR");
+        var header = string.IsNullOrWhiteSpace(supplierName)
+            ? "Qual conta do plano classifica este fornecedor? Responda com o número:"
+            : $"Fornecedor: {supplierName}. Qual conta classifica? Responda com o número:";
+        var lines = categories
+            .Take(40)
+            .Select((c, i) => $"{i + 1}. {c.DisplayNumber ?? c.Code} {c.Name}");
+        return header + "\n" + string.Join("\n", lines);
+    }
+
+    private static string BuildConfirmPrompt(ReceiptIntakeResponse intake)
+    {
+        var br = new CultureInfo("pt-BR");
+        var amount = intake.ExtractedAmount?.ToString("N2", br) ?? "?";
+        var account = intake.ProposedCategoryName ?? intake.ProposedCategoryCode ?? "conta";
+        var name = intake.ExtractedName ?? "fornecedor";
+        return $"Confirma R$ {amount} em {account} ({name})?\n1 = Sim\n2 = Alterar conta";
     }
 
     private async Task<string> AnswerBudgetAsync(CancellationToken ct)
@@ -282,8 +409,7 @@ public sealed partial class WhatsAppService
         return QueryWords.Any(lowered.Contains) && !lowered.Any(char.IsDigit);
     }
 
-    /// <summary>Extracts (from, text) pairs from the Cloud API payload: entry[].changes[].value.messages[].</summary>
-    private static IEnumerable<(string From, string Text)> ExtractMessages(string body)
+    private static IEnumerable<InboundMessage> ExtractInbound(string body)
     {
         if (!TryParse(body, out var doc))
             yield break;
@@ -308,17 +434,35 @@ public sealed partial class WhatsAppService
                     foreach (var message in messages.EnumerateArray())
                     {
                         var from = message.TryGetProperty("from", out var f) ? f.GetString() : null;
+                        if (string.IsNullOrWhiteSpace(from))
+                            continue;
+
+                        var type = message.TryGetProperty("type", out var typeEl) ? typeEl.GetString() : null;
+                        if (type == "image"
+                            && message.TryGetProperty("image", out var image)
+                            && image.TryGetProperty("id", out var mediaIdEl))
+                        {
+                            var mediaId = mediaIdEl.GetString();
+                            if (!string.IsNullOrWhiteSpace(mediaId))
+                                yield return new InboundMessage(from, InboundKind.Image, null, mediaId);
+                            continue;
+                        }
+
                         string? text = null;
                         if (message.TryGetProperty("text", out var t) && t.TryGetProperty("body", out var b))
                             text = b.GetString();
 
-                        if (!string.IsNullOrWhiteSpace(from) && !string.IsNullOrWhiteSpace(text))
-                            yield return (from, text);
+                        if (!string.IsNullOrWhiteSpace(text))
+                            yield return new InboundMessage(from, InboundKind.Text, text, null);
                     }
                 }
             }
         }
     }
+
+    private enum InboundKind { Text, Image }
+
+    private sealed record InboundMessage(string From, InboundKind Kind, string? Text, string? MediaId);
 
     private static bool TryParse(string body, out JsonDocument doc)
     {

@@ -29,6 +29,7 @@ public static class DependencyInjection
         services.AddScoped<GeminiService>();
         services.AddScoped<IanReportService>();
         services.AddScoped<WhatsAppService>();
+        services.AddScoped<ReceiptIntakeService>();
         services.AddScoped<SesFeedbackService>();
         services.AddScoped<FeedbackService>();
         services.AddSingleton<HelpService>();

@@ -25,6 +25,9 @@ BenchmarkDotNet.Artifacts/
 build-log.txt
 *.binlog
 
+## Local publish/output used for smoke runs
+artifacts/
+
 ## Segredos e ambiente local — nunca versionar
 .env
 *.pfx

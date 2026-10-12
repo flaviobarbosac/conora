@@ -186,6 +186,7 @@ app.MapFeedbackEndpoints();
 app.MapHelpEndpoints();
 app.MapAiEndpoints();
 app.MapWhatsAppEndpoints();
+app.MapReceiptEndpoints();
 app.MapSesWebhookEndpoints();
 
 using (var scope = app.Services.CreateScope())

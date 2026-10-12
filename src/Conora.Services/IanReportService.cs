@@ -255,12 +255,12 @@ public sealed class IanReportService
         var dash = await _dashboard.GetAsync(ym, ct);
         var points = new List<IanReportPoint>
         {
-            new("income", "Receita", dash.IncomeTotal),
+            new("income", "Renda", dash.IncomeTotal),
             new("expense", "Despesa", dash.ExpenseTotal),
         };
         var found = dash.IncomeTotal != 0 || dash.ExpenseTotal != 0;
         return BuildLabeledAmountReport(
-            $"Receita × despesa — {ym}",
+            $"Renda × despesa — {ym}",
             points,
             IanChartSelector.KindSnapshot,
             found,
@@ -282,7 +282,7 @@ public sealed class IanReportService
                 c.CategoryName,
                 c.Amount))
             .ToList();
-        var label = focus == IanQuestionClassifier.FocusIncome ? "Receitas" : "Despesas";
+        var label = focus == IanQuestionClassifier.FocusIncome ? "Renda" : "Despesas";
         var found = points.Count > 0;
         return BuildLabeledAmountReport(
             $"{label} de {ym}",

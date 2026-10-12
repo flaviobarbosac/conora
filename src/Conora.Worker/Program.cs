@@ -9,6 +9,8 @@ builder.Services.AddInfrastructure(builder.Configuration);
 builder.Services.AddRepositories();
 builder.Services.AddServices();
 builder.Services.AddHostedService<LgpdRetentionWorker>();
+builder.Services.AddHostedService<ReceiptOcrWorker>();
+builder.Services.AddHostedService<ReceiptImagePurgeWorker>();
 
 var host = builder.Build();
 await host.RunAsync();

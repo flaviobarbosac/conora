@@ -67,6 +67,13 @@ namespace Conora.Infrastructure.Persistence.Migrations
                         .HasMaxLength(120)
                         .HasColumnType("character varying(120)");
 
+                    b.Property<decimal>("OpeningBalance")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("numeric(18,2)");
+
+                    b.Property<DateTime>("OpeningBalanceAt")
+                        .HasColumnType("timestamp with time zone");
+
                     b.Property<DateTime>("UpdatedAt")
                         .HasColumnType("timestamp with time zone");
 
@@ -1127,6 +1134,97 @@ namespace Conora.Infrastructure.Persistence.Migrations
                     b.ToTable("patrimony_items", (string)null);
                 });
 
+            modelBuilder.Entity("Conora.Domain.Entities.ReceiptIntake", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("Channel")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<DateTime?>("DeletedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<decimal?>("ExtractedAmount")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("numeric(18,2)");
+
+                    b.Property<string>("ExtractedCnpj")
+                        .HasMaxLength(14)
+                        .HasColumnType("character varying(14)");
+
+                    b.Property<string>("ExtractedName")
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)");
+
+                    b.Property<DateTime?>("ExtractedOccurredAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("FailureReason")
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)");
+
+                    b.Property<DateTime>("ImageExpiresAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("ImageObjectKey")
+                        .IsRequired()
+                        .HasMaxLength(260)
+                        .HasColumnType("character varying(260)");
+
+                    b.Property<string>("PhoneE164")
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)");
+
+                    b.Property<string>("ProposedCategoryCode")
+                        .HasMaxLength(40)
+                        .HasColumnType("character varying(40)");
+
+                    b.Property<Guid?>("SelectedBankAccountId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasMaxLength(30)
+                        .HasColumnType("character varying(30)");
+
+                    b.Property<Guid?>("SupplierId")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid>("UsuarioId")
+                        .HasColumnType("uuid");
+
+                    b.Property<long>("Version")
+                        .HasColumnType("bigint");
+
+                    b.Property<string>("WhatsAppAwaiting")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)");
+
+                    b.Property<Guid?>("WhatsAppDraftId")
+                        .HasColumnType("uuid");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("ImageExpiresAt");
+
+                    b.HasIndex("PhoneE164", "WhatsAppAwaiting");
+
+                    b.HasIndex("UsuarioId", "Status");
+
+                    b.ToTable("receipt_intakes", (string)null);
+                });
+
             modelBuilder.Entity("Conora.Domain.Entities.RefreshToken", b =>
                 {
                     b.Property<Guid>("Id")
@@ -1166,6 +1264,62 @@ namespace Conora.Infrastructure.Persistence.Migrations
                     b.HasIndex("UsuarioId");
 
                     b.ToTable("refresh_tokens", (string)null);
+                });
+
+            modelBuilder.Entity("Conora.Domain.Entities.Supplier", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime?>("ClassifiedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid?>("ClassifiedByUsuarioId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("Cnpj")
+                        .HasMaxLength(14)
+                        .HasColumnType("character varying(14)");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("DefaultCategoryCode")
+                        .HasMaxLength(40)
+                        .HasColumnType("character varying(40)");
+
+                    b.Property<DateTime?>("DeletedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)");
+
+                    b.Property<bool>("NeedsReview")
+                        .HasColumnType("boolean");
+
+                    b.Property<string>("NormalizedName")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)");
+
+                    b.Property<DateTime>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<long>("Version")
+                        .HasColumnType("bigint");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("Cnpj")
+                        .IsUnique()
+                        .HasFilter("\"Cnpj\" IS NOT NULL");
+
+                    b.HasIndex("NormalizedName");
+
+                    b.ToTable("suppliers", (string)null);
                 });
 
             modelBuilder.Entity("Conora.Domain.Entities.User", b =>

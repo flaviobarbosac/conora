@@ -74,6 +74,7 @@ EOF
 }
 
 upsert_a "$DOMAIN"
+upsert_a "www.${DOMAIN}"
 upsert_a "api.${DOMAIN}"
 
 echo "==> Zone records (A/NS)"

@@ -1,5 +1,6 @@
 using System.Net.Http.Headers;
 using System.Net.Http.Json;
+using System.Text.Json;
 using System.Text.RegularExpressions;
 using Conora.Domain.Ports;
 using Microsoft.Extensions.Configuration;
@@ -53,6 +54,47 @@ public sealed class CloudApiWhatsAppMessenger : IWhatsAppMessenger
         {
             var body = await response.Content.ReadAsStringAsync(ct);
             _logger.LogWarning("WhatsApp send failed for {Phone}: {Status} {Body}", phoneE164, (int)response.StatusCode, body);
+        }
+    }
+
+    public async Task<(byte[] Bytes, string MimeType)?> DownloadMediaAsync(string mediaId, CancellationToken ct)
+    {
+        if (!IsConfigured || string.IsNullOrWhiteSpace(mediaId))
+            return null;
+
+        try
+        {
+            using var metaRequest = new HttpRequestMessage(HttpMethod.Get, mediaId);
+            metaRequest.Headers.Authorization = new AuthenticationHeaderValue("Bearer", _token);
+            using var metaResponse = await _http.SendAsync(metaRequest, ct);
+            if (!metaResponse.IsSuccessStatusCode)
+            {
+                _logger.LogWarning("WhatsApp media meta failed: {Status}", (int)metaResponse.StatusCode);
+                return null;
+            }
+
+            using var metaDoc = await JsonDocument.ParseAsync(await metaResponse.Content.ReadAsStreamAsync(ct), cancellationToken: ct);
+            var url = metaDoc.RootElement.TryGetProperty("url", out var urlEl) ? urlEl.GetString() : null;
+            var mime = metaDoc.RootElement.TryGetProperty("mime_type", out var mimeEl) ? mimeEl.GetString() : "image/jpeg";
+            if (string.IsNullOrWhiteSpace(url))
+                return null;
+
+            using var fileRequest = new HttpRequestMessage(HttpMethod.Get, url);
+            fileRequest.Headers.Authorization = new AuthenticationHeaderValue("Bearer", _token);
+            using var fileResponse = await _http.SendAsync(fileRequest, ct);
+            if (!fileResponse.IsSuccessStatusCode)
+            {
+                _logger.LogWarning("WhatsApp media download failed: {Status}", (int)fileResponse.StatusCode);
+                return null;
+            }
+
+            var bytes = await fileResponse.Content.ReadAsByteArrayAsync(ct);
+            return (bytes, mime ?? "image/jpeg");
+        }
+        catch (Exception ex) when (ex is not OperationCanceledException)
+        {
+            _logger.LogWarning(ex, "WhatsApp media download error for {MediaId}", mediaId);
+            return null;
         }
     }
 }
