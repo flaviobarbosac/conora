@@ -21,3 +21,11 @@ resource "aws_route53_record" "api" {
   ttl     = 300
   records = [aws_eip.app.public_ip]
 }
+
+resource "aws_route53_record" "www" {
+  zone_id = aws_route53_zone.main.zone_id
+  name    = "www.${var.domain}"
+  type    = "A"
+  ttl     = 300
+  records = [aws_eip.app.public_ip]
+}

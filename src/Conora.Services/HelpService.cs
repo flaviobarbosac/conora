@@ -30,7 +30,7 @@ public sealed class HelpService
         new("competencia", "Competência",
             "Mês de referência no formato ano-mês (ex.: 2026-10). Orçamento, Raio-X, lançamentos e diagnóstico usam a competência."),
         new("raio-x", "Raio-X",
-            "Visão do mês: previsto, realizado e % do previsto. Na raiz mostra Receita, Despesa e Patrimônio; o clique desce a cadeia até o item lançado."),
+            "Visão do mês: previsto, realizado e % do previsto. Na raiz mostra Renda, Despesa e Patrimônio; o clique desce a cadeia até o item lançado."),
         new("orcamento-cadastro", "Orçamento (cadastro)",
             "Tela para informar o valor planejado de cada conta, salvar, copiar o mês anterior e ver o ano."),
         new("inicio-aporte", "Início do aporte",
@@ -78,11 +78,11 @@ public sealed class HelpService
             ]),
 
         new("inicio", "Início",
-            "Painel do mês: pizzas de receita e despesa, comparação em barra, e os blocos Orçamento, Patrimônio e Projeto de vida. Em grupo familiar, os totais somam os dois membros.",
+            "Painel do mês: pizzas de renda e despesa, comparação em barra, e os blocos Orçamento, Patrimônio e Projetos de vida. Em grupo familiar, os totais somam os dois membros.",
             [
-                new("Receita e despesa", "Duas pizzas com legenda: detalhamento da renda e da despesa realizadas no mês."),
-                new("Comparativo", "Barra horizontal com o total de receita frente ao total de despesa."),
-                new("Visão macro", "Três blocos: orçamento (previsto × realizado), patrimônio (ativo e passivo) e projeto de vida (horizontes)."),
+                new("Renda e despesa", "Duas pizzas com legenda: detalhamento da renda e da despesa realizadas no mês."),
+                new("Comparativo", "Barra horizontal com o total de renda frente ao total de despesa."),
+                new("Visão macro", "Três blocos: orçamento (previsto × realizado), patrimônio (ativo e passivo) e projetos de vida (horizontes)."),
                 new("Projetos de vida", "Três barras: verde curto, amarelo médio, azul longo. Vermelho só quando o acumulado passa a meta (Acima da meta). Clique abre a lista filtrada."),
                 new("Alertas", "Avisos de orçamento, limite de cartão e mês negativo.")
             ]),
@@ -90,7 +90,7 @@ public sealed class HelpService
         new("lancamentos", "Lançamentos",
             "Registra o movimento do dia a dia. É a fonte do realizado no Raio-X.",
             [
-                new("Tipo", "Despesa, receita, transferência, contribuição ou aporte em projeto."),
+                new("Tipo", "Despesa, renda, transferência, contribuição ou aporte em projeto."),
                 new("Valor", "Valor do lançamento, sempre com duas casas decimais."),
                 new("Data", "Dia em que a movimentação ocorreu."),
                 new("Descrição", "Texto livre que identifica o lançamento."),
@@ -98,7 +98,7 @@ public sealed class HelpService
                 new("Conta de destino", "Só em transferência: conta que recebe."),
                 new("Conta do plano", "Busca e agrupa por seção e grupo. O lançamento entra na conta analítica."),
                 new("Insert (web)", "No computador, Insert abre o formulário de novo lançamento. Não vale no app nativo. Não dispara se o foco estiver em um campo de texto."),
-                new("Editar", "Clique na linha de despesa, receita ou transferência para abrir o formulário preenchido. Salvar grava; Cancelar (ou Fechar) descarta o rascunho. O tipo não muda na edição."),
+                new("Editar", "Clique na linha de despesa, renda ou transferência para abrir o formulário preenchido. Salvar grava; Cancelar (ou Fechar) descarta o rascunho. O tipo não muda na edição."),
                 new("Excluir", "Lixeira vermelha. Pede confirmação."),
                 new("Competência", "Mês em que o lançamento entra no orçamento e nos relatórios.")
             ]),
@@ -106,11 +106,11 @@ public sealed class HelpService
         new("raio-x", "Raio-X",
             "Listagem do mês na ordem das categorias. Só visão — o cadastro do planejado fica em Orçamento.",
             [
-                new("Indicadores", "No topo: receita recebida, descontos realizados e renda gastável. Toque destaca a seção na lista."),
+                new("Indicadores", "No topo: saldo do mês anterior, renda recebida, descontos, renda gastável, projetos de vida e saldo do mês. Toque nos do meio destaca a seção na lista."),
                 new("Patrimônio", "Card com ativo, passivo e patrimônio líquido (resultado, não conta)."),
-                new("Projeto de vida", "Quanto foi separado no período, com atalho para Projetos."),
-                new("Período", "1, 2, 6 ou 12 meses até a competência escolhida."),
-                new("Estado inicial", "Só o primeiro nível: Receita, Despesa e Patrimônio."),
+                new("Projetos de vida", "Quanto foi separado no período, com atalho para Projetos."),
+                new("Período", "Arraste de 1 a 24 meses até a competência escolhida."),
+                new("Estado inicial", "Só o primeiro nível: Renda, Despesa e Patrimônio."),
                 new("Navegar", "Clique desce a cadeia de contas. Só o item lançado (lançamento, projeto ou patrimônio) abre a tela de registro."),
                 new("Totais", "Cada linha soma as contas de baixo."),
                 new("% do previsto", "Com orçamento, mostra o progresso. Sem orçamento lançado, aparece 0% em amarelo. Legenda: Amarelo = sem orçamento lançado.")
@@ -120,7 +120,7 @@ public sealed class HelpService
             "Cadastro do planejado do mês.",
             [
                 new("Renda gastável", "Soma dos líquidos do diagnóstico do mês (base do percentual dos blocos)."),
-                new("Receita", "Também recebe valor planejado, além das despesas e dos outros blocos."),
+                new("Renda", "Também recebe valor planejado, além das despesas e dos outros blocos."),
                 new("Contas", "Cada conta analítica, na ordem do plano: seções fixas e, dentro delas, grupos e itens em ordem alfabética. Grupos começam fechados."),
                 new("Busca", "Filtra a lista pelo nome da conta e abre o ramo encontrado."),
                 new("% do previsto", "Sem valor planejado, mostra 0% em amarelo. Legenda: Amarelo = sem orçamento lançado."),
@@ -140,7 +140,7 @@ public sealed class HelpService
                 new("Agência", "Número da agência."),
                 new("Número da conta", "Número da conta sem o dígito."),
                 new("Dígito verificador", "Dígito da conta."),
-                new("Saldo inicial", "Saldo ao cadastrar a conta."),
+                new("Saldo inicial", "Valor e data em que esse saldo era verdadeiro. Não é receita do mês."),
                 new("Saldo atual", "Atualizado pelos lançamentos e transferências."),
                 new("Arquivar", "Esconde a conta sem apagar o histórico."),
                 new("Transferir", "Move valor entre duas contas suas — não é receita nem despesa do mês.")
@@ -168,7 +168,7 @@ public sealed class HelpService
                 new("Categoria sintética", "Orçamento, Despesa, Patrimônio e os grupos (Habitação, Curto prazo…). Não recebem valor."),
                 new("Categoria analítica", "Linha que recebe o lançamento (Salário, Aluguel…)."),
                 new("Padrão", "Categoria do sistema: não renomeia nem exclui."),
-                new("Sua categoria", "Analítica que você cria sob Receita, Descontos, Projeto de vida, Essencial, Social, Ativo ou Passivo."),
+                new("Sua categoria", "Analítica que você cria sob Renda, Descontos, Projetos de vida, Essencial, Social, Ativo ou Passivo."),
                 new("Desativar", "Tira a categoria dos seletores e mantém o histórico.")
             ]),
 
@@ -215,7 +215,7 @@ public sealed class HelpService
         new("relatorios", "Relatórios",
             "Resumo do mês, exportações e links para outras funções.",
             [
-                new("Resumo do mês", "Receitas, despesas e resultado da competência."),
+                new("Resumo do mês", "Renda, despesas e resultado da competência."),
                 new("Por categoria", "Quanto foi gasto em cada categoria."),
                 new("Comparação", "Diferença em relação ao mês anterior."),
                 new("Exportar CSV", "Baixa o movimento ou o resumo em planilha."),

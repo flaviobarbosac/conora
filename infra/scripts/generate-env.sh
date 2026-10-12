@@ -13,15 +13,47 @@ DOMAIN="${4:?domain, e.g. conora.com.br}"
 ASPNET_ENV="${5:-Production}"
 REGION="${AWS_REGION:-sa-east-1}"
 
-APP_CORE=$(aws secretsmanager get-secret-value --secret-id "${SECRET_PREFIX}/app-core" --query SecretString --output text --region "$REGION")
-INTEGRATIONS=$(aws secretsmanager get-secret-value --secret-id "${SECRET_PREFIX}/integrations" --query SecretString --output text --region "$REGION")
+umask 077
+APP_CORE_FILE="${OUT_DIR}/.app-core.json"
+INT_FILE="${OUT_DIR}/.integrations.json"
+aws secretsmanager get-secret-value --secret-id "${SECRET_PREFIX}/app-core" --query SecretString --output text --region "$REGION" > "$APP_CORE_FILE"
+aws secretsmanager get-secret-value --secret-id "${SECRET_PREFIX}/integrations" --query SecretString --output text --region "$REGION" > "$INT_FILE"
+trap 'rm -f "$APP_CORE_FILE" "$INT_FILE"' EXIT
 
 ACCOUNT=$(aws sts get-caller-identity --query Account --output text --region "$REGION")
 ENV_NAME="${SECRET_PREFIX##*/}"
 ECR_HOST="${ACCOUNT}.dkr.ecr.${REGION}.amazonaws.com"
 
-get_app() { echo "$APP_CORE" | jq -r "$1 // empty"; }
-get_int() { echo "$INTEGRATIONS" | jq -r "$1 // empty"; }
+# Secrets saved from Windows may start with a UTF-8 BOM, which jq rejects.
+json_get() {
+  local file="$1"
+  local expr="$2"
+  python3 - "$file" "$expr" <<'PY'
+import json, pathlib, sys
+raw = pathlib.Path(sys.argv[1]).read_bytes()
+# Windows editors and the AWS CLI can prefix the secret with a UTF-8 BOM,
+# sometimes stored again as the latin-1 mojibake of that BOM.
+for prefix in (b"\xef\xbb\xbf", b"\xc3\xaf\xc2\xbb\xc2\xbf"):
+    if raw.startswith(prefix):
+        raw = raw[len(prefix):]
+text = raw.decode("utf-8-sig").lstrip("\ufeff")
+data = json.loads(text)
+cur = data
+for part in sys.argv[2].strip(".").split("."):
+    if part == "":
+        continue
+    if not isinstance(cur, dict) or part not in cur or cur[part] is None:
+        sys.exit(0)
+    cur = cur[part]
+if isinstance(cur, bool):
+    print("true" if cur else "false")
+else:
+    print(cur)
+PY
+}
+
+get_app() { json_get "$APP_CORE_FILE" "$1"; }
+get_int() { json_get "$INT_FILE" "$1"; }
 
 # docker compose interpolates '$' in env files; escape it.
 esc() { printf '%s' "$1" | sed 's/\$/$$/g'; }
@@ -64,13 +96,15 @@ WhatsApp__AccessToken=$(esc "$(get_int .whatsapp.accessToken)")
 WhatsApp__PhoneNumberId=$(get_int .whatsapp.phoneNumberId)
 Cors__Origins__0=https://${DOMAIN}
 Cors__Origins__1=http://${DOMAIN}
+Cors__Origins__2=https://www.${DOMAIN}
+Cors__Origins__3=http://www.${DOMAIN}
 OpenTelemetry__OtlpEndpoint=
 EOF
 
 # Allow provisional access via the instance public IP (same-origin front+API on :80).
 if PUBLIC_IP=$(curl -fsS --connect-timeout 2 -H "X-aws-ec2-metadata-token: $(curl -fsS -X PUT --connect-timeout 2 -H 'X-aws-ec2-metadata-token-ttl-seconds: 60' http://169.254.169.254/latest/api/token)" http://169.254.169.254/latest/meta-data/public-ipv4 2>/dev/null); then
   if [ -n "$PUBLIC_IP" ]; then
-    printf 'Cors__Origins__2=http://%s\n' "$PUBLIC_IP" >> "${OUT_DIR}/.env.app"
+    printf 'Cors__Origins__4=http://%s\n' "$PUBLIC_IP" >> "${OUT_DIR}/.env.app"
   fi
 fi
 

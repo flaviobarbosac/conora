@@ -20,6 +20,7 @@ public class AppDbContext : DbContext
     public DbSet<RefreshToken> RefreshTokens => Set<RefreshToken>();
     public DbSet<LgpdRequest> LgpdRequests => Set<LgpdRequest>();
     public DbSet<EmailSuppression> EmailSuppressions => Set<EmailSuppression>();
+    public DbSet<Supplier> Suppliers => Set<Supplier>();
 
     // Finance domain (all tenant-owned)
     public DbSet<Category> Categories => Set<Category>();
@@ -44,6 +45,7 @@ public class AppDbContext : DbContext
     public DbSet<ImportPreviewRow> ImportPreviewRows => Set<ImportPreviewRow>();
     public DbSet<WhatsAppLink> WhatsAppLinks => Set<WhatsAppLink>();
     public DbSet<WhatsAppDraft> WhatsAppDrafts => Set<WhatsAppDraft>();
+    public DbSet<ReceiptIntake> ReceiptIntakes => Set<ReceiptIntake>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -73,6 +75,7 @@ public class AppDbContext : DbContext
         TenantFilter<ImportPreviewRow>(modelBuilder);
         TenantFilter<WhatsAppLink>(modelBuilder);
         TenantFilter<WhatsAppDraft>(modelBuilder);
+        TenantFilter<ReceiptIntake>(modelBuilder);
     }
 
     public override async Task<int> SaveChangesAsync(CancellationToken cancellationToken = default)

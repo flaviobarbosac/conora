@@ -125,7 +125,7 @@ public sealed class CategoryService
         if (!SystemCategories.AcceptsAnalyticalChild(parent.Section))
             throw new ValidationException(
                 "parentId",
-                "Nova conta só pode ficar sob Receita, Descontos, Projeto de vida, Essencial, Social, Ativo ou Passivo.");
+                "Nova conta só pode ficar sob Renda, Descontos, Projetos de vida, Essencial, Social, Ativo ou Passivo.");
 
         var sortOrder = (await _repo.ListAsync<Category>(c => c.ParentId == parent.Id, ct))
             .Select(c => c.SortOrder)

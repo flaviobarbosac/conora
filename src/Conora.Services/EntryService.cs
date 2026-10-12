@@ -327,7 +327,7 @@ public sealed class EntryService
                      ?? throw new NotFoundException("Fonte de renda", sid);
 
         if (count > 1)
-            throw new ValidationException("incomeSourceId", "Receita vinculada a uma fonte não aceita parcelas ou recorrência.");
+            throw new ValidationException("incomeSourceId", "Renda vinculada a uma fonte não aceita parcelas ou recorrência.");
         if (source.CompetenceYm != competenceYm)
             throw new ValidationException("incomeSourceId", $"A fonte '{source.Name}' tem diagnóstico em {source.CompetenceYm}.");
         if (amount != source.NetSpendable)

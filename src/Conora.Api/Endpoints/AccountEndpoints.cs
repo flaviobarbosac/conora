@@ -14,6 +14,9 @@ public static class AccountEndpoints
 
         group.MapGet("/banks", (AccountService service) => Results.Ok(service.ListBanks()));
 
+        group.MapGet("/cash-balance", async (string endYm, AccountService service, CancellationToken ct) =>
+            Results.Ok(await service.GetCashBalanceAtEndOfMonthAsync(endYm, ct)));
+
         group.MapPost("/", async (CreateAccountRequest request, AccountService service, CancellationToken ct) =>
         {
             var created = await service.CreateAsync(request, ct);

@@ -2,6 +2,7 @@ using Conora.Domain.Catalog;
 using Conora.Domain.Entities;
 using Conora.Domain.Enums;
 using Conora.Domain.Exceptions;
+using Conora.Domain.Services;
 using Conora.Repository.Interface;
 using Conora.Services.Contracts;
 
@@ -31,13 +32,31 @@ public sealed class AccountService
         return items.OrderBy(a => a.Name).Select(ToResponse).ToList();
     }
 
+    /// <summary>
+    /// Cash at the end of <paramref name="endYm"/>: current balances minus movements on or after the next month.
+    /// </summary>
+    public async Task<CashBalanceResponse> GetCashBalanceAtEndOfMonthAsync(string endYm, CancellationToken ct)
+    {
+        var ym = Competence.Require(endYm);
+        var cutoff = Competence.EndExclusive(ym);
+        var accounts = await _repo.ListAsync<Account>(a => !a.IsArchived, ct);
+        var current = accounts.Sum(a => a.Balance);
+        var later = await _repo.ListAsync<Entry>(e => e.OccurredAt >= cutoff, ct);
+        var laterDelta = later.SelectMany(e => e.BalanceEffects()).Sum(x => x.Delta);
+        // Opening was baked into Balance at create; exclude openings dated after endYm.
+        var laterOpenings = accounts.Where(a => a.OpeningBalanceAt >= cutoff).Sum(a => a.OpeningBalance);
+        return new CashBalanceResponse(ym, current - laterDelta - laterOpenings);
+    }
+
     public async Task<AccountResponse> CreateAsync(CreateAccountRequest request, CancellationToken ct)
     {
         await _plan.EnsureWritableAsync(ct);
+        var openingAt = request.OpeningBalanceAt ?? DateTime.UtcNow.Date;
         var account = Account.Create(
             request.Name,
             request.Kind,
             request.OpeningBalance,
+            openingAt,
             request.BankCode,
             request.Agency,
             request.AccountNumber,
@@ -99,6 +118,8 @@ public sealed class AccountService
             a.Name,
             a.Kind,
             a.Balance,
+            a.OpeningBalance,
+            a.OpeningBalanceAt,
             a.IsArchived,
             a.BankCode,
             a.Agency,

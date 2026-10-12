@@ -2,8 +2,8 @@
 	email flavio@redfivesistemas.com.br
 }
 
-# Public site at apex; SPA under /app/; API fallback for other paths.
-conora.com.br {
+# Public site at apex and www; SPA under /app/; API fallback for other paths.
+conora.com.br, www.conora.com.br {
 	encode zstd gzip
 
 	handle /privacidade {

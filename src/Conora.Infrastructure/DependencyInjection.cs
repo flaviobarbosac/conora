@@ -31,13 +31,16 @@ public static class DependencyInjection
         services.AddSingleton<ITokenService, JwtTokenService>();
         services.AddSingleton<IGoogleTokenValidator, GoogleTokenValidator>();
         services.AddScoped<IEmailSuppressionStore, EfEmailSuppressionStore>();
+        services.AddScoped<ISupplierStore, Persistence.EfSupplierStore>();
+        services.AddScoped<IReceiptOcrQueue, Persistence.EfReceiptOcrQueue>();
+        services.AddSingleton<IReceiptImageStore, Storage.LocalReceiptImageStore>();
         services.AddScoped<IEmailSender, SmtpEmailSender>();
         services.AddHttpClient("ses-sns", client => client.Timeout = TimeSpan.FromSeconds(15));
-        services.AddHttpClient<IGeminiClient, Ai.GeminiClient>(client => client.Timeout = TimeSpan.FromSeconds(20));
+        services.AddHttpClient<IGeminiClient, Ai.GeminiClient>(client => client.Timeout = TimeSpan.FromSeconds(45));
         services.AddHttpClient<IWhatsAppMessenger, WhatsApp.CloudApiWhatsAppMessenger>(client =>
         {
             client.BaseAddress = new Uri("https://graph.facebook.com/v21.0/");
-            client.Timeout = TimeSpan.FromSeconds(20);
+            client.Timeout = TimeSpan.FromSeconds(30);
         });
         var health = services.AddHealthChecks()
             .AddCheck("self", () => HealthCheckResult.Healthy(), tags: new[] { "live" })

@@ -26,17 +26,55 @@ public sealed class GeminiClient : IGeminiClient
 
     public bool IsConfigured => !string.IsNullOrWhiteSpace(_apiKey);
 
-    public async Task<string?> GenerateJsonAsync(string systemInstruction, string userPrompt, CancellationToken ct)
+    public Task<string?> GenerateJsonAsync(string systemInstruction, string userPrompt, CancellationToken ct)
     {
-        if (!IsConfigured)
-            return null;
-
         var body = new
         {
             systemInstruction = new { parts = new[] { new { text = systemInstruction } } },
             contents = new[] { new { role = "user", parts = new[] { new { text = userPrompt } } } },
             generationConfig = new { responseMimeType = "application/json", temperature = 0.3 }
         };
+        return SendAsync(body, ct);
+    }
+
+    public Task<string?> GenerateJsonFromImageAsync(
+        string systemInstruction,
+        string userPrompt,
+        ReadOnlyMemory<byte> imageBytes,
+        string mimeType,
+        CancellationToken ct)
+    {
+        var body = new
+        {
+            systemInstruction = new { parts = new[] { new { text = systemInstruction } } },
+            contents = new[]
+            {
+                new
+                {
+                    role = "user",
+                    parts = new object[]
+                    {
+                        new { text = userPrompt },
+                        new
+                        {
+                            inline_data = new
+                            {
+                                mime_type = string.IsNullOrWhiteSpace(mimeType) ? "image/jpeg" : mimeType,
+                                data = Convert.ToBase64String(imageBytes.Span)
+                            }
+                        }
+                    }
+                }
+            },
+            generationConfig = new { responseMimeType = "application/json", temperature = 0.1 }
+        };
+        return SendAsync(body, ct);
+    }
+
+    private async Task<string?> SendAsync(object body, CancellationToken ct)
+    {
+        if (!IsConfigured)
+            return null;
 
         try
         {
