@@ -35,9 +35,6 @@ public static class AccountEndpoints
             return Results.NoContent();
         });
 
-        group.MapPost("/transfers", async (TransferRequest request, AccountService service, CancellationToken ct) =>
-            Results.Ok(await service.TransferAsync(request, ct)));
-
         return app;
     }
 }

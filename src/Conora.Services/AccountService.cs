@@ -1,6 +1,5 @@
 using Conora.Domain.Catalog;
 using Conora.Domain.Entities;
-using Conora.Domain.Enums;
 using Conora.Domain.Exceptions;
 using Conora.Domain.Services;
 using Conora.Repository.Interface;
@@ -13,14 +12,12 @@ public sealed class AccountService
     private readonly IFinanceRepository _repo;
     private readonly IUnitOfWork _uow;
     private readonly PlanService _plan;
-    private readonly EntryService _entries;
 
-    public AccountService(IFinanceRepository repo, IUnitOfWork uow, PlanService plan, EntryService entries)
+    public AccountService(IFinanceRepository repo, IUnitOfWork uow, PlanService plan)
     {
         _repo = repo;
         _uow = uow;
         _plan = plan;
-        _entries = entries;
     }
 
     public IReadOnlyList<BankOptionResponse> ListBanks()
@@ -43,20 +40,15 @@ public sealed class AccountService
         var current = accounts.Sum(a => a.Balance);
         var later = await _repo.ListAsync<Entry>(e => e.OccurredAt >= cutoff, ct);
         var laterDelta = later.SelectMany(e => e.BalanceEffects()).Sum(x => x.Delta);
-        // Opening was baked into Balance at create; exclude openings dated after endYm.
-        var laterOpenings = accounts.Where(a => a.OpeningBalanceAt >= cutoff).Sum(a => a.OpeningBalance);
-        return new CashBalanceResponse(ym, current - laterDelta - laterOpenings);
+        return new CashBalanceResponse(ym, current - laterDelta);
     }
 
     public async Task<AccountResponse> CreateAsync(CreateAccountRequest request, CancellationToken ct)
     {
         await _plan.EnsureWritableAsync(ct);
-        var openingAt = request.OpeningBalanceAt ?? DateTime.UtcNow.Date;
         var account = Account.Create(
             request.Name,
             request.Kind,
-            request.OpeningBalance,
-            openingAt,
             request.BankCode,
             request.Agency,
             request.AccountNumber,
@@ -95,20 +87,6 @@ public sealed class AccountService
         await _uow.SaveChangesAsync(ct);
     }
 
-    /// <summary>A transfer is an entry of type Transfer: it never changes the monthly result.</summary>
-    public async Task<EntryResponse> TransferAsync(TransferRequest request, CancellationToken ct)
-    {
-        var created = await _entries.CreateAsync(new CreateEntryRequest(
-            EntryType.Transfer,
-            request.Amount,
-            request.OccurredAt,
-            string.IsNullOrWhiteSpace(request.Description) ? "Transferência entre contas" : request.Description,
-            AccountId: request.FromAccountId,
-            ContraAccountId: request.ToAccountId), ct);
-
-        return created[0];
-    }
-
     private async Task<Account> RequireAsync(Guid id, CancellationToken ct)
         => await _repo.GetAsync<Account>(id, ct) ?? throw new NotFoundException("Conta", id);
 
@@ -118,8 +96,6 @@ public sealed class AccountService
             a.Name,
             a.Kind,
             a.Balance,
-            a.OpeningBalance,
-            a.OpeningBalanceAt,
             a.IsArchived,
             a.BankCode,
             a.Agency,
