@@ -40,8 +40,10 @@ public sealed class PatrimonyService
             .ThenBy(i => i.Name)
             .ToList();
 
-        var assetsInUse = responses.Where(i => i.Section == CategorySection.Asset && i.GroupName == "Bens de Uso").Sum(i => i.Amount);
-        var assetsNotInUse = responses.Where(i => i.Section == CategorySection.Asset && i.GroupName == "Bens de Não Uso").Sum(i => i.Amount);
+        var assetsInUse = responses.Where(i => i.Section == CategorySection.Asset
+            && i.GroupName.Equals(SystemCategories.AssetsInUse, StringComparison.OrdinalIgnoreCase)).Sum(i => i.Amount);
+        var assetsNotInUse = responses.Where(i => i.Section == CategorySection.Asset
+            && i.GroupName.Equals(SystemCategories.AssetsNotInUse, StringComparison.OrdinalIgnoreCase)).Sum(i => i.Amount);
         var assets = responses.Where(i => i.Section == CategorySection.Asset).Sum(i => i.Amount);
         var liabilities = responses.Where(i => i.Section == CategorySection.Liability).Sum(i => i.Amount);
 

@@ -49,6 +49,15 @@ public class Category : ModelBase, ITenantOwned
 
     public void SetDisplayNumber(string? displayNumber) => DisplayNumber = displayNumber;
 
+    public void Reparent(Guid parentId, CategorySection section)
+    {
+        if (IsSystem)
+            return;
+
+        ParentId = parentId;
+        Section = section;
+    }
+
     public void Rename(string name)
     {
         EnsureNotSystem();

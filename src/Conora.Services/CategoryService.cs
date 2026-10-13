@@ -74,6 +74,9 @@ public sealed class CategoryService
             }
         }
 
+        if (await RetireObsoleteAsync(byCode, ct))
+            changed = true;
+
         if (changed)
         {
             await _uow.SaveChangesAsync(ct);
@@ -125,7 +128,7 @@ public sealed class CategoryService
         if (!SystemCategories.AcceptsAnalyticalChild(parent.Section))
             throw new ValidationException(
                 "parentId",
-                "Nova conta só pode ficar sob Renda, Descontos, Projetos de vida, Essencial, Social, Ativo ou Passivo.");
+                "Nova conta só pode ficar sob Renda, Descontos sobre renda, Projetos de vida, Essencial, Social, Ativo ou Passivo.");
 
         var sortOrder = (await _repo.ListAsync<Category>(c => c.ParentId == parent.Id, ct))
             .Select(c => c.SortOrder)
@@ -191,6 +194,105 @@ public sealed class CategoryService
             c => c.ParentId == parentId && c.Id != ignoreId && c.Name.ToLower() == lowered, ct);
         if (clash)
             throw new ValidationException("name", "Já existe uma conta com este nome neste grupo.");
+    }
+
+    private async Task<bool> RetireObsoleteAsync(Dictionary<string, Category> byCode, CancellationToken ct)
+    {
+        var catalog = SystemCategories.All.Select(d => d.Code).ToHashSet(StringComparer.Ordinal);
+        var obsolete = byCode.Where(kv => !catalog.Contains(kv.Key)).Select(kv => kv.Value).ToList();
+        if (obsolete.Count == 0)
+            return false;
+
+        var all = await _repo.ListAsync<Category>(ct: ct, track: true);
+        foreach (var (fromCode, toCode) in SystemCategories.Replacements)
+        {
+            if (!byCode.TryGetValue(fromCode, out var from) || !byCode.TryGetValue(toCode, out var to))
+                continue;
+
+            if (from.Level == CategoryLevel.Analytical && to.AcceptsPosting)
+                await MovePostingsAsync(from, to, ct);
+
+            var parentId = to.Level == CategoryLevel.Analytical ? to.ParentId : to.Id;
+            if (parentId is Guid pid)
+            {
+                foreach (var child in all.Where(c => !c.IsSystem && c.ParentId == from.Id && c.DeletedAt is null))
+                    child.Reparent(pid, to.Section);
+            }
+
+            await RetargetReceiptsAsync(fromCode, toCode, ct);
+        }
+
+        foreach (var old in obsolete)
+        {
+            var parent = old.ParentId is Guid pid
+                ? all.FirstOrDefault(c => c.Id == pid && c.DeletedAt is null && catalog.Contains(c.Code ?? ""))
+                : null;
+            if (parent is null)
+                continue;
+
+            foreach (var child in all.Where(c => !c.IsSystem && c.ParentId == old.Id && c.DeletedAt is null))
+                child.Reparent(parent.Id, parent.Section);
+        }
+
+        foreach (var old in obsolete.OrderByDescending(c => c.Level))
+        {
+            if (old.Level == CategoryLevel.Analytical && await HasPostingsAsync(old.Id, ct))
+                continue;
+
+            if (all.Any(c => c.Id != old.Id && c.ParentId == old.Id && c.DeletedAt is null))
+                continue;
+
+            _repo.SoftDelete(old);
+        }
+
+        return true;
+    }
+
+    private async Task<bool> HasPostingsAsync(Guid categoryId, CancellationToken ct)
+        => await _repo.AnyAsync<Entry>(e => e.CategoryId == categoryId, ct)
+           || await _repo.AnyAsync<CardPurchase>(p => p.CategoryId == categoryId, ct)
+           || await _repo.AnyAsync<BudgetLine>(l => l.CategoryId == categoryId, ct)
+           || await _repo.AnyAsync<PatrimonyItem>(p => p.CategoryId == categoryId, ct)
+           || await _repo.AnyAsync<LifeProject>(p => p.CategoryId == categoryId, ct);
+
+    private async Task MovePostingsAsync(Category from, Category to, CancellationToken ct)
+    {
+        foreach (var entry in await _repo.ListAsync<Entry>(e => e.CategoryId == from.Id, ct, track: true))
+            entry.MoveCategory(to.Id);
+
+        foreach (var purchase in await _repo.ListAsync<CardPurchase>(p => p.CategoryId == from.Id, ct, track: true))
+            purchase.MoveCategory(to.Id);
+
+        foreach (var item in await _repo.ListAsync<PatrimonyItem>(p => p.CategoryId == from.Id, ct, track: true))
+            item.SetCategory(to.Id);
+
+        foreach (var project in await _repo.ListAsync<LifeProject>(p => p.CategoryId == from.Id, ct, track: true))
+            project.MoveCategory(to.Id);
+
+        var incoming = await _repo.ListAsync<BudgetLine>(l => l.CategoryId == from.Id, ct, track: true);
+        foreach (var line in incoming)
+        {
+            var clash = await _repo.FirstOrDefaultAsync<BudgetLine>(
+                l => l.BudgetId == line.BudgetId && l.CategoryId == to.Id && l.Id != line.Id, ct, track: true);
+            if (clash is not null)
+            {
+                clash.SetPlanned(clash.PlannedAmount + line.PlannedAmount);
+                _repo.SoftDelete(line);
+            }
+            else
+            {
+                line.MoveCategory(to.Id);
+            }
+        }
+
+        await _uow.SaveChangesAsync(ct);
+    }
+
+    private async Task RetargetReceiptsAsync(string fromCode, string toCode, CancellationToken ct)
+    {
+        var receipts = await _repo.ListAsync<ReceiptIntake>(r => r.ProposedCategoryCode == fromCode, ct, track: true);
+        foreach (var receipt in receipts)
+            receipt.RetargetProposedCode(toCode);
     }
 
     private async Task RenumberIfNeededAsync(CancellationToken ct)

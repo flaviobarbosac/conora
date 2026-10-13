@@ -140,4 +140,12 @@ public class Entry : ModelBase, ITenantOwned
         MemberId = memberId;
         Description = description.Trim();
     }
+
+    public void MoveCategory(Guid categoryId)
+    {
+        if (Type == EntryType.Transfer)
+            return;
+
+        CategoryId = categoryId;
+    }
 }

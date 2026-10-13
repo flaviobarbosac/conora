@@ -166,7 +166,7 @@ public sealed class HelpService
                 new("Categoria sintética", "Orçamento, Despesa, Patrimônio e os grupos (Habitação, Curto prazo…). Não recebem valor."),
                 new("Categoria analítica", "Linha que recebe o lançamento (Salário, Aluguel…)."),
                 new("Padrão", "Categoria do sistema: não renomeia nem exclui."),
-                new("Sua categoria", "Analítica que você cria sob Renda, Descontos, Projetos de vida, Essencial, Social, Ativo ou Passivo."),
+                new("Sua categoria", "Analítica que você cria sob Renda, Descontos sobre renda, Projetos de vida, Essencial, Social, Ativo ou Passivo."),
                 new("Desativar", "Tira a categoria dos seletores e mantém o histórico.")
             ]),
 

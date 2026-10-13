@@ -53,6 +53,8 @@ public class CardPurchase : ModelBase, ITenantOwned
         };
     }
 
+    public void MoveCategory(Guid categoryId) => CategoryId = categoryId;
+
     /// <summary>Splits the total in installments; the last one absorbs the rounding remainder.</summary>
     public IReadOnlyList<(string InvoiceYm, decimal Amount)> InstallmentPlan()
     {
