@@ -14,8 +14,6 @@ public class AccountConfiguration : IEntityTypeConfiguration<Account>
         builder.Property(e => e.Name).IsRequired().HasMaxLength(120);
         builder.Property(e => e.Kind).HasConversion<string>().HasMaxLength(20);
         builder.Property(e => e.Balance).HasPrecision(18, 2);
-        builder.Property(e => e.OpeningBalance).HasPrecision(18, 2);
-        builder.Property(e => e.OpeningBalanceAt).IsRequired();
         builder.Property(e => e.BankCode).HasMaxLength(3);
         builder.Property(e => e.Agency).HasMaxLength(20);
         builder.Property(e => e.AccountNumber).HasMaxLength(20);

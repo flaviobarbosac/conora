@@ -1,7 +1,6 @@
 using Conora.Domain.Catalog;
 using Conora.Domain.Enums;
 using Conora.Domain.Exceptions;
-using Conora.Domain.Services;
 
 namespace Conora.Domain.Entities;
 
@@ -11,10 +10,6 @@ public class Account : ModelBase, ITenantOwned
     public string Name { get; private set; } = default!;
     public AccountKind Kind { get; private set; }
     public decimal Balance { get; private set; }
-    /// <summary>Opening amount set at create; used to reconstruct cash before that date.</summary>
-    public decimal OpeningBalance { get; private set; }
-    /// <summary>UTC calendar day when <see cref="OpeningBalance"/> was true.</summary>
-    public DateTime OpeningBalanceAt { get; private set; }
     public bool IsArchived { get; private set; }
     public string? BankCode { get; private set; }
     public string? Agency { get; private set; }
@@ -28,8 +23,6 @@ public class Account : ModelBase, ITenantOwned
     public static Account Create(
         string name,
         AccountKind kind,
-        decimal openingBalance,
-        DateTime openingBalanceAt,
         string? bankCode = null,
         string? agency = null,
         string? accountNumber = null,
@@ -38,18 +31,11 @@ public class Account : ModelBase, ITenantOwned
         if (string.IsNullOrWhiteSpace(name))
             throw new ValidationException("name", "Descrição da conta é obrigatória.");
 
-        var at = Competence.ToUtc(openingBalanceAt.Date);
-        var today = Competence.ToUtc(DateTime.UtcNow.Date);
-        if (at > today)
-            throw new ValidationException("openingBalanceAt", "Data do saldo inicial não pode ser futura.");
-
         var account = new Account
         {
             Name = name.Trim(),
             Kind = kind,
-            Balance = openingBalance,
-            OpeningBalance = openingBalance,
-            OpeningBalanceAt = at,
+            Balance = 0m,
         };
         account.SetBankDetails(kind, bankCode, agency, accountNumber, checkDigit);
         return account;

@@ -140,10 +140,8 @@ public sealed class HelpService
                 new("Agência", "Número da agência."),
                 new("Número da conta", "Número da conta sem o dígito."),
                 new("Dígito verificador", "Dígito da conta."),
-                new("Saldo inicial", "Valor e data em que esse saldo era verdadeiro. Não é receita do mês."),
-                new("Saldo atual", "Atualizado pelos lançamentos e transferências."),
-                new("Arquivar", "Esconde a conta sem apagar o histórico."),
-                new("Transferir", "Move valor entre duas contas suas — não é receita nem despesa do mês.")
+                new("Saldo atual", "Atualizado pelos lançamentos."),
+                new("Arquivar", "Esconde a conta sem apagar o histórico.")
             ]),
 
         new("cartoes", "Cartões",

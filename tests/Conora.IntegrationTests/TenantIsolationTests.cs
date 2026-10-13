@@ -137,7 +137,7 @@ public sealed class TenantIsolationTests : IClassFixture<ApiFactory>
     {
         using var request = new HttpRequestMessage(HttpMethod.Post, "/accounts")
         {
-            Content = JsonContent.Create(new { Name = name, Kind = 1, OpeningBalance = 0 })
+            Content = JsonContent.Create(new { Name = name, Kind = 1 })
         };
         request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", auth.AccessToken);
         var response = await _client.SendAsync(request);
