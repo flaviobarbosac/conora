@@ -5,6 +5,7 @@ using Conora.Api.Middleware;
 using Conora.Domain.Ports;
 using Conora.Infrastructure;
 using Conora.Infrastructure.Persistence;
+using Conora.Infrastructure.Security;
 using Conora.Infrastructure.Telemetry;
 using Conora.Repository;
 using Conora.Services;
@@ -195,8 +196,39 @@ using (var scope = app.Services.CreateScope())
     await db.Database.MigrateAsync();
 }
 
+await SyncSystemCategoriesAsync(app);
+
+if (string.Equals(Environment.GetEnvironmentVariable("CONORA_SYNC_CATEGORIES_ONLY"), "1", StringComparison.Ordinal))
+    return;
+
 app.Run();
 
 public partial class Program
 {
+    private static async Task SyncSystemCategoriesAsync(WebApplication app)
+    {
+        List<Guid> userIds;
+        using (var scope = app.Services.CreateScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+            var accounts = await db.Users.IgnoreQueryFilters()
+                .Where(u => u.DeletedAt == null)
+                .Select(u => u.Id)
+                .ToListAsync();
+            var owners = await db.Categories.IgnoreQueryFilters()
+                .Where(c => c.DeletedAt == null)
+                .Select(c => c.UsuarioId)
+                .Distinct()
+                .ToListAsync();
+            userIds = accounts.Union(owners).Distinct().ToList();
+        }
+
+        foreach (var userId in userIds)
+        {
+            using var scope = app.Services.CreateScope();
+            var tenant = (TenantContext)scope.ServiceProvider.GetRequiredService<ITenantContext>();
+            tenant.Set(userId);
+            await scope.ServiceProvider.GetRequiredService<CategoryService>().EnsureDefaultsAsync(CancellationToken.None);
+        }
+    }
 }

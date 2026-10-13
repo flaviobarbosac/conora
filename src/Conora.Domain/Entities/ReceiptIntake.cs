@@ -69,6 +69,14 @@ public class ReceiptIntake : ModelBase, ITenantOwned
         }
     }
 
+    public void RetargetProposedCode(string categoryCode)
+    {
+        if (string.IsNullOrWhiteSpace(ProposedCategoryCode))
+            return;
+
+        ProposedCategoryCode = categoryCode.Trim();
+    }
+
     public void SetClassification(string categoryCode, Guid? supplierId = null)
     {
         if (Status is not (ReceiptIntakeStatus.NeedsClassification or ReceiptIntakeStatus.Ready or ReceiptIntakeStatus.Processing))

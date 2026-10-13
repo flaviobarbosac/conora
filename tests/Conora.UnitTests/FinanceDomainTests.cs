@@ -10,13 +10,18 @@ namespace Conora.UnitTests;
 public class FinanceDomainTests
 {
     [Fact]
-    public void System_categories_have_two_masters_and_tithe_under_discount()
+    public void System_categories_match_the_official_chart()
     {
         var roots = SystemCategories.All.Where(c => c.Level == CategoryLevel.Root).ToList();
         Assert.Equal(2, roots.Count);
         Assert.Contains(roots, c => c.Code == "BUDGET");
         Assert.Contains(roots, c => c.Code == "PATRIMONY");
         Assert.DoesNotContain(SystemCategories.All, c => c.Name.Contains("líquido", StringComparison.OrdinalIgnoreCase));
+        Assert.Equal(250, SystemCategories.All.Count(c => c.Level == CategoryLevel.Analytical));
+        Assert.Equal(SystemCategories.All.Count, SystemCategories.All.Select(c => c.Code).Distinct().Count());
+
+        var codes = SystemCategories.All.Select(c => c.Code).ToHashSet(StringComparer.Ordinal);
+        Assert.All(SystemCategories.All.Where(c => c.ParentCode is not null), c => Assert.Contains(c.ParentCode!, codes));
 
         var income = SystemCategories.All.First(c => c.Code == "INC");
         Assert.Equal("BUDGET", income.ParentCode);
@@ -24,12 +29,18 @@ public class FinanceDomainTests
 
         var expense = SystemCategories.All.First(c => c.Code == "EXPENSE");
         Assert.Equal("BUDGET", expense.ParentCode);
-        Assert.Equal("EXPENSE", SystemCategories.All.First(c => c.Code == "DISC").ParentCode);
+        var discounts = SystemCategories.All.First(c => c.Code == "DISC");
+        Assert.Equal("EXPENSE", discounts.ParentCode);
+        Assert.Equal("Descontos sobre renda", discounts.Name);
         Assert.Equal("PATRIMONY", SystemCategories.All.First(c => c.Code == "ASSET").ParentCode);
         Assert.Equal("PATRIMONY", SystemCategories.All.First(c => c.Code == "LIAB").ParentCode);
+        Assert.Equal("Bens de uso", SystemCategories.All.First(c => c.Code == "ASSET_USE").Name);
+        Assert.Contains(SystemCategories.All, c => c.Code is "LIFE_SHORT" or "LIFE_MID" or "LIFE_LONG");
 
-        Assert.Contains(SystemCategories.All, c => c.Code == SystemCategories.Tithe);
-        Assert.Equal(CategorySection.Discount, SystemCategories.All.First(c => c.Code == SystemCategories.Tithe).Section);
+        var tithe = SystemCategories.All.First(c => c.Code == SystemCategories.Tithe);
+        Assert.Equal(CategorySection.Social, tithe.Section);
+        Assert.Equal("SOC_DONATE", tithe.ParentCode);
+        Assert.Equal("Dízimo", tithe.Name);
     }
 
     [Fact]

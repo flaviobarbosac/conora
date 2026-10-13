@@ -20,6 +20,8 @@ public class BudgetLine : ModelBase, ITenantOwned
         return line;
     }
 
+    public void MoveCategory(Guid categoryId) => CategoryId = categoryId;
+
     public void SetPlanned(decimal plannedAmount)
     {
         if (plannedAmount < 0)
