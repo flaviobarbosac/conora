@@ -90,10 +90,17 @@ public sealed class FamilyGroupService
 
     public async Task EnsureCanEditGroupBudgetAsync(CancellationToken ct)
     {
-        var (group, isOwner) = await RequireGroupAsync(ct);
-        if (!isOwner)
+        // Alone (Family-default chart): anyone edits their own budget.
+        // In a group: only the budget owner may edit the consolidated planned.
+        var self = RequireUserId();
+        var membership = await _family.FindActiveMembershipAsync(self, ct);
+        if (membership is null)
+            return;
+
+        var group = await _family.GetGroupAsync(membership.FamilyGroupId, ct)
+                    ?? throw new ValidationException("group", "Grupo não encontrado.");
+        if (!group.IsBudgetOwner(self))
             throw new ForbiddenException("Só o responsável pelo orçamento familiar pode editá-lo.");
-        _ = group;
     }
 
     public async Task<Guid?> GetBudgetOwnerUsuarioIdAsync(CancellationToken ct)
