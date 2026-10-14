@@ -1,4 +1,6 @@
 using Conora.Domain;
+using Conora.Domain.Catalog;
+using Conora.Domain.Exceptions;
 
 namespace Conora.Domain.Entities;
 
@@ -10,6 +12,13 @@ public class User : ModelBase
     public string? PasswordHash { get; private set; }
     public string? GoogleId { get; private set; }
     public bool EmailVerified { get; private set; }
+
+    public bool OnboardingCompleted { get; private set; }
+    public string ThemeId { get; private set; } = ThemeCatalog.Clareza;
+    public bool QuietMode { get; private set; }
+    public int ReserveTargetMonths { get; private set; } = 6;
+    public int MonthCloseDay { get; private set; } = 1;
+    public bool IncludeAbsoluteValuesInRetrospective { get; private set; }
 
     private User()
     {
@@ -56,6 +65,33 @@ public class User : ModelBase
         if (string.IsNullOrWhiteSpace(name))
             throw new ArgumentException("Nome é obrigatório.", nameof(name));
         Name = name.Trim();
+    }
+
+    public void CompleteOnboarding() => OnboardingCompleted = true;
+
+    public void UpdatePreferences(
+        string themeId,
+        bool quietMode,
+        int reserveTargetMonths,
+        int monthCloseDay,
+        bool includeAbsoluteValuesInRetrospective)
+    {
+        var errors = new Dictionary<string, string[]>();
+        var theme = ThemeCatalog.Normalize(themeId);
+        if (!ThemeCatalog.IsKnown(theme))
+            errors["themeId"] = ["Tema inválido."];
+        if (reserveTargetMonths is < 1 or > 24)
+            errors["reserveTargetMonths"] = ["Meta da reserva deve ter entre 1 e 24 meses."];
+        if (monthCloseDay is < 1 or > 31)
+            errors["monthCloseDay"] = ["Dia de fechamento deve ser entre 1 e 31."];
+        if (errors.Count > 0)
+            throw new ValidationException(errors);
+
+        ThemeId = theme;
+        QuietMode = quietMode;
+        ReserveTargetMonths = reserveTargetMonths;
+        MonthCloseDay = monthCloseDay;
+        IncludeAbsoluteValuesInRetrospective = includeAbsoluteValuesInRetrospective;
     }
 
     public void RequestDeletion()

@@ -16,6 +16,8 @@ public class Category : ModelBase, ITenantOwned
     public bool IsSystem { get; private set; }
     public bool IsActive { get; private set; } = true;
     public int SortOrder { get; private set; }
+    /// <summary>Family enters group Raio-X/budget consolidation; Personal stays private.</summary>
+    public SharingScope SharingScope { get; private set; } = SharingScope.Personal;
 
     public bool AcceptsPosting => Level == CategoryLevel.Analytical && IsActive;
 
@@ -75,6 +77,18 @@ public class Category : ModelBase, ITenantOwned
 
         IsActive = active;
     }
+
+    public void SetSharingScope(SharingScope scope)
+    {
+        if (Level != CategoryLevel.Analytical)
+            throw new ValidationException("sharingScope", "Só contas analíticas têm escopo Família/Pessoal.");
+
+        SharingScope = scope;
+    }
+
+    public void MarkFamily() => SharingScope = SharingScope.Family;
+
+    public void MarkPersonal() => SharingScope = SharingScope.Personal;
 
     public void SyncFromDefinition(SystemCategoryDefinition definition, Guid? parentId)
     {

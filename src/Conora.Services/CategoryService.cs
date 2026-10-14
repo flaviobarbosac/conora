@@ -151,6 +151,8 @@ public sealed class CategoryService
         var account = await RequireAsync(id, ct);
         account.Rename(request.Name);
         account.SetActive(request.IsActive);
+        if (request.SharingScope is SharingScope scope)
+            account.SetSharingScope(scope);
         await EnsureUniqueNameAsync(account.Name, account.ParentId ?? Guid.Empty, account.Id, ct);
 
         await _uow.SaveChangesAsync(ct);
@@ -312,6 +314,15 @@ public sealed class CategoryService
         await _uow.SaveChangesAsync(ct);
     }
 
+    public async Task<CategoryResponse> UpdateSharingAsync(Guid id, UpdateCategorySharingRequest request, CancellationToken ct)
+    {
+        await _plan.EnsureWritableAsync(ct);
+        var account = await RequireAsync(id, ct);
+        account.SetSharingScope(request.SharingScope);
+        await _uow.SaveChangesAsync(ct);
+        return ToResponse(account);
+    }
+
     private static CategoryResponse ToResponse(Category c)
-        => new(c.Id, c.ParentId, c.Name, c.Code, c.DisplayNumber, c.Level, c.Section, c.IsSystem, c.IsActive, c.SortOrder, c.AcceptsPosting);
+        => new(c.Id, c.ParentId, c.Name, c.Code, c.DisplayNumber, c.Level, c.Section, c.IsSystem, c.IsActive, c.SortOrder, c.AcceptsPosting, c.SharingScope);
 }

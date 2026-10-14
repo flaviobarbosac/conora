@@ -145,20 +145,48 @@ public sealed class DashboardService
     /// </summary>
     private async Task<Totals> ComputeTotalsAsync(string ym, CancellationToken ct)
     {
-        var userIds = await _family.GetReadableUsuarioIdsAsync(ct);
+        var scope = await _family.ResolveSharingScopeAsync(SharingScope.Family, ct);
+        var userIds = await _family.GetReadableUsuarioIdsAsync(ct, scope);
         var multi = userIds.Count > 1;
+        var familyCategoryIds = (await _repo.ListForUsuariosAsync<Category>(
+                userIds, c => c.SharingScope == scope && c.Level == CategoryLevel.Analytical, ct))
+            .Select(c => c.Id)
+            .ToHashSet();
 
-        var sources = multi
-            ? await _repo.ListForUsuariosAsync<IncomeSource>(userIds, s => s.CompetenceYm == ym, ct)
-            : await _repo.ListAsync<IncomeSource>(s => s.CompetenceYm == ym, ct);
-        var sourceIds = sources.Select(s => s.Id).ToHashSet();
+        // Diagnosis (IncomeSource) stays personal: list/sum own sources; peers only contribute
+        // anonymized NetSpendable to the family total — never uncategorizadas do outro.
+        var selfId = _family.RequireUserId();
+        var ownSources = await _repo.ListAsync<IncomeSource>(s => s.CompetenceYm == ym, ct);
+        var sourceIds = ownSources.Select(s => s.Id).ToHashSet();
+        decimal peerSpendable = 0m;
+        if (multi)
+        {
+            var peerIds = userIds.Where(id => id != selfId).ToList();
+            if (peerIds.Count > 0)
+            {
+                peerSpendable = (await _repo.ListForUsuariosAsync<IncomeSource>(
+                        peerIds, s => s.CompetenceYm == ym, ct))
+                    .Sum(s => s.NetSpendable);
+            }
+        }
+
         var incomes = multi
             ? await _repo.ListForUsuariosAsync<Entry>(
-                userIds, e => e.CompetenceYm == ym && e.Type == EntryType.Income, ct)
-            : await _repo.ListAsync<Entry>(e => e.CompetenceYm == ym && e.Type == EntryType.Income, ct);
+                userIds,
+                e => e.CompetenceYm == ym
+                     && e.Type == EntryType.Income
+                     && (
+                         (e.CategoryId != null && familyCategoryIds.Contains(e.CategoryId.Value))
+                         || (e.UsuarioId == selfId && e.CategoryId == null)),
+                ct)
+            : await _repo.ListAsync<Entry>(
+                e => e.CompetenceYm == ym
+                     && e.Type == EntryType.Income
+                     && (e.CategoryId == null || familyCategoryIds.Contains(e.CategoryId.Value)),
+                ct);
 
         var extra = incomes.Where(e => e.IncomeSourceId is null || !sourceIds.Contains(e.IncomeSourceId.Value)).Sum(e => e.Amount);
-        var income = sources.Sum(s => s.NetSpendable) + extra;
+        var income = ownSources.Sum(s => s.NetSpendable) + peerSpendable + extra;
 
         decimal expenses;
         decimal contributions;
@@ -167,20 +195,54 @@ public sealed class DashboardService
         if (multi)
         {
             expenses = (await _repo.ListForUsuariosAsync<Entry>(
-                userIds, e => e.CompetenceYm == ym && e.Type == EntryType.Expense, ct)).Sum(e => e.Amount);
+                userIds,
+                e => e.CompetenceYm == ym
+                     && e.Type == EntryType.Expense
+                     && e.CategoryId != null
+                     && familyCategoryIds.Contains(e.CategoryId.Value),
+                ct)).Sum(e => e.Amount);
             contributions = (await _repo.ListForUsuariosAsync<Entry>(
-                userIds, e => e.CompetenceYm == ym && e.Type == EntryType.Contribution, ct)).Sum(e => e.Amount);
+                userIds,
+                e => e.CompetenceYm == ym
+                     && e.Type == EntryType.Contribution
+                     && e.CategoryId != null
+                     && familyCategoryIds.Contains(e.CategoryId.Value),
+                ct)).Sum(e => e.Amount);
             cardPurchases = (await _repo.ListForUsuariosAsync<CardPurchase>(
-                userIds, p => p.CompetenceYm == ym, ct)).Sum(p => p.Amount);
+                userIds,
+                p => p.CompetenceYm == ym && familyCategoryIds.Contains(p.CategoryId),
+                ct)).Sum(p => p.Amount);
             projects = (await _repo.ListForUsuariosAsync<Entry>(
-                userIds, e => e.CompetenceYm == ym && e.Type == EntryType.ProjectContribution, ct)).Sum(e => e.Amount);
+                userIds,
+                e => e.CompetenceYm == ym
+                     && e.Type == EntryType.ProjectContribution
+                     && e.CategoryId != null
+                     && familyCategoryIds.Contains(e.CategoryId.Value),
+                ct)).Sum(e => e.Amount);
         }
         else
         {
-            expenses = await _repo.SumAsync<Entry>(e => e.CompetenceYm == ym && e.Type == EntryType.Expense, e => e.Amount, ct);
-            contributions = await _repo.SumAsync<Entry>(e => e.CompetenceYm == ym && e.Type == EntryType.Contribution, e => e.Amount, ct);
-            cardPurchases = await _repo.SumAsync<CardPurchase>(p => p.CompetenceYm == ym, p => p.Amount, ct);
-            projects = await _repo.SumAsync<Entry>(e => e.CompetenceYm == ym && e.Type == EntryType.ProjectContribution, e => e.Amount, ct);
+            expenses = await _repo.SumAsync<Entry>(
+                e => e.CompetenceYm == ym
+                     && e.Type == EntryType.Expense
+                     && e.CategoryId != null
+                     && familyCategoryIds.Contains(e.CategoryId.Value),
+                e => e.Amount, ct);
+            contributions = await _repo.SumAsync<Entry>(
+                e => e.CompetenceYm == ym
+                     && e.Type == EntryType.Contribution
+                     && e.CategoryId != null
+                     && familyCategoryIds.Contains(e.CategoryId.Value),
+                e => e.Amount, ct);
+            cardPurchases = await _repo.SumAsync<CardPurchase>(
+                p => p.CompetenceYm == ym && familyCategoryIds.Contains(p.CategoryId),
+                p => p.Amount, ct);
+            projects = await _repo.SumAsync<Entry>(
+                e => e.CompetenceYm == ym
+                     && e.Type == EntryType.ProjectContribution
+                     && e.CategoryId != null
+                     && familyCategoryIds.Contains(e.CategoryId.Value),
+                e => e.Amount, ct);
         }
 
         return new Totals(income, incomes.Sum(e => e.Amount), expenses + contributions + cardPurchases, contributions, cardPurchases, projects);

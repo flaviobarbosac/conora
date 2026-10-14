@@ -106,14 +106,17 @@ public sealed class PatrimonyService
         await _uow.SaveChangesAsync(ct);
     }
 
-    public async Task<ReserveResponse> GetReserveAsync(string? referenceYm, CancellationToken ct)
+    public async Task<ReserveResponse> GetReserveAsync(string? referenceYm, CancellationToken ct, int targetMonths = 6)
     {
         var reference = string.IsNullOrWhiteSpace(referenceYm) ? Competence.From(DateTime.UtcNow) : Competence.Require(referenceYm);
         var essentialIds = (await _categories.ListAsync(CategorySection.Essential, false, true, ct))
             .Select(c => c.Id)
             .ToList();
+        var balance = await GetReserveBalanceAsync(ct);
+        var target = Math.Clamp(targetMonths, 1, 24);
+
         if (essentialIds.Count == 0)
-            return new ReserveResponse(reference, 0, 0, "None");
+            return BuildReserve(reference, 0, 0, "None", balance, target);
 
         var monthly = new List<decimal>();
         for (var back = 1; back <= 3; back++)
@@ -132,18 +135,54 @@ public sealed class PatrimonyService
         }
 
         if (monthly.Count > 0)
-            return new ReserveResponse(reference, decimal.Round(monthly.Average(), 2), monthly.Count,
-                monthly.Count == 3 ? "Last3Months" : "AvailableMonths");
+            return BuildReserve(
+                reference,
+                decimal.Round(monthly.Average(), 2),
+                monthly.Count,
+                monthly.Count == 3 ? "Last3Months" : "AvailableMonths",
+                balance,
+                target);
 
         var budget = await _repo.FirstOrDefaultAsync<Budget>(b => b.CompetenceYm == reference, ct, track: false);
         if (budget is null)
-            return new ReserveResponse(reference, 0, 0, "None");
+            return BuildReserve(reference, 0, 0, "None", balance, target);
 
         var planned = await _repo.SumAsync<BudgetLine>(
             l => l.BudgetId == budget.Id && essentialIds.Contains(l.CategoryId), l => l.PlannedAmount, ct);
         return planned > 0
-            ? new ReserveResponse(reference, planned, 0, "Budget")
-            : new ReserveResponse(reference, 0, 0, "None");
+            ? BuildReserve(reference, planned, 0, "Budget", balance, target)
+            : BuildReserve(reference, 0, 0, "None", balance, target);
+    }
+
+    private async Task<decimal> GetReserveBalanceAsync(CancellationToken ct)
+    {
+        var reserveCategory = await _repo.FirstOrDefaultAsync<Category>(
+            c => c.Code == "LIFE_RESERVE", ct, track: false);
+        if (reserveCategory is null)
+            return 0;
+
+        var projects = await _repo.ListAsync<LifeProject>(p => p.CategoryId == reserveCategory.Id, ct);
+        if (projects.Count > 0)
+            return projects.Sum(p => p.AccumulatedAmount);
+
+        return await _repo.SumAsync<Entry>(
+            e => e.CategoryId == reserveCategory.Id && e.Type == EntryType.Contribution,
+            e => e.Amount, ct);
+    }
+
+    private static ReserveResponse BuildReserve(
+        string reference,
+        decimal monthlyAverage,
+        int monthsConsidered,
+        string source,
+        decimal balance,
+        int targetMonths)
+    {
+        var covered = monthlyAverage > 0 ? decimal.Round(balance / monthlyAverage, 1) : 0m;
+        var progress = targetMonths <= 0
+            ? 0m
+            : Math.Min(100m, decimal.Round(covered / targetMonths * 100, 1));
+        return new ReserveResponse(reference, monthlyAverage, monthsConsidered, source, balance, covered, targetMonths, progress);
     }
 
     private static PatrimonyItemResponse ToResponse(PatrimonyItem item, Dictionary<Guid, CategoryResponse> accounts)

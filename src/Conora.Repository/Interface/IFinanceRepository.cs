@@ -1,5 +1,6 @@
 using System.Linq.Expressions;
 using Conora.Domain.Entities;
+using Conora.Domain.Enums;
 
 namespace Conora.Repository.Interface;
 
@@ -76,4 +77,15 @@ public interface IFinanceRepository
     void AddRange<T>(IEnumerable<T> entities) where T : ModelBase, ITenantOwned;
 
     void SoftDelete<T>(T entity) where T : ModelBase, ITenantOwned;
+
+    /// <summary>
+    /// Privileged family-join write: sets analytical categories' SharingScope for a peer
+    /// without going through tenant StampTenant (ExecuteUpdate).
+    /// </summary>
+    Task<int> SetCategorySharingForUsuarioAsync(Guid usuarioId, SharingScope scope, CancellationToken ct = default);
+
+    /// <summary>
+    /// Privileged family-join write: sets LifeProject.Scope for a peer via ExecuteUpdate.
+    /// </summary>
+    Task<int> SetLifeProjectScopeForUsuarioAsync(Guid usuarioId, LifeProjectScope scope, CancellationToken ct = default);
 }

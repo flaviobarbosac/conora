@@ -29,4 +29,12 @@ public sealed record PatrimonySummaryResponse(
     IReadOnlyList<PatrimonyItemResponse> Items);
 
 /// <summary>Reserve base = average monthly essential spending. Source: Last3Months | AvailableMonths | Budget | None.</summary>
-public sealed record ReserveResponse(string ReferenceYm, decimal MonthlyEssentialAverage, int MonthsConsidered, string Source);
+public sealed record ReserveResponse(
+    string ReferenceYm,
+    decimal MonthlyEssentialAverage,
+    int MonthsConsidered,
+    string Source,
+    decimal ReserveBalance = 0,
+    decimal MonthsCovered = 0,
+    int TargetMonths = 6,
+    decimal ProgressPercent = 0);

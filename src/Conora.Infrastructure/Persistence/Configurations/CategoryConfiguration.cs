@@ -16,6 +16,7 @@ public class CategoryConfiguration : IEntityTypeConfiguration<Category>
         builder.Property(e => e.DisplayNumber).HasMaxLength(40);
         builder.Property(e => e.Level).HasConversion<string>().HasMaxLength(20);
         builder.Property(e => e.Section).HasConversion<string>().HasMaxLength(20);
+        builder.Property(e => e.SharingScope).HasConversion<string>().HasMaxLength(20).IsRequired();
         builder.Ignore(e => e.AcceptsPosting);
 
         builder.HasIndex(e => new { e.UsuarioId, e.Code })
@@ -24,5 +25,7 @@ public class CategoryConfiguration : IEntityTypeConfiguration<Category>
             .HasDatabaseName("IX_categories_UsuarioId_Code");
         builder.HasIndex(e => new { e.UsuarioId, e.ParentId });
         builder.HasIndex(e => new { e.UsuarioId, e.Section });
+        builder.HasIndex(e => new { e.UsuarioId, e.SharingScope })
+            .HasDatabaseName("IX_categories_UsuarioId_SharingScope");
     }
 }

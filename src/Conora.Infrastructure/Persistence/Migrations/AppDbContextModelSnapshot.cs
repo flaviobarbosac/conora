@@ -388,6 +388,11 @@ namespace Conora.Infrastructure.Persistence.Migrations
                         .HasMaxLength(20)
                         .HasColumnType("character varying(20)");
 
+                    b.Property<string>("SharingScope")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)");
+
                     b.Property<int>("SortOrder")
                         .HasColumnType("integer");
 
@@ -410,6 +415,9 @@ namespace Conora.Infrastructure.Persistence.Migrations
                     b.HasIndex("UsuarioId", "ParentId");
 
                     b.HasIndex("UsuarioId", "Section");
+
+                    b.HasIndex("UsuarioId", "SharingScope")
+                        .HasDatabaseName("IX_categories_UsuarioId_SharingScope");
 
                     b.ToTable("categories", (string)null);
                 });
@@ -580,6 +588,9 @@ namespace Conora.Infrastructure.Persistence.Migrations
                         .ValueGeneratedOnAdd()
                         .HasColumnType("uuid");
 
+                    b.Property<Guid>("BudgetOwnerUsuarioId")
+                        .HasColumnType("uuid");
+
                     b.Property<DateTime>("CreatedAt")
                         .HasColumnType("timestamp with time zone");
 
@@ -596,6 +607,10 @@ namespace Conora.Infrastructure.Persistence.Migrations
                         .HasColumnType("bigint");
 
                     b.HasKey("Id");
+
+                    b.HasIndex("BudgetOwnerUsuarioId");
+
+                    b.HasIndex("CreatedByUsuarioId");
 
                     b.ToTable("family_groups", (string)null);
                 });
@@ -686,6 +701,8 @@ namespace Conora.Infrastructure.Persistence.Migrations
 
                     b.HasIndex("Email");
 
+                    b.HasIndex("FamilyGroupId");
+
                     b.HasIndex("InviterUsuarioId");
 
                     b.HasIndex("Token")
@@ -769,6 +786,66 @@ namespace Conora.Infrastructure.Persistence.Migrations
                     b.HasIndex("UsuarioId", "ReadAt");
 
                     b.ToTable("family_notices", (string)null);
+                });
+
+            modelBuilder.Entity("Conora.Domain.Entities.FamilyOwnerTransfer", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime?>("AcceptedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<DateTime?>("CancelledAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<DateTime?>("DeletedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<DateTime>("ExpiresAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid>("FamilyGroupId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("FromUsuarioId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("ToUsuarioId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("Token")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)");
+
+                    b.Property<DateTime>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<long>("Version")
+                        .HasColumnType("bigint");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("FamilyGroupId")
+                        .IsUnique()
+                        .HasDatabaseName("IX_family_owner_transfers_one_open")
+                        .HasFilter("\"AcceptedAt\" IS NULL AND \"CancelledAt\" IS NULL AND \"DeletedAt\" IS NULL");
+
+                    b.HasIndex("FromUsuarioId");
+
+                    b.HasIndex("ToUsuarioId");
+
+                    b.HasIndex("Token")
+                        .IsUnique();
+
+                    b.HasIndex("FamilyGroupId", "AcceptedAt", "CancelledAt");
+
+                    b.ToTable("family_owner_transfers", (string)null);
                 });
 
             modelBuilder.Entity("Conora.Domain.Entities.ImportBatch", b =>
@@ -1343,14 +1420,34 @@ namespace Conora.Infrastructure.Persistence.Migrations
                         .HasMaxLength(100)
                         .HasColumnType("character varying(100)");
 
+                    b.Property<bool>("IncludeAbsoluteValuesInRetrospective")
+                        .HasColumnType("boolean");
+
+                    b.Property<int>("MonthCloseDay")
+                        .HasColumnType("integer");
+
                     b.Property<string>("Name")
                         .IsRequired()
                         .HasMaxLength(200)
                         .HasColumnType("character varying(200)");
 
+                    b.Property<bool>("OnboardingCompleted")
+                        .HasColumnType("boolean");
+
                     b.Property<string>("PasswordHash")
                         .HasMaxLength(500)
                         .HasColumnType("character varying(500)");
+
+                    b.Property<bool>("QuietMode")
+                        .HasColumnType("boolean");
+
+                    b.Property<int>("ReserveTargetMonths")
+                        .HasColumnType("integer");
+
+                    b.Property<string>("ThemeId")
+                        .IsRequired()
+                        .HasMaxLength(40)
+                        .HasColumnType("character varying(40)");
 
                     b.Property<DateTime>("UpdatedAt")
                         .HasColumnType("timestamp with time zone");
@@ -1503,6 +1600,80 @@ namespace Conora.Infrastructure.Persistence.Migrations
                         .HasFilter("\"DeletedAt\" IS NULL");
 
                     b.ToTable("workspace_subscriptions", (string)null);
+                });
+
+            modelBuilder.Entity("Conora.Domain.Entities.FamilyGroup", b =>
+                {
+                    b.HasOne("Conora.Domain.Entities.User", null)
+                        .WithMany()
+                        .HasForeignKey("BudgetOwnerUsuarioId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("Conora.Domain.Entities.User", null)
+                        .WithMany()
+                        .HasForeignKey("CreatedByUsuarioId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("Conora.Domain.Entities.FamilyGroupMember", b =>
+                {
+                    b.HasOne("Conora.Domain.Entities.FamilyGroup", null)
+                        .WithMany()
+                        .HasForeignKey("FamilyGroupId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("Conora.Domain.Entities.User", null)
+                        .WithMany()
+                        .HasForeignKey("UsuarioId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("Conora.Domain.Entities.FamilyInvite", b =>
+                {
+                    b.HasOne("Conora.Domain.Entities.FamilyGroup", null)
+                        .WithMany()
+                        .HasForeignKey("FamilyGroupId")
+                        .OnDelete(DeleteBehavior.SetNull);
+
+                    b.HasOne("Conora.Domain.Entities.User", null)
+                        .WithMany()
+                        .HasForeignKey("InviterUsuarioId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("Conora.Domain.Entities.FamilyNotice", b =>
+                {
+                    b.HasOne("Conora.Domain.Entities.User", null)
+                        .WithMany()
+                        .HasForeignKey("UsuarioId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("Conora.Domain.Entities.FamilyOwnerTransfer", b =>
+                {
+                    b.HasOne("Conora.Domain.Entities.FamilyGroup", null)
+                        .WithMany()
+                        .HasForeignKey("FamilyGroupId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("Conora.Domain.Entities.User", null)
+                        .WithMany()
+                        .HasForeignKey("FromUsuarioId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("Conora.Domain.Entities.User", null)
+                        .WithMany()
+                        .HasForeignKey("ToUsuarioId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
                 });
 #pragma warning restore 612, 618
         }
