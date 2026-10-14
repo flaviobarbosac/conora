@@ -14,7 +14,9 @@ public sealed record CategoryResponse(
     bool IsActive,
     int SortOrder,
     bool AcceptsPosting,
-    SharingScope SharingScope);
+    SharingScope SharingScope,
+    Guid? CreatedByUsuarioId = null,
+    string? CreatedByName = null);
 
 public sealed record CreateCategoryRequest(string Name, Guid ParentId);
 

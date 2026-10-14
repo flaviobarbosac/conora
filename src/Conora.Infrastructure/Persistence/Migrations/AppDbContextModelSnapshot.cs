@@ -357,12 +357,18 @@ namespace Conora.Infrastructure.Persistence.Migrations
                     b.Property<DateTime>("CreatedAt")
                         .HasColumnType("timestamp with time zone");
 
+                    b.Property<Guid?>("CreatedByUsuarioId")
+                        .HasColumnType("uuid");
+
                     b.Property<DateTime?>("DeletedAt")
                         .HasColumnType("timestamp with time zone");
 
                     b.Property<string>("DisplayNumber")
                         .HasMaxLength(40)
                         .HasColumnType("character varying(40)");
+
+                    b.Property<Guid?>("FamilyKey")
+                        .HasColumnType("uuid");
 
                     b.Property<bool>("IsActive")
                         .HasColumnType("boolean");
@@ -420,6 +426,10 @@ namespace Conora.Infrastructure.Persistence.Migrations
 
                     b.HasIndex("UsuarioId", "SharingScope")
                         .HasDatabaseName("IX_categories_UsuarioId_SharingScope");
+
+                    b.HasIndex("FamilyKey")
+                        .HasDatabaseName("IX_categories_FamilyKey")
+                        .HasFilter("\"FamilyKey\" IS NOT NULL AND \"DeletedAt\" IS NULL");
 
                     b.ToTable("categories", (string)null);
                 });

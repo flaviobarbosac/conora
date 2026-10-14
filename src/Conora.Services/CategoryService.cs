@@ -2,6 +2,7 @@
 using Conora.Domain.Entities;
 using Conora.Domain.Enums;
 using Conora.Domain.Exceptions;
+using Conora.Domain.Ports;
 using Conora.Domain.Services;
 using Conora.Repository.Interface;
 using Conora.Services.Contracts;
@@ -13,12 +14,21 @@ public sealed class CategoryService
     private readonly IFinanceRepository _repo;
     private readonly IUnitOfWork _uow;
     private readonly PlanService _plan;
+    private readonly IFamilyGroupRepository _family;
+    private readonly ITenantContext _tenant;
 
-    public CategoryService(IFinanceRepository repo, IUnitOfWork uow, PlanService plan)
+    public CategoryService(
+        IFinanceRepository repo,
+        IUnitOfWork uow,
+        PlanService plan,
+        IFamilyGroupRepository family,
+        ITenantContext tenant)
     {
         _repo = repo;
         _uow = uow;
         _plan = plan;
+        _family = family;
+        _tenant = tenant;
     }
 
     /// <summary>Adds the system categories without saving (used when a new user registers).</summary>
@@ -102,18 +112,21 @@ public sealed class CategoryService
         CancellationToken ct)
     {
         await EnsureDefaultsAsync(ct);
+        await SyncFamilyCategoriesAsync(ct);
         var items = await _repo.ListAsync<Category>(
             c => (section == null || c.Section == section)
                  && (includeInactive || c.IsActive)
                  && (!analyticalOnly || c.Level == CategoryLevel.Analytical),
             ct);
 
+        var names = await CreatorNamesAsync(items, ct);
+        var self = _tenant.UsuarioId;
         var nameOrder = StringComparer.Create(System.Globalization.CultureInfo.GetCultureInfo("pt-BR"), ignoreCase: true);
         return items
             .OrderBy(c => c.Section)
             .ThenBy(c => c.Level == CategoryLevel.Root ? 0 : 1)
             .ThenBy(c => c.Name, nameOrder)
-            .Select(ToResponse)
+            .Select(c => ToResponse(c, CreatorName(c, self, names)))
             .ToList();
     }
 
@@ -136,11 +149,13 @@ public sealed class CategoryService
             .Max() + 1;
 
         var account = Category.CreateAnalytical(request.Name, parent.Id, parent.Section, sortOrder);
+        account.AssignFamilyIdentity(RequireUserId(), Guid.CreateVersion7());
         await EnsureUniqueNameAsync(account.Name, parent.Id, null, ct);
 
         _repo.Add(account);
         await _uow.SaveChangesAsync(ct);
         await RenumberAsync(ct);
+        await SyncFamilyCategoriesAsync(ct);
         var numbered = await RequireAsync(account.Id, ct);
         return ToResponse(numbered);
     }
@@ -149,6 +164,7 @@ public sealed class CategoryService
     {
         await _plan.EnsureWritableAsync(ct);
         var account = await RequireAsync(id, ct);
+        EnsureCreator(account);
         account.Rename(request.Name);
         account.SetActive(request.IsActive);
         if (request.SharingScope is SharingScope scope)
@@ -156,6 +172,10 @@ public sealed class CategoryService
         await EnsureUniqueNameAsync(account.Name, account.ParentId ?? Guid.Empty, account.Id, ct);
 
         await _uow.SaveChangesAsync(ct);
+        if (account.SharingScope == SharingScope.Personal)
+            await DropFamilyReplicasAsync(account, ct);
+        else
+            await SyncFamilyCategoriesAsync(ct);
         return ToResponse(account);
     }
 
@@ -165,15 +185,17 @@ public sealed class CategoryService
         var account = await RequireAsync(id, ct);
         account.EnsureNotSystem();
         account.EnsureAnalytical();
+        EnsureCreator(account);
 
-        if (await _repo.AnyAsync<Entry>(e => e.CategoryId == id, ct)
-            || await _repo.AnyAsync<CardPurchase>(p => p.CategoryId == id, ct)
-            || await _repo.AnyAsync<BudgetLine>(l => l.CategoryId == id, ct)
-            || await _repo.AnyAsync<PatrimonyItem>(p => p.CategoryId == id, ct))
+        var memberIds = await MemberIdsAsync(ct);
+        var replicaIds = await ReplicaIdsAsync(account, memberIds, ct);
+        if (await InUseAsync(replicaIds, memberIds, ct))
             throw new ValidationException("id", "Conta em uso. Desative-a em vez de excluir.");
 
         _repo.SoftDelete(account);
         await _uow.SaveChangesAsync(ct);
+        if (account.FamilyKey is Guid familyKey && memberIds.Count > 1)
+            await _repo.SoftDeleteFamilyReplicasAsync(familyKey, memberIds, account.Id, ct);
         await RenumberAsync(ct);
     }
 
@@ -318,11 +340,283 @@ public sealed class CategoryService
     {
         await _plan.EnsureWritableAsync(ct);
         var account = await RequireAsync(id, ct);
+        if (!account.IsSystem)
+            EnsureCreator(account);
         account.SetSharingScope(request.SharingScope);
         await _uow.SaveChangesAsync(ct);
+        if (account.IsSystem)
+            return ToResponse(account);
+
+        if (request.SharingScope == SharingScope.Personal)
+            await DropFamilyReplicasAsync(account, ct);
+        else
+            await SyncFamilyCategoriesAsync(ct);
         return ToResponse(account);
     }
 
-    private static CategoryResponse ToResponse(Category c)
-        => new(c.Id, c.ParentId, c.Name, c.Code, c.DisplayNumber, c.Level, c.Section, c.IsSystem, c.IsActive, c.SortOrder, c.AcceptsPosting, c.SharingScope);
+    /// <summary>
+    /// Copies every Family analytical category onto every member of the current group.
+    /// New members therefore receive the owner's chart, including categories created by someone else.
+    /// </summary>
+    public async Task SyncFamilyCategoriesAsync(CancellationToken ct)
+    {
+        var self = _tenant.UsuarioId;
+        if (self is null)
+            return;
+
+        var membership = await _family.FindActiveMembershipAsync(self.Value, ct);
+        if (membership is null)
+            return;
+
+        var memberIds = (await _family.ListActiveMembersAsync(membership.FamilyGroupId, ct))
+            .Select(m => m.UsuarioId)
+            .Distinct()
+            .ToList();
+        if (memberIds.Count < 2)
+            return;
+
+        var all = await _repo.ListGroupCategoriesAsync(memberIds, ct);
+        var active = all.Where(c => c.DeletedAt is null).ToList();
+        var byId = active.ToDictionary(c => c.Id);
+        var familyCustom = active
+            .Where(c => !c.IsSystem && c.Level == CategoryLevel.Analytical && c.SharingScope == SharingScope.Family)
+            .ToList();
+        if (familyCustom.Count == 0)
+            return;
+
+        var changed = false;
+        foreach (var cluster in MergeClusters(familyCustom, byId))
+        {
+            var origin = cluster.OrderBy(c => c.CreatedAt).ThenBy(c => c.Id).First();
+            var creators = cluster.Select(c => c.CreatedByUsuarioId ?? c.UsuarioId).Distinct().ToList();
+            // One creator already: keep them. Independent copies of the same name: the earliest row wins.
+            var createdBy = creators.Count == 1 ? creators[0] : origin.UsuarioId;
+            var source = cluster.FirstOrDefault(c => c.UsuarioId == createdBy) ?? origin;
+            var familyKey = (creators.Count == 1 ? source.FamilyKey : origin.FamilyKey) ?? origin.Id;
+            var parentCode = ParentCode(source, byId);
+            if (string.IsNullOrEmpty(parentCode))
+                continue;
+
+            foreach (var memberId in memberIds)
+            {
+                var parent = active.FirstOrDefault(c =>
+                    c.UsuarioId == memberId && c.IsSystem && c.Code == parentCode && c.DeletedAt is null);
+                if (parent is null)
+                    continue;
+
+                var align = new CategoryReplicaAlign(
+                    parent.Id,
+                    source.Name,
+                    source.DisplayNumber,
+                    source.Section,
+                    source.IsActive,
+                    source.SortOrder,
+                    createdBy,
+                    familyKey);
+
+                var row = cluster.FirstOrDefault(c => c.UsuarioId == memberId && c.DeletedAt is null);
+                if (row is null)
+                {
+                    var deleted = all.FirstOrDefault(c =>
+                        c.UsuarioId == memberId && c.DeletedAt is not null && c.FamilyKey == familyKey);
+                    if (deleted is not null)
+                    {
+                        await _repo.RestoreCategoryReplicaAsync(deleted.Id, align, ct);
+                        changed = true;
+                        continue;
+                    }
+
+                    var clash = active.Any(c =>
+                        c.UsuarioId == memberId
+                        && c.ParentId == parent.Id
+                        && !c.IsSystem
+                        && c.Name.Equals(source.Name, StringComparison.OrdinalIgnoreCase));
+                    if (clash)
+                        continue;
+
+                    await _repo.InsertCategoryReplicaAsync(
+                        new CategoryReplicaInsert(
+                            Guid.CreateVersion7(),
+                            memberId,
+                            parent.Id,
+                            source.Name,
+                            source.DisplayNumber,
+                            source.Section,
+                            source.IsActive,
+                            source.SortOrder,
+                            createdBy,
+                            familyKey),
+                        ct);
+                    changed = true;
+                    continue;
+                }
+
+                if (row.FamilyKey == familyKey
+                    && row.CreatedByUsuarioId == createdBy
+                    && row.Name == source.Name
+                    && row.IsActive == source.IsActive
+                    && row.ParentId == parent.Id
+                    && row.SharingScope == SharingScope.Family)
+                    continue;
+
+                await _repo.AlignCategoryReplicaAsync(row.Id, align, ct);
+                changed = true;
+            }
+        }
+
+        if (changed)
+            await RenumberAsync(ct);
+    }
+
+    private async Task DropFamilyReplicasAsync(Category account, CancellationToken ct)
+    {
+        if (account.FamilyKey is not Guid familyKey)
+            return;
+
+        var memberIds = await MemberIdsAsync(ct);
+        if (memberIds.Count < 2)
+            return;
+
+        await _repo.SoftDeleteFamilyReplicasAsync(familyKey, memberIds, account.Id, ct);
+    }
+
+    private async Task<bool> InUseAsync(IReadOnlyList<Guid> categoryIds, IReadOnlyList<Guid> memberIds, CancellationToken ct)
+    {
+        if (categoryIds.Count == 0)
+            return false;
+
+        if (memberIds.Count < 2)
+        {
+            return await _repo.AnyAsync<Entry>(e => e.CategoryId != null && categoryIds.Contains(e.CategoryId.Value), ct)
+                   || await _repo.AnyAsync<CardPurchase>(p => categoryIds.Contains(p.CategoryId), ct)
+                   || await _repo.AnyAsync<BudgetLine>(l => categoryIds.Contains(l.CategoryId), ct)
+                   || await _repo.AnyAsync<PatrimonyItem>(p => categoryIds.Contains(p.CategoryId), ct);
+        }
+
+        return await _repo.AnyForUsuariosAsync<Entry>(
+                   memberIds, e => e.CategoryId != null && categoryIds.Contains(e.CategoryId.Value), ct)
+               || await _repo.AnyForUsuariosAsync<CardPurchase>(memberIds, p => categoryIds.Contains(p.CategoryId), ct)
+               || await _repo.AnyForUsuariosAsync<BudgetLine>(memberIds, l => categoryIds.Contains(l.CategoryId), ct)
+               || await _repo.AnyForUsuariosAsync<PatrimonyItem>(memberIds, p => categoryIds.Contains(p.CategoryId), ct);
+    }
+
+    private async Task<List<Guid>> ReplicaIdsAsync(Category account, IReadOnlyList<Guid> memberIds, CancellationToken ct)
+    {
+        var ids = new List<Guid> { account.Id };
+        if (account.FamilyKey is not Guid familyKey || memberIds.Count < 2)
+            return ids;
+
+        var rows = await _repo.ListGroupCategoriesAsync(memberIds, ct);
+        ids.AddRange(rows.Where(c => c.FamilyKey == familyKey && c.DeletedAt is null).Select(c => c.Id));
+        return ids.Distinct().ToList();
+    }
+
+    private async Task<List<Guid>> MemberIdsAsync(CancellationToken ct)
+    {
+        var self = RequireUserId();
+        var membership = await _family.FindActiveMembershipAsync(self, ct);
+        if (membership is null)
+            return [self];
+
+        var ids = (await _family.ListActiveMembersAsync(membership.FamilyGroupId, ct))
+            .Select(m => m.UsuarioId)
+            .Distinct()
+            .ToList();
+        return ids.Count == 0 ? [self] : ids;
+    }
+
+    private async Task<Dictionary<Guid, string>> CreatorNamesAsync(IReadOnlyList<Category> items, CancellationToken ct)
+    {
+        var self = _tenant.UsuarioId;
+        var ownerIds = items
+            .Where(c => !c.IsSystem && c.CreatedByUsuarioId is Guid id && id != self)
+            .Select(c => c.CreatedByUsuarioId!.Value)
+            .Distinct()
+            .ToList();
+        if (ownerIds.Count == 0)
+            return [];
+
+        var users = await _family.ListUsersByIdsAsync(ownerIds, ct);
+        return users.ToDictionary(u => u.Id, u => u.Name);
+    }
+
+    private static string? CreatorName(Category category, Guid? self, IReadOnlyDictionary<Guid, string> names)
+    {
+        if (category.IsSystem || category.CreatedByUsuarioId is not Guid owner || owner == self)
+            return null;
+        return names.TryGetValue(owner, out var name) ? name : null;
+    }
+
+    private Guid RequireUserId()
+        => _tenant.UsuarioId ?? throw new ForbiddenException("Usuário não autenticado.");
+
+    private void EnsureCreator(Category account)
+    {
+        if (account.IsSystem)
+            return;
+
+        var owner = account.CreatedByUsuarioId ?? account.UsuarioId;
+        if (owner != RequireUserId())
+            throw new ForbiddenException("Só quem criou esta categoria pode alterá-la.");
+    }
+
+    private static List<List<Category>> MergeClusters(List<Category> familyCustom, Dictionary<Guid, Category> byId)
+    {
+        var keyed = familyCustom
+            .GroupBy(c => c.FamilyKey ?? c.Id)
+            .Select(g => g.ToList())
+            .ToList();
+
+        var merged = new Dictionary<string, List<Category>>(StringComparer.OrdinalIgnoreCase);
+        var kept = new List<List<Category>>();
+        foreach (var cluster in keyed)
+        {
+            var sharedKey = cluster.Select(c => c.FamilyKey).Distinct().Count() == 1
+                            && cluster[0].FamilyKey is not null
+                            && cluster.Count > 1;
+            if (sharedKey)
+            {
+                kept.Add(cluster);
+                continue;
+            }
+
+            var origin = cluster.OrderBy(c => c.CreatedAt).ThenBy(c => c.Id).First();
+            var code = ParentCode(origin, byId) ?? "";
+            var mergeKey = code + "\n" + origin.Name.Trim();
+            if (!merged.TryGetValue(mergeKey, out var bucket))
+            {
+                bucket = [];
+                merged[mergeKey] = bucket;
+            }
+
+            bucket.AddRange(cluster);
+        }
+
+        kept.AddRange(merged.Values);
+        return kept;
+    }
+
+    private static string? ParentCode(Category category, IReadOnlyDictionary<Guid, Category> byId)
+    {
+        if (category.ParentId is not Guid parentId)
+            return null;
+        return byId.TryGetValue(parentId, out var parent) ? parent.Code : null;
+    }
+
+    private static CategoryResponse ToResponse(Category c, string? createdByName = null)
+        => new(
+            c.Id,
+            c.ParentId,
+            c.Name,
+            c.Code,
+            c.DisplayNumber,
+            c.Level,
+            c.Section,
+            c.IsSystem,
+            c.IsActive,
+            c.SortOrder,
+            c.AcceptsPosting,
+            c.SharingScope,
+            c.CreatedByUsuarioId,
+            createdByName);
 }

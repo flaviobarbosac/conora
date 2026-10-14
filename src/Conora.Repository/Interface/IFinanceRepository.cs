@@ -88,4 +88,53 @@ public interface IFinanceRepository
     /// Privileged family-join write: sets LifeProject.Scope for a peer via ExecuteUpdate.
     /// </summary>
     Task<int> SetLifeProjectScopeForUsuarioAsync(Guid usuarioId, LifeProjectScope scope, CancellationToken ct = default);
+
+    /// <summary>
+    /// Active and soft-deleted categories for the given users. Family replica sync only.
+    /// </summary>
+    Task<List<Category>> ListGroupCategoriesAsync(IReadOnlyCollection<Guid> usuarioIds, CancellationToken ct = default);
+
+    Task<bool> AnyForUsuariosAsync<T>(
+        IReadOnlyCollection<Guid> allowedUsuarioIds,
+        Expression<Func<T, bool>> predicate,
+        CancellationToken ct = default)
+        where T : ModelBase, ITenantOwned;
+
+    /// <summary>Inserts a family-category replica on another member. Bypasses tenant stamp.</summary>
+    Task InsertCategoryReplicaAsync(CategoryReplicaInsert row, CancellationToken ct = default);
+
+    Task AlignCategoryReplicaAsync(Guid categoryId, CategoryReplicaAlign row, CancellationToken ct = default);
+
+    Task RestoreCategoryReplicaAsync(Guid categoryId, CategoryReplicaAlign row, CancellationToken ct = default);
+
+    Task SoftDeleteFamilyReplicasAsync(
+        Guid familyKey,
+        IReadOnlyCollection<Guid> usuarioIds,
+        Guid exceptCategoryId,
+        CancellationToken ct = default);
+
+    /// <summary>Hands family categories created by <paramref name="fromUsuarioId"/> to <paramref name="toUsuarioId"/> on the copies that stay in the group.</summary>
+    Task ReassignCategoryCreatorAsync(Guid fromUsuarioId, Guid toUsuarioId, CancellationToken ct = default);
 }
+
+public sealed record CategoryReplicaInsert(
+    Guid Id,
+    Guid UsuarioId,
+    Guid ParentId,
+    string Name,
+    string? DisplayNumber,
+    CategorySection Section,
+    bool IsActive,
+    int SortOrder,
+    Guid CreatedByUsuarioId,
+    Guid FamilyKey);
+
+public sealed record CategoryReplicaAlign(
+    Guid ParentId,
+    string Name,
+    string? DisplayNumber,
+    CategorySection Section,
+    bool IsActive,
+    int SortOrder,
+    Guid CreatedByUsuarioId,
+    Guid FamilyKey);
