@@ -26,6 +26,7 @@ public sealed class FamilyGroupService
     private readonly IAuditEventRepository _audits;
     private readonly ICorrelationContext _correlation;
     private readonly ILogger<FamilyGroupService> _logger;
+    private readonly CategoryService _categories;
 
     public FamilyGroupService(
         IFamilyGroupRepository family,
@@ -37,7 +38,8 @@ public sealed class FamilyGroupService
         IConfiguration config,
         IAuditEventRepository audits,
         ICorrelationContext correlation,
-        ILogger<FamilyGroupService> logger)
+        ILogger<FamilyGroupService> logger,
+        CategoryService categories)
     {
         _family = family;
         _repo = repo;
@@ -49,6 +51,7 @@ public sealed class FamilyGroupService
         _audits = audits;
         _correlation = correlation;
         _logger = logger;
+        _categories = categories;
     }
 
     public Guid RequireUserId() => _tenant.UsuarioId ?? throw new ForbiddenException("Usuário não autenticado.");
@@ -252,6 +255,11 @@ public sealed class FamilyGroupService
         var membership = await _family.FindActiveMembershipAsync(self, ct);
         if (membership is not null)
         {
+            var group = await _family.GetGroupAsync(membership.FamilyGroupId, ct)
+                        ?? throw new ValidationException("group", "Grupo não encontrado.");
+            if (!group.IsBudgetOwner(self))
+                throw new ForbiddenException("Só o responsável pelo grupo pode convidar.");
+
             var count = await _family.CountActiveMembersAsync(membership.FamilyGroupId, ct);
             if (count >= FamilyGroup.MaxMembers)
                 throw new ValidationException("email", $"O grupo já tem {FamilyGroup.MaxMembers} membros.");
@@ -359,6 +367,8 @@ public sealed class FamilyGroupService
         {
             group = await _family.GetGroupAsync(gid, ct)
                     ?? throw new ValidationException("token", "Grupo do convite não encontrado.");
+            if (!group.IsBudgetOwner(invite.InviterUsuarioId))
+                throw new ValidationException("token", "Quem convidou não é mais o responsável pelo grupo.");
             if (await _family.CountActiveMembersAsync(gid, ct) >= FamilyGroup.MaxMembers)
                 throw new ValidationException("token", $"O grupo já tem {FamilyGroup.MaxMembers} membros.");
         }
@@ -369,6 +379,8 @@ public sealed class FamilyGroupService
             {
                 group = await _family.GetGroupAsync(inviterMembership.FamilyGroupId, ct)
                         ?? throw new ValidationException("token", "Grupo do convidante não encontrado.");
+                if (!group.IsBudgetOwner(invite.InviterUsuarioId))
+                    throw new ValidationException("token", "Quem convidou não é mais o responsável pelo grupo.");
                 if (await _family.CountActiveMembersAsync(group.Id, ct) >= FamilyGroup.MaxMembers)
                     throw new ValidationException("token", $"O grupo já tem {FamilyGroup.MaxMembers} membros.");
             }
@@ -419,6 +431,7 @@ public sealed class FamilyGroupService
 
         AuditRecorder.Record(_audits, _correlation, "FamilyInvite", invite.Id, "FamilyInviteAccepted", new { invite.Email, self });
         await _uow.SaveChangesAsync(ct);
+        await _categories.SyncFamilyCategoriesAsync(ct);
         return await GetGroupAsync(ct);
     }
 
@@ -551,6 +564,9 @@ public sealed class FamilyGroupService
 
         await CopyOwnerBudgetsAsync(transfer.FromUsuarioId, self, ct);
         group.TransferBudgetOwner(self);
+        var openInvites = await _family.ListOpenInvitesByGroupAsync(group.Id, ct);
+        foreach (var invite in openInvites)
+            invite.Cancel();
 
         _family.AddNotice(FamilyNotice.Create(
             transfer.FromUsuarioId,
@@ -583,6 +599,15 @@ public sealed class FamilyGroupService
         var row = members.FirstOrDefault(m => m.UsuarioId == removedUsuarioId)
                   ?? throw new NotFoundException("Membro do grupo", removedUsuarioId);
         _family.SoftDelete(row);
+
+        var heir = members.FirstOrDefault(m => m.UsuarioId != removedUsuarioId)?.UsuarioId;
+        var groupOwner = await _family.GetGroupAsync(groupId, ct, track: false);
+        if (groupOwner is not null
+            && groupOwner.BudgetOwnerUsuarioId != removedUsuarioId
+            && members.Any(m => m.UsuarioId == groupOwner.BudgetOwnerUsuarioId))
+            heir = groupOwner.BudgetOwnerUsuarioId;
+        if (heir is Guid heirId)
+            await _repo.ReassignCategoryCreatorAsync(removedUsuarioId, heirId, ct);
 
         if (markPersonal)
             await MarkUserDataAsPersonalAsync(removedUsuarioId, ct);

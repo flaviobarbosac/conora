@@ -19,6 +19,12 @@ public class Category : ModelBase, ITenantOwned
     /// <summary>Default Family (ready for group). Personal = explicit opt-out from consolidation.</summary>
     public SharingScope SharingScope { get; private set; } = SharingScope.Family;
 
+    /// <summary>User who registered this analytical category. Null on system accounts. Shared by every replica.</summary>
+    public Guid? CreatedByUsuarioId { get; private set; }
+
+    /// <summary>Same value on every member's copy of a family category. Null on system accounts.</summary>
+    public Guid? FamilyKey { get; private set; }
+
     public bool AcceptsPosting => Level == CategoryLevel.Analytical && IsActive;
 
     private Category()
@@ -89,6 +95,18 @@ public class Category : ModelBase, ITenantOwned
     public void MarkFamily() => SharingScope = SharingScope.Family;
 
     public void MarkPersonal() => SharingScope = SharingScope.Personal;
+
+    public void AssignFamilyIdentity(Guid createdByUsuarioId, Guid familyKey)
+    {
+        if (IsSystem)
+            return;
+
+        if (createdByUsuarioId == Guid.Empty || familyKey == Guid.Empty)
+            throw new ValidationException("familyKey", "Identidade da categoria familiar é obrigatória.");
+
+        CreatedByUsuarioId = createdByUsuarioId;
+        FamilyKey = familyKey;
+    }
 
     public void SyncFromDefinition(SystemCategoryDefinition definition, Guid? parentId)
     {

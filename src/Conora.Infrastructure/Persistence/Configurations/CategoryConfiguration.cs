@@ -23,6 +23,9 @@ public class CategoryConfiguration : IEntityTypeConfiguration<Category>
             .IsRequired()
             .HasDefaultValue(SharingScope.Family);
         builder.Ignore(e => e.AcceptsPosting);
+        builder.HasIndex(e => e.FamilyKey)
+            .HasFilter("\"FamilyKey\" IS NOT NULL AND \"DeletedAt\" IS NULL")
+            .HasDatabaseName("IX_categories_FamilyKey");
 
         builder.HasIndex(e => new { e.UsuarioId, e.Code })
             .IsUnique()
