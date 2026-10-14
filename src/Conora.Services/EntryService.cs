@@ -47,13 +47,19 @@ public sealed class EntryService
     {
         var ym = string.IsNullOrWhiteSpace(filter.CompetenceYm) ? null : Competence.Require(filter.CompetenceYm);
         var type = filter.Type;
-        var categoryIds = filter.CategoryId is Guid rootId
-            ? await ResolveCategoryFilterIdsAsync(rootId, ct)
-            : null;
         var accountId = filter.AccountId;
         var search = string.IsNullOrWhiteSpace(filter.Search) ? null : filter.Search.Trim().ToLowerInvariant();
         var skip = Math.Max(0, filter.Skip);
         var take = Math.Clamp(filter.Take, 1, 200);
+
+        var scope = await _family.ResolveSharingScopeAsync(filter.Scope, ct);
+        var userIds = await _family.GetReadableUsuarioIdsAsync(ct, scope);
+        var selfId = _family.RequireUserId();
+        var multi = userIds.Count > 1;
+
+        var categoryIds = filter.CategoryId is Guid rootId
+            ? await ResolveCategoryFilterIdsAsync(rootId, userIds, ct)
+            : null;
 
         System.Linq.Expressions.Expression<Func<Entry, bool>> predicate = e =>
             (ym == null || e.CompetenceYm == ym)
@@ -63,28 +69,90 @@ public sealed class EntryService
             && (accountId == null || e.AccountId == accountId || e.ContraAccountId == accountId)
             && (search == null || e.Description.ToLower().Contains(search));
 
-        var total = await _repo.CountAsync(predicate, ct);
-        var items = await _repo.QueryAsync<Entry, Entry>(
-            q => q.Where(predicate).OrderByDescending(e => e.OccurredAt).ThenByDescending(e => e.CreatedAt).Skip(skip).Take(take), ct);
+        List<Entry> items;
+        int total;
+        if (multi)
+        {
+            items = await _repo.QueryForUsuariosAsync<Entry, Entry>(
+                userIds,
+                q => q.Where(predicate)
+                    .OrderByDescending(e => e.OccurredAt)
+                    .ThenByDescending(e => e.CreatedAt)
+                    .Skip(skip)
+                    .Take(take),
+                ct);
+            total = (await _repo.ListForUsuariosAsync<Entry>(userIds, predicate, ct)).Count;
+        }
+        else
+        {
+            total = await _repo.CountAsync(predicate, ct);
+            items = await _repo.QueryAsync<Entry, Entry>(
+                q => q.Where(predicate)
+                    .OrderByDescending(e => e.OccurredAt)
+                    .ThenByDescending(e => e.CreatedAt)
+                    .Skip(skip)
+                    .Take(take),
+                ct);
+        }
 
-        return new PagedResponse<EntryResponse>(items.Select(ToResponse).ToList(), skip, take, total);
+        var map = await BuildResponseMapAsync(items, userIds, selfId, multi, ct);
+        return new PagedResponse<EntryResponse>(
+            items.Select(e => ToResponse(e, map)).ToList(),
+            skip,
+            take,
+            total);
     }
 
     /// <summary>
-    /// When filtering by a group/master account, include that id and every descendant
-    /// so Renda/Despesa/Orçamento filters match analytical postings under them.
+    /// When filtering by a group/master account, include that id, every descendant on the
+    /// viewer's chart, and peer replicas (same code/name) so Family aggregate drill-down works.
+    /// Cross-tenant reads stay inside <paramref name="userIds"/> only.
     /// </summary>
-    private async Task<HashSet<Guid>> ResolveCategoryFilterIdsAsync(Guid categoryId, CancellationToken ct)
+    private async Task<HashSet<Guid>> ResolveCategoryFilterIdsAsync(
+        Guid categoryId,
+        IReadOnlyList<Guid> userIds,
+        CancellationToken ct)
     {
-        var accounts = await _repo.ListAsync<Category>(ct: ct);
+        var accounts = userIds.Count > 1
+            ? await _repo.ListForUsuariosAsync<Category>(userIds, c => !c.IsPendingReview, ct)
+            : await _repo.ListAsync<Category>(c => !c.IsPendingReview, ct);
+
+        var root = accounts.FirstOrDefault(a => a.Id == categoryId)
+                   ?? throw new NotFoundException("Conta", categoryId);
+
+        var sameChart = accounts.Where(a => a.UsuarioId == root.UsuarioId).ToList();
+        var localIds = DescendantsOf(sameChart, categoryId);
+        if (userIds.Count <= 1)
+            return localIds;
+
+        var keys = sameChart
+            .Where(a => localIds.Contains(a.Id))
+            .Select(a => (a.Code, a.Name))
+            .ToList();
+        var ids = new HashSet<Guid>(localIds);
+        foreach (var peer in accounts)
+        {
+            if (ids.Contains(peer.Id))
+                continue;
+            if (keys.Any(k =>
+                    (k.Code is not null && peer.Code == k.Code)
+                    || string.Equals(peer.Name, k.Name, StringComparison.OrdinalIgnoreCase)))
+                ids.Add(peer.Id);
+        }
+
+        return ids;
+    }
+
+    private static HashSet<Guid> DescendantsOf(IReadOnlyList<Category> accounts, Guid rootId)
+    {
         var byParent = accounts
             .Where(a => a.ParentId != null)
             .GroupBy(a => a.ParentId!.Value)
             .ToDictionary(g => g.Key, g => g.Select(a => a.Id).ToList());
 
-        var ids = new HashSet<Guid> { categoryId };
+        var ids = new HashSet<Guid> { rootId };
         var queue = new Queue<Guid>();
-        queue.Enqueue(categoryId);
+        queue.Enqueue(rootId);
         while (queue.Count > 0)
         {
             var current = queue.Dequeue();
@@ -102,9 +170,16 @@ public sealed class EntryService
 
     public async Task<EntryResponse> GetAsync(Guid id, CancellationToken ct)
     {
-        var entry = await _repo.FirstOrDefaultAsync<Entry>(e => e.Id == id, ct, track: false)
-                    ?? throw new NotFoundException("Lançamento", id);
-        return ToResponse(entry);
+        var selfId = _family.RequireUserId();
+        var userIds = await _family.GetReadableUsuarioIdsAsync(ct);
+        var entry = userIds.Count > 1
+            ? await _repo.FirstOrDefaultForUsuariosAsync<Entry>(userIds, e => e.Id == id, ct)
+            : await _repo.FirstOrDefaultAsync<Entry>(e => e.Id == id, ct, track: false);
+        if (entry is null)
+            throw new NotFoundException("Lançamento", id);
+
+        var map = await BuildResponseMapAsync([entry], userIds, selfId, userIds.Count > 1, ct);
+        return ToResponse(entry, map);
     }
 
     public async Task<IReadOnlyList<EntryResponse>> CreateAsync(CreateEntryRequest request, CancellationToken ct)
@@ -171,7 +246,7 @@ public sealed class EntryService
         AuditRecorder.Record(_audits, _correlation, "Entry", created[0].Id, "EntryCreated",
             new { request.Type, request.Amount, Count = count, Competence = competences[0] });
         await _uow.SaveChangesAsync(ct);
-        return created.Select(ToResponse).ToList();
+        return created.Select(e => ToResponse(e)).ToList();
     }
 
     public async Task<EntryResponse> UpdateAsync(Guid id, UpdateEntryRequest request, CancellationToken ct)
@@ -396,8 +471,80 @@ public sealed class EntryService
         return amounts;
     }
 
-    internal static EntryResponse ToResponse(Entry e) => new(
-        e.Id, e.Type, e.Amount, e.OccurredAt, e.CompetenceYm, e.AccountId, e.ContraAccountId, e.CategoryId,
-        e.IncomeSourceId, e.CreditCardId, e.LifeProjectId, e.MemberId, e.Description, e.RecurrenceKey,
-        e.InstallmentNumber, e.InstallmentCount);
+    private async Task<EntryResponseMap> BuildResponseMapAsync(
+        IReadOnlyList<Entry> items,
+        IReadOnlyList<Guid> userIds,
+        Guid selfId,
+        bool multi,
+        CancellationToken ct)
+    {
+        var names = new Dictionary<Guid, string>();
+        if (multi && items.Count > 0)
+        {
+            var group = await _family.GetGroupAsync(ct);
+            foreach (var member in group.Members)
+                names[member.UsuarioId] = FirstName(member.Name);
+        }
+
+        Dictionary<Guid, Guid>? categoryRemap = null;
+        if (multi)
+        {
+            var selfCategories = await _repo.ListAsync<Category>(c => !c.IsPendingReview, ct);
+            var peerIds = items
+                .Select(e => e.CategoryId)
+                .Where(id => id is Guid cid && selfCategories.All(c => c.Id != cid))
+                .Select(id => id!.Value)
+                .Distinct()
+                .ToList();
+            if (peerIds.Count > 0)
+            {
+                var peers = await _repo.ListForUsuariosAsync<Category>(
+                    userIds, c => peerIds.Contains(c.Id) && !c.IsPendingReview, ct);
+                categoryRemap = new Dictionary<Guid, Guid>();
+                foreach (var peer in peers)
+                {
+                    var local = selfCategories.FirstOrDefault(c =>
+                        (peer.Code is not null && c.Code == peer.Code)
+                        || string.Equals(c.Name, peer.Name, StringComparison.OrdinalIgnoreCase));
+                    if (local is not null)
+                        categoryRemap[peer.Id] = local.Id;
+                }
+            }
+        }
+
+        return new EntryResponseMap(selfId, names, categoryRemap);
+    }
+
+    private static string FirstName(string? fullName)
+    {
+        if (string.IsNullOrWhiteSpace(fullName))
+            return "Membro";
+        var part = fullName.Trim().Split(' ', StringSplitOptions.RemoveEmptyEntries)[0];
+        return part;
+    }
+
+    private static EntryResponse ToResponse(Entry e, EntryResponseMap? map = null)
+    {
+        var selfId = map?.SelfId ?? e.UsuarioId;
+        var canEdit = e.UsuarioId == selfId;
+        var categoryId = e.CategoryId;
+        if (categoryId is Guid cid
+            && map?.CategoryRemap is not null
+            && map.CategoryRemap.TryGetValue(cid, out var localId))
+            categoryId = localId;
+
+        string? postedBy = null;
+        if (!canEdit && map is not null)
+            postedBy = map.Names.GetValueOrDefault(e.UsuarioId);
+
+        return new(
+            e.Id, e.Type, e.Amount, e.OccurredAt, e.CompetenceYm, e.AccountId, e.ContraAccountId, categoryId,
+            e.IncomeSourceId, e.CreditCardId, e.LifeProjectId, e.MemberId, e.Description, e.RecurrenceKey,
+            e.InstallmentNumber, e.InstallmentCount, e.UsuarioId, postedBy, canEdit);
+    }
+
+    private sealed record EntryResponseMap(
+        Guid SelfId,
+        IReadOnlyDictionary<Guid, string> Names,
+        IReadOnlyDictionary<Guid, Guid>? CategoryRemap);
 }
