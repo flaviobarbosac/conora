@@ -149,7 +149,7 @@ public sealed class DashboardService
         var userIds = await _family.GetReadableUsuarioIdsAsync(ct, scope);
         var multi = userIds.Count > 1;
         var familyCategoryIds = (await _repo.ListForUsuariosAsync<Category>(
-                userIds, c => c.SharingScope == scope && c.Level == CategoryLevel.Analytical, ct))
+                userIds, c => !c.IsPendingReview && c.Level == CategoryLevel.Analytical, ct))
             .Select(c => c.Id)
             .ToHashSet();
 
@@ -251,6 +251,22 @@ public sealed class DashboardService
     private async Task<IReadOnlyList<AlertResponse>> BuildAlertsAsync(string ym, Totals totals, CancellationToken ct)
     {
         var alerts = new List<AlertResponse>();
+
+        var ownerId = await _family.GetBudgetOwnerUsuarioIdAsync(ct);
+        if (ownerId == _family.RequireUserId())
+        {
+            var pendingCount = await _repo.CountAsync<Category>(
+                c => c.IsPendingReview && !c.IsSystem && c.Level == CategoryLevel.Analytical, ct);
+            if (pendingCount > 0)
+            {
+                alerts.Add(new AlertResponse(
+                    "CATEGORY_PENDING_REVIEW",
+                    "Exceeded",
+                    pendingCount == 1
+                        ? "Urgente: revise 1 categoria sob análise para lançar corretamente."
+                        : $"Urgente: revise {pendingCount} categorias sob análise para lançar corretamente."));
+            }
+        }
 
         var budget = await _budgets.GetAsync(ym, ct);
         foreach (var line in budget.Lines.Where(l => l.Status != "Ok"))

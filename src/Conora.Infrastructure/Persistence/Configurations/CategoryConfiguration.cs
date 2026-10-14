@@ -22,10 +22,15 @@ public class CategoryConfiguration : IEntityTypeConfiguration<Category>
             .HasMaxLength(20)
             .IsRequired()
             .HasDefaultValue(SharingScope.Family);
+        builder.Property(e => e.IsPendingReview)
+            .IsRequired()
+            .HasDefaultValue(false);
         builder.Ignore(e => e.AcceptsPosting);
         builder.HasIndex(e => e.FamilyKey)
             .HasFilter("\"FamilyKey\" IS NOT NULL AND \"DeletedAt\" IS NULL")
             .HasDatabaseName("IX_categories_FamilyKey");
+        builder.HasIndex(e => new { e.UsuarioId, e.IsPendingReview })
+            .HasDatabaseName("IX_categories_UsuarioId_IsPendingReview");
 
         builder.HasIndex(e => new { e.UsuarioId, e.Code })
             .IsUnique()

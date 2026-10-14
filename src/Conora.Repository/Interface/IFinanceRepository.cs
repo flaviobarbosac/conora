@@ -90,7 +90,7 @@ public interface IFinanceRepository
     Task<int> SetLifeProjectScopeForUsuarioAsync(Guid usuarioId, LifeProjectScope scope, CancellationToken ct = default);
 
     /// <summary>
-    /// Active and soft-deleted categories for the given users. Family replica sync only.
+    /// Active and soft-deleted categories for the given users. Family chart sync only.
     /// </summary>
     Task<List<Category>> ListGroupCategoriesAsync(IReadOnlyCollection<Guid> usuarioIds, CancellationToken ct = default);
 
@@ -100,7 +100,7 @@ public interface IFinanceRepository
         CancellationToken ct = default)
         where T : ModelBase, ITenantOwned;
 
-    /// <summary>Inserts a family-category replica on another member. Bypasses tenant stamp.</summary>
+    /// <summary>Inserts a chart replica on another member. Bypasses tenant stamp.</summary>
     Task InsertCategoryReplicaAsync(CategoryReplicaInsert row, CancellationToken ct = default);
 
     Task AlignCategoryReplicaAsync(Guid categoryId, CategoryReplicaAlign row, CancellationToken ct = default);
@@ -110,8 +110,15 @@ public interface IFinanceRepository
     Task SoftDeleteFamilyReplicasAsync(
         Guid familyKey,
         IReadOnlyCollection<Guid> usuarioIds,
-        Guid exceptCategoryId,
+        Guid? exceptCategoryId,
         CancellationToken ct = default);
+
+    Task SetCategoryPendingReviewAsync(
+        IReadOnlyCollection<Guid> categoryIds,
+        bool isPendingReview,
+        CancellationToken ct = default);
+
+    Task SetCategoryDisplayNumberAsync(Guid categoryId, string? displayNumber, CancellationToken ct = default);
 
     /// <summary>Hands family categories created by <paramref name="fromUsuarioId"/> to <paramref name="toUsuarioId"/> on the copies that stay in the group.</summary>
     Task ReassignCategoryCreatorAsync(Guid fromUsuarioId, Guid toUsuarioId, CancellationToken ct = default);
@@ -127,7 +134,8 @@ public sealed record CategoryReplicaInsert(
     bool IsActive,
     int SortOrder,
     Guid CreatedByUsuarioId,
-    Guid FamilyKey);
+    Guid FamilyKey,
+    bool IsPendingReview);
 
 public sealed record CategoryReplicaAlign(
     Guid ParentId,
@@ -137,4 +145,5 @@ public sealed record CategoryReplicaAlign(
     bool IsActive,
     int SortOrder,
     Guid CreatedByUsuarioId,
-    Guid FamilyKey);
+    Guid FamilyKey,
+    bool IsPendingReview);

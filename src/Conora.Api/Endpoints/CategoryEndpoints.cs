@@ -15,8 +15,9 @@ public static class CategoryEndpoints
             CancellationToken ct,
             CategorySection? section = null,
             bool includeInactive = false,
-            bool analyticalOnly = false) =>
-            Results.Ok(await service.ListAsync(section, includeInactive, analyticalOnly, ct)));
+            bool analyticalOnly = false,
+            bool includePending = false) =>
+            Results.Ok(await service.ListAsync(section, includeInactive, analyticalOnly, ct, includePending)));
 
         group.MapPost("/", async (CreateCategoryRequest request, CategoryService service, CancellationToken ct) =>
         {
@@ -29,6 +30,15 @@ public static class CategoryEndpoints
 
         group.MapPut("/{id:guid}/sharing", async (Guid id, UpdateCategorySharingRequest request, CategoryService service, CancellationToken ct) =>
             Results.Ok(await service.UpdateSharingAsync(id, request, ct)));
+
+        group.MapPost("/{id:guid}/approve", async (Guid id, CategoryService service, CancellationToken ct) =>
+            Results.Ok(await service.ApproveAsync(id, ct)));
+
+        group.MapPost("/{id:guid}/reject", async (Guid id, CategoryService service, CancellationToken ct) =>
+        {
+            await service.RejectAsync(id, ct);
+            return Results.NoContent();
+        });
 
         group.MapDelete("/{id:guid}", async (Guid id, CategoryService service, CancellationToken ct) =>
         {

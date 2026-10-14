@@ -82,7 +82,7 @@ public sealed class BudgetService
         var until = ActualUntilUtc(ym);
 
         var allowedCategoryIds = (await _repo.ListForUsuariosAsync<Category>(
-                userIds, c => c.SharingScope == scope && c.Level == CategoryLevel.Analytical, ct))
+                userIds, c => !c.IsPendingReview && c.Level == CategoryLevel.Analytical, ct))
             .Select(c => c.Id)
             .ToHashSet();
 
@@ -209,7 +209,7 @@ public sealed class BudgetService
         {
             accounts[pair.CategoryId] = new CategoryResponse(
                 pair.CategoryId, null, "—", null, null, CategoryLevel.Analytical, CategorySection.Social,
-                false, true, 0, true, SharingScope.Family);
+                false, true, 0, true, SharingScope.Family, IsPendingReview: false);
         }
 
         var detailLines = BuildDetailLines(plannedPairs, actuals, accounts);
@@ -413,7 +413,7 @@ public sealed class BudgetService
 
         var peerCategories = await _repo.ListForUsuariosAsync<Category>(
             userIds,
-            c => c.SharingScope == scope
+            c => !c.IsPendingReview
                  && c.Level == CategoryLevel.Analytical
                  && ((local.Code != null && c.Code == local.Code) || c.Name == local.Name),
             ct);
@@ -727,7 +727,7 @@ public sealed class BudgetService
         var until = ActualUntilUtc(ym);
         var selfId = _family.RequireUserId();
         var allowedCategoryIds = (await _repo.ListForUsuariosAsync<Category>(
-                userIds, c => c.SharingScope == scope && c.Level == CategoryLevel.Analytical, ct))
+                userIds, c => !c.IsPendingReview && c.Level == CategoryLevel.Analytical, ct))
             .Select(c => c.Id)
             .ToHashSet();
 
@@ -755,5 +755,7 @@ public sealed class BudgetService
     }
 
     private static CategoryResponse ToResponse(Category c)
-        => new(c.Id, c.ParentId, c.Name, c.Code, c.DisplayNumber, c.Level, c.Section, c.IsSystem, c.IsActive, c.SortOrder, c.AcceptsPosting, c.SharingScope);
+        => new(
+            c.Id, c.ParentId, c.Name, c.Code, c.DisplayNumber, c.Level, c.Section, c.IsSystem, c.IsActive,
+            c.SortOrder, c.AcceptsPosting, c.SharingScope, c.CreatedByUsuarioId, null, c.IsPendingReview);
 }

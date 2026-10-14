@@ -11,6 +11,7 @@ namespace Conora.Services;
 public sealed class MonthService
 {
     private readonly IFinanceRepository _repo;
+    private readonly IFamilyGroupRepository _family;
     private readonly IAuditEventRepository _audits;
     private readonly IUnitOfWork _uow;
     private readonly ITenantContext _tenant;
@@ -19,6 +20,7 @@ public sealed class MonthService
 
     public MonthService(
         IFinanceRepository repo,
+        IFamilyGroupRepository family,
         IAuditEventRepository audits,
         IUnitOfWork uow,
         ITenantContext tenant,
@@ -26,6 +28,7 @@ public sealed class MonthService
         PlanService plan)
     {
         _repo = repo;
+        _family = family;
         _audits = audits;
         _uow = uow;
         _tenant = tenant;
@@ -63,6 +66,7 @@ public sealed class MonthService
     {
         await _plan.EnsureWritableAsync(ct);
         Competence.Require(competenceYm);
+        await EnsureCanCloseAsync(competenceYm, ct);
 
         var row = await _repo.FirstOrDefaultAsync<MonthLock>(m => m.CompetenceYm == competenceYm, ct);
         if (row is { IsClosed: true })
@@ -98,6 +102,40 @@ public sealed class MonthService
         AuditRecorder.Record(_audits, _correlation, "MonthLock", row.Id, "MonthReopened", new { competenceYm, reason = row.ReopenReason });
         await _uow.SaveChangesAsync(ct);
         return ToResponse(competenceYm, row);
+    }
+
+    private async Task EnsureCanCloseAsync(string competenceYm, CancellationToken ct)
+    {
+        var today = BrazilToday();
+        var currentYm = Competence.From(today);
+        if (competenceYm != currentYm)
+            return;
+
+        var user = await RequireUserAsync(ct);
+        var daysInMonth = DateTime.DaysInMonth(today.Year, today.Month);
+        var closeDay = Math.Min(user.MonthCloseDay, daysInMonth);
+        if (today.Day < closeDay)
+        {
+            throw new ValidationException(
+                "competenceYm",
+                $"O mês atual só pode ser fechado a partir do dia {closeDay} (configurado em Preferências).");
+        }
+    }
+
+    private static DateTime BrazilToday()
+    {
+        var tzId = OperatingSystem.IsWindows()
+            ? "E. South America Standard Time"
+            : "America/Sao_Paulo";
+        var tz = TimeZoneInfo.FindSystemTimeZoneById(tzId);
+        return TimeZoneInfo.ConvertTimeFromUtc(DateTime.UtcNow, tz);
+    }
+
+    private async Task<User> RequireUserAsync(CancellationToken ct)
+    {
+        var id = _tenant.UsuarioId ?? throw new ForbiddenException("Usuário não autenticado.");
+        return await _family.FindUserByIdAsync(id, ct)
+               ?? throw new UserNotFoundException(id);
     }
 
     private Guid RequireOwner()

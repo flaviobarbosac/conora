@@ -16,16 +16,19 @@ public class Category : ModelBase, ITenantOwned
     public bool IsSystem { get; private set; }
     public bool IsActive { get; private set; } = true;
     public int SortOrder { get; private set; }
-    /// <summary>Default Family (ready for group). Personal = explicit opt-out from consolidation.</summary>
+    /// <summary>Kept for schema compatibility. Chart is shared; Personal is unused for categories.</summary>
     public SharingScope SharingScope { get; private set; } = SharingScope.Family;
 
-    /// <summary>User who registered this analytical category. Null on system accounts. Shared by every replica.</summary>
+    /// <summary>User who brought this analytical category into the group chart. Null on system accounts.</summary>
     public Guid? CreatedByUsuarioId { get; private set; }
 
-    /// <summary>Same value on every member's copy of a family category. Null on system accounts.</summary>
+    /// <summary>Same value on every member's copy. Null on system accounts.</summary>
     public Guid? FamilyKey { get; private set; }
 
-    public bool AcceptsPosting => Level == CategoryLevel.Analytical && IsActive;
+    /// <summary>True until the budget owner accepts. Pending rows stay out of reports and posting.</summary>
+    public bool IsPendingReview { get; private set; }
+
+    public bool AcceptsPosting => Level == CategoryLevel.Analytical && IsActive && !IsPendingReview;
 
     private Category()
     {
@@ -40,7 +43,8 @@ public class Category : ModelBase, ITenantOwned
             Level = CategoryLevel.Analytical,
             Section = section,
             IsSystem = false,
-            SortOrder = sortOrder
+            SortOrder = sortOrder,
+            IsPendingReview = false
         };
     }
 
@@ -52,7 +56,8 @@ public class Category : ModelBase, ITenantOwned
         Level = definition.Level,
         Section = definition.Section,
         IsSystem = true,
-        SortOrder = definition.SortOrder
+        SortOrder = definition.SortOrder,
+        IsPendingReview = false
     };
 
     public void SetDisplayNumber(string? displayNumber) => DisplayNumber = displayNumber;
@@ -106,6 +111,19 @@ public class Category : ModelBase, ITenantOwned
 
         CreatedByUsuarioId = createdByUsuarioId;
         FamilyKey = familyKey;
+    }
+
+    public void MarkPendingReview()
+    {
+        EnsureAnalytical();
+        EnsureNotSystem();
+        IsPendingReview = true;
+    }
+
+    public void AcceptReview()
+    {
+        EnsureAnalytical();
+        IsPendingReview = false;
     }
 
     public void SyncFromDefinition(SystemCategoryDefinition definition, Guid? parentId)
