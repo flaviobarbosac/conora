@@ -16,8 +16,8 @@ public class Category : ModelBase, ITenantOwned
     public bool IsSystem { get; private set; }
     public bool IsActive { get; private set; } = true;
     public int SortOrder { get; private set; }
-    /// <summary>Family enters group Raio-X/budget consolidation; Personal stays private.</summary>
-    public SharingScope SharingScope { get; private set; } = SharingScope.Personal;
+    /// <summary>Default Family (ready for group). Personal = explicit opt-out from consolidation.</summary>
+    public SharingScope SharingScope { get; private set; } = SharingScope.Family;
 
     public bool AcceptsPosting => Level == CategoryLevel.Analytical && IsActive;
 

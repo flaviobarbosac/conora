@@ -391,7 +391,8 @@ namespace Conora.Infrastructure.Persistence.Migrations
                     b.Property<string>("SharingScope")
                         .IsRequired()
                         .HasMaxLength(20)
-                        .HasColumnType("character varying(20)");
+                        .HasColumnType("character varying(20)")
+                        .HasDefaultValue("Family");
 
                     b.Property<int>("SortOrder")
                         .HasColumnType("integer");

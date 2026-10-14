@@ -71,13 +71,11 @@ public sealed class FamilyGroupService
         return ids.Count == 0 ? [self] : ids;
     }
 
-    public async Task<SharingScope> ResolveSharingScopeAsync(SharingScope? requested, CancellationToken ct)
+    public Task<SharingScope> ResolveSharingScopeAsync(SharingScope? requested, CancellationToken ct)
     {
-        var self = RequireUserId();
-        var membership = await _family.FindActiveMembershipAsync(self, ct);
-        if (membership is null)
-            return SharingScope.Personal;
-        return requested ?? SharingScope.Family;
+        // Alone or in group: default Family (chart is Family-first; Personal is opt-out).
+        _ = ct;
+        return Task.FromResult(requested ?? SharingScope.Family);
     }
 
     public async Task<(FamilyGroup Group, bool IsOwner)> RequireGroupAsync(CancellationToken ct)
@@ -582,7 +580,7 @@ public sealed class FamilyGroupService
 
     private async Task MarkUserDataAsPersonalAsync(Guid usuarioId, CancellationToken ct)
     {
-        await _repo.SetCategorySharingForUsuarioAsync(usuarioId, SharingScope.Personal, ct);
+        // Categories stay Family by default (opt-out model). Only life projects reset to Personal.
         await _repo.SetLifeProjectScopeForUsuarioAsync(usuarioId, LifeProjectScope.Personal, ct);
     }
 

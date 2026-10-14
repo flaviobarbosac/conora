@@ -1,6 +1,6 @@
 namespace Conora.Domain.Enums;
 
-/// <summary>Family = enters group consolidation; Personal = stays private to the user.</summary>
+/// <summary>Family = default / enters group consolidation; Personal = opt-out (private).</summary>
 public enum SharingScope
 {
     Personal = 0,
