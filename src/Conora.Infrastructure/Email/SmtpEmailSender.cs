@@ -1,5 +1,6 @@
 using System.Net;
 using System.Net.Mail;
+using System.Text;
 using Conora.Domain.Ports;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
@@ -22,11 +23,11 @@ public sealed class SmtpEmailSender : IEmailSender
         _logger = logger;
     }
 
-    public async Task SendAsync(string to, string subject, string body, CancellationToken ct = default)
+    public async Task SendAsync(string to, string subject, EmailContent content, CancellationToken ct = default)
     {
         if (await _suppressions.IsSuppressedAsync(to, ct))
         {
-            _logger.LogWarning("E-mail bloqueado (supressão SES). To={To} Subject={Subject}", to, subject);
+            _logger.LogWarning("E-mail bloqueado (supressão/opt-out). To={To} Subject={Subject}", to, subject);
             return;
         }
 
@@ -49,10 +50,31 @@ public sealed class SmtpEmailSender : IEmailSender
                 : new NetworkCredential(_configuration["Email:User"], _configuration["Email:Password"])
         };
 
-        using var message = new MailMessage(from, to, subject, body);
+        var renderer = CreateRenderer();
+        using var message = new MailMessage(from, to, subject, renderer.RenderText(content))
+        {
+            SubjectEncoding = Encoding.UTF8,
+            BodyEncoding = Encoding.UTF8
+        };
+        message.AlternateViews.Add(
+            AlternateView.CreateAlternateViewFromString(renderer.RenderHtml(content), Encoding.UTF8, "text/html"));
         if (!string.IsNullOrWhiteSpace(configurationSet))
             message.Headers.Add("X-SES-CONFIGURATION-SET", configurationSet);
 
         await client.SendMailAsync(message, ct);
+    }
+
+    private EmailLayoutRenderer CreateRenderer()
+    {
+        // Images must be absolute HTTPS URLs; default to the web app's public brand folder.
+        var assetBase = _configuration["Email:AssetBaseUrl"];
+        if (string.IsNullOrWhiteSpace(assetBase))
+        {
+            var web = (_configuration["App:PublicWebUrl"] ?? "https://conora.com.br").TrimEnd('/');
+            assetBase = $"{web}/app/brand";
+        }
+
+        var brandName = _configuration["Email:BrandName"];
+        return new EmailLayoutRenderer(assetBase, string.IsNullOrWhiteSpace(brandName) ? "Conora" : brandName);
     }
 }

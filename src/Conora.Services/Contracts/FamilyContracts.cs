@@ -54,6 +54,7 @@ public sealed record UpdateProfileRequest(string Name);
 public sealed record UpdatePreferencesRequest(
     string ThemeId,
     bool QuietMode,
+    bool EmailsEnabled,
     int ReserveTargetMonths,
     int MonthCloseDay,
     bool IncludeAbsoluteValuesInRetrospective);
@@ -65,6 +66,7 @@ public sealed record ProfileResponse(
     bool OnboardingCompleted,
     string ThemeId,
     bool QuietMode,
+    bool EmailsEnabled,
     int ReserveTargetMonths,
     int MonthCloseDay,
     bool IncludeAbsoluteValuesInRetrospective);

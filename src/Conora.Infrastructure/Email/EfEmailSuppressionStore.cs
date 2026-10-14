@@ -28,6 +28,10 @@ public sealed class EfEmailSuppressionStore : IEmailSuppressionStore
         {
             _db.EmailSuppressions.Add(entity);
         }
+        else if (entity.IsUserOptOut && !existing.IsUserOptOut)
+        {
+            // Keep SES bounce/complaint; address is already blocked.
+        }
         else
         {
             existing.Reason = entity.Reason;
@@ -35,6 +39,20 @@ public sealed class EfEmailSuppressionStore : IEmailSuppressionStore
                 existing.SourceMessageId = sourceMessageId;
         }
 
+        await _db.SaveChangesAsync(ct);
+    }
+
+    public async Task RemoveUserOptOutAsync(string email, CancellationToken ct = default)
+    {
+        var normalized = EmailSuppression.Normalize(email);
+        if (string.IsNullOrEmpty(normalized))
+            return;
+
+        var existing = await _db.EmailSuppressions.FirstOrDefaultAsync(e => e.Email == normalized, ct);
+        if (existing is null || !existing.IsUserOptOut)
+            return;
+
+        _db.EmailSuppressions.Remove(existing);
         await _db.SaveChangesAsync(ct);
     }
 }
