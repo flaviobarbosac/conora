@@ -70,12 +70,21 @@ public sealed class BudgetService
         return (percent, status);
     }
 
-    public async Task<Dictionary<Guid, decimal>> GetActualsAsync(string competenceYm, CancellationToken ct)
+    public async Task<Dictionary<Guid, decimal>> GetActualsAsync(
+        string competenceYm,
+        CancellationToken ct,
+        SharingScope? sharingScope = null)
     {
         var ym = Competence.Require(competenceYm);
-        var userIds = await _family.GetReadableUsuarioIdsAsync(ct);
+        var scope = await _family.ResolveSharingScopeAsync(sharingScope, ct);
+        var userIds = await _family.GetReadableUsuarioIdsAsync(ct, scope);
         var multi = userIds.Count > 1;
         var until = ActualUntilUtc(ym);
+
+        var allowedCategoryIds = (await _repo.ListForUsuariosAsync<Category>(
+                userIds, c => c.SharingScope == scope && c.Level == CategoryLevel.Analytical, ct))
+            .Select(c => c.Id)
+            .ToHashSet();
 
         var entries = multi
             ? await _repo.QueryForUsuariosAsync<Entry, AccountSum>(userIds, q => q
@@ -85,7 +94,8 @@ public sealed class BudgetService
                                 || e.Type == EntryType.Expense
                                 || e.Type == EntryType.Contribution
                                 || e.Type == EntryType.ProjectContribution)
-                            && e.CategoryId != null)
+                            && e.CategoryId != null
+                            && allowedCategoryIds.Contains(e.CategoryId.Value))
                 .GroupBy(e => e.CategoryId!.Value)
                 .Select(g => new AccountSum(g.Key, g.Sum(x => x.Amount))), ct)
             : await _repo.QueryAsync<Entry, AccountSum>(q => q
@@ -95,17 +105,18 @@ public sealed class BudgetService
                                 || e.Type == EntryType.Expense
                                 || e.Type == EntryType.Contribution
                                 || e.Type == EntryType.ProjectContribution)
-                            && e.CategoryId != null)
+                            && e.CategoryId != null
+                            && allowedCategoryIds.Contains(e.CategoryId.Value))
                 .GroupBy(e => e.CategoryId!.Value)
                 .Select(g => new AccountSum(g.Key, g.Sum(x => x.Amount))), ct);
 
         var purchases = multi
             ? await _repo.QueryForUsuariosAsync<CardPurchase, AccountSum>(userIds, q => q
-                .Where(p => p.CompetenceYm == ym && p.PurchasedAt <= until)
+                .Where(p => p.CompetenceYm == ym && p.PurchasedAt <= until && allowedCategoryIds.Contains(p.CategoryId))
                 .GroupBy(p => p.CategoryId)
                 .Select(g => new AccountSum(g.Key, g.Sum(x => x.Amount))), ct)
             : await _repo.QueryAsync<CardPurchase, AccountSum>(q => q
-                .Where(p => p.CompetenceYm == ym && p.PurchasedAt <= until)
+                .Where(p => p.CompetenceYm == ym && p.PurchasedAt <= until && allowedCategoryIds.Contains(p.CategoryId))
                 .GroupBy(p => p.CategoryId)
                 .Select(g => new AccountSum(g.Key, g.Sum(x => x.Amount))), ct);
 
@@ -116,20 +127,27 @@ public sealed class BudgetService
         return totals;
     }
 
-    public async Task<BudgetResponse> GetAsync(string competenceYm, CancellationToken ct)
+    public async Task<BudgetResponse> GetAsync(string competenceYm, CancellationToken ct, SharingScope? sharingScope = null)
     {
         var ym = Competence.Require(competenceYm);
-        var userIds = await _family.GetReadableUsuarioIdsAsync(ct);
+        var scope = await _family.ResolveSharingScopeAsync(sharingScope, ct);
+        var userIds = await _family.GetReadableUsuarioIdsAsync(ct, scope);
         var multi = userIds.Count > 1;
+        var ownerId = scope == SharingScope.Family
+            ? await _family.GetBudgetOwnerUsuarioIdAsync(ct) ?? _family.RequireUserId()
+            : _family.RequireUserId();
+        var canEdit = scope != SharingScope.Family || ownerId == _family.RequireUserId();
 
-        var budgets = multi
-            ? await _repo.ListForUsuariosAsync<Budget>(userIds, b => b.CompetenceYm == ym, ct)
+        // Family planned = budget owner only; Personal = self.
+        var plannerIds = scope == SharingScope.Family ? (IReadOnlyList<Guid>)[ownerId] : userIds;
+        var budgets = multi || scope == SharingScope.Family
+            ? await _repo.ListForUsuariosAsync<Budget>(plannerIds, b => b.CompetenceYm == ym, ct)
             : (await _repo.FirstOrDefaultAsync<Budget>(b => b.CompetenceYm == ym, ct, track: false) is { } one ? [one] : []);
         var budgetIds = budgets.Select(b => b.Id).ToList();
         var lines = budgetIds.Count == 0
             ? []
-            : multi
-                ? await _repo.ListForUsuariosAsync<BudgetLine>(userIds, l => budgetIds.Contains(l.BudgetId), ct)
+            : plannerIds.Count > 1 || scope == SharingScope.Family
+                ? await _repo.ListForUsuariosAsync<BudgetLine>(plannerIds, l => budgetIds.Contains(l.BudgetId), ct)
                 : await _repo.ListAsync<BudgetLine>(l => budgetIds.Contains(l.BudgetId), ct);
 
         var accounts = (await _categories.ListAsync(null, true, false, ct)).ToDictionary(c => c.Id);
@@ -157,20 +175,29 @@ public sealed class BudgetService
             }
         }
 
-        var actuals = await GetActualsAsync(ym, ct);
+        var actuals = await GetActualsAsync(ym, ct, scope);
         if (multi)
             actuals = await RemapActualsAsync(actuals, accounts, userIds, ct);
 
-        var sources = multi
-            ? (await _repo.ListForUsuariosAsync<IncomeSource>(userIds, s => s.CompetenceYm == ym, ct))
-                .OrderBy(s => s.Name)
-                .Select(s => new BudgetIncomeSourceResponse(s.Id, s.Name, s.NetSpendable))
-                .ToList()
-            : (await _repo.ListAsync<IncomeSource>(s => s.CompetenceYm == ym, ct))
-                .OrderBy(s => s.Name)
-                .Select(s => new BudgetIncomeSourceResponse(s.Id, s.Name, s.NetSpendable))
-                .ToList();
-        var spendable = sources.Sum(s => s.NetSpendable);
+        // Never expose peer IncomeSource names; diagnosis remains personal.
+        var selfId = _family.RequireUserId();
+        var ownSources = await _repo.ListAsync<IncomeSource>(s => s.CompetenceYm == ym, ct);
+        var sources = ownSources
+            .OrderBy(s => s.Name)
+            .Select(s => new BudgetIncomeSourceResponse(s.Id, s.Name, s.NetSpendable))
+            .ToList();
+        var spendable = ownSources.Sum(s => s.NetSpendable);
+        if (scope == SharingScope.Family && multi)
+        {
+            var peerIds = userIds.Where(id => id != selfId).ToList();
+            if (peerIds.Count > 0)
+            {
+                // Family spendable may include peers' net totals (anonymous sum only).
+                spendable += (await _repo.ListForUsuariosAsync<IncomeSource>(
+                        peerIds, s => s.CompetenceYm == ym, ct))
+                    .Sum(s => s.NetSpendable);
+            }
+        }
 
         var plannedPairs = plannedByCode.Select(kv =>
         {
@@ -182,7 +209,7 @@ public sealed class BudgetService
         {
             accounts[pair.CategoryId] = new CategoryResponse(
                 pair.CategoryId, null, "—", null, null, CategoryLevel.Analytical, CategorySection.Social,
-                false, true, 0, true);
+                false, true, 0, true, SharingScope.Family);
         }
 
         var detailLines = BuildDetailLines(plannedPairs, actuals, accounts);
@@ -201,7 +228,7 @@ public sealed class BudgetService
 
         var totalPlanned = displayLines.Sum(l => l.PlannedAmount);
         var totalActual = actuals.Values.Sum();
-        var receivedIncome = await GetReceivedIncomeAsync(ym, userIds, multi, ct);
+        var receivedIncome = await GetReceivedIncomeAsync(ym, userIds, multi, scope, ct);
         return new BudgetResponse(
             ym,
             mode,
@@ -213,10 +240,16 @@ public sealed class BudgetService
             spendable - totalActual,
             sources,
             sections,
-            displayLines);
+            displayLines,
+            scope,
+            canEdit,
+            scope == SharingScope.Family ? ownerId : null);
     }
 
-    public async Task<BudgetYearResponse> GetYearAsync(int year, CancellationToken ct)
+    public async Task<BudgetYearResponse> GetYearAsync(
+        int year,
+        CancellationToken ct,
+        SharingScope? sharingScope = null)
     {
         if (year is < 2000 or > 2100)
             throw new ValidationException("year", "Ano inválido.");
@@ -226,27 +259,36 @@ public sealed class BudgetService
         var plannedByMonth = new Dictionary<string, Dictionary<Guid, decimal>>();
         var actualByMonth = new Dictionary<string, Dictionary<Guid, decimal>>();
 
-        var userIds = await _family.GetReadableUsuarioIdsAsync(ct);
+        var scope = await _family.ResolveSharingScopeAsync(sharingScope, ct);
+        var userIds = await _family.GetReadableUsuarioIdsAsync(ct, scope);
         var multi = userIds.Count > 1;
+        var ownerId = scope == SharingScope.Family
+            ? await _family.GetBudgetOwnerUsuarioIdAsync(ct) ?? _family.RequireUserId()
+            : _family.RequireUserId();
+        // Family planned = owner only; Personal = self. Never sum peers' personal budgets.
+        var plannerIds = scope == SharingScope.Family ? (IReadOnlyList<Guid>)[ownerId] : userIds;
         foreach (var ym in months)
         {
-            var budgets = multi
-                ? await _repo.ListForUsuariosAsync<Budget>(userIds, b => b.CompetenceYm == ym, ct)
+            var budgets = multi || scope == SharingScope.Family
+                ? await _repo.ListForUsuariosAsync<Budget>(plannerIds, b => b.CompetenceYm == ym, ct)
                 : (await _repo.FirstOrDefaultAsync<Budget>(b => b.CompetenceYm == ym, ct, track: false) is { } one ? [one] : []);
             var budgetIds = budgets.Select(b => b.Id).ToList();
             var lines = budgetIds.Count == 0
                 ? []
-                : multi
-                    ? await _repo.ListForUsuariosAsync<BudgetLine>(userIds, l => budgetIds.Contains(l.BudgetId), ct)
+                : plannerIds.Count > 1 || scope == SharingScope.Family
+                    ? await _repo.ListForUsuariosAsync<BudgetLine>(plannerIds, l => budgetIds.Contains(l.BudgetId), ct)
                     : await _repo.ListAsync<BudgetLine>(l => budgetIds.Contains(l.BudgetId), ct);
 
             var planned = new Dictionary<Guid, decimal>();
             foreach (var line in lines)
             {
                 var localId = line.CategoryId;
-                if (multi && !accounts.ContainsKey(localId))
+                Category? remote = null;
+                if (!accounts.ContainsKey(localId)
+                    && (multi || scope == SharingScope.Family))
                 {
-                    var remote = await _repo.FirstOrDefaultForUsuariosAsync<Category>(userIds, c => c.Id == line.CategoryId, ct);
+                    remote = await _repo.FirstOrDefaultForUsuariosAsync<Category>(
+                        plannerIds, c => c.Id == line.CategoryId, ct);
                     var match = remote is null
                         ? null
                         : accounts.Values.FirstOrDefault(c =>
@@ -255,11 +297,20 @@ public sealed class BudgetService
                         localId = match.Id;
                 }
 
+                // Skip lines that belong to the other sharing scope.
+                var lineScope = accounts.TryGetValue(localId, out var localCat)
+                    ? localCat.SharingScope
+                    : remote?.SharingScope;
+                if (lineScope is SharingScope ls && ls != scope)
+                    continue;
+
                 planned[localId] = planned.GetValueOrDefault(localId) + line.PlannedAmount;
             }
 
             plannedByMonth[ym] = planned;
-            actualByMonth[ym] = await GetActualsAsync(ym, ct);
+            actualByMonth[ym] = await GetActualsAsync(ym, ct, scope);
+            if (multi)
+                actualByMonth[ym] = await RemapActualsAsync(actualByMonth[ym], accounts, userIds, ct);
         }
 
         var accountIds = plannedByMonth.Values.SelectMany(d => d.Keys)
@@ -296,9 +347,17 @@ public sealed class BudgetService
         return new BudgetYearResponse(year, months, yearLines, totals);
     }
 
-    public async Task<BudgetResponse> UpsertAsync(string competenceYm, UpsertBudgetRequest request, CancellationToken ct)
+    public async Task<BudgetResponse> UpsertAsync(
+        string competenceYm,
+        UpsertBudgetRequest request,
+        CancellationToken ct,
+        SharingScope? sharingScope = null)
     {
         await _plan.EnsureWritableAsync(ct);
+        var scope = await _family.ResolveSharingScopeAsync(sharingScope, ct);
+        if (scope == SharingScope.Family)
+            await _family.EnsureCanEditGroupBudgetAsync(ct);
+
         var ym = Competence.Require(competenceYm);
         await _months.EnsureOpenAsync(ym, ct);
 
@@ -315,12 +374,17 @@ public sealed class BudgetService
         }
 
         await _uow.SaveChangesAsync(ct);
-        return await GetAsync(ym, ct);
+        return await GetAsync(ym, ct, scope);
     }
 
     public async Task<BudgetResponse> DeleteLineAsync(string competenceYm, Guid categoryId, CancellationToken ct)
     {
         await _plan.EnsureWritableAsync(ct);
+        var account = await _categories.RequireAnalyticalAsync(categoryId, ct);
+        if (account.SharingScope == SharingScope.Family
+            && await _family.GetBudgetOwnerUsuarioIdAsync(ct) is not null)
+            await _family.EnsureCanEditGroupBudgetAsync(ct);
+
         var ym = Competence.Require(competenceYm);
         await _months.EnsureOpenAsync(ym, ct);
 
@@ -333,6 +397,66 @@ public sealed class BudgetService
         _repo.SoftDelete(line);
         await _uow.SaveChangesAsync(ct);
         return await GetAsync(ym, ct);
+    }
+
+    public async Task<CategoryMemberBreakdownResponse> GetCategoryBreakdownAsync(
+        string competenceYm,
+        Guid categoryId,
+        CancellationToken ct,
+        SharingScope? sharingScope = null)
+    {
+        var ym = Competence.Require(competenceYm);
+        var scope = await _family.ResolveSharingScopeAsync(sharingScope, ct);
+        var userIds = await _family.GetReadableUsuarioIdsAsync(ct, scope);
+        var local = await _repo.FirstOrDefaultAsync<Category>(c => c.Id == categoryId, ct, track: false)
+                    ?? throw new NotFoundException("Conta", categoryId);
+
+        var peerCategories = await _repo.ListForUsuariosAsync<Category>(
+            userIds,
+            c => c.SharingScope == scope
+                 && c.Level == CategoryLevel.Analytical
+                 && ((local.Code != null && c.Code == local.Code) || c.Name == local.Name),
+            ct);
+        var categoryIds = peerCategories.Select(c => c.Id).ToHashSet();
+        var until = ActualUntilUtc(ym);
+        var entries = await _repo.ListForUsuariosAsync<Entry>(
+            userIds,
+            e => e.CompetenceYm == ym
+                 && e.OccurredAt <= until
+                 && e.CategoryId != null
+                 && categoryIds.Contains(e.CategoryId.Value)
+                 && (e.Type == EntryType.Income
+                     || e.Type == EntryType.Expense
+                     || e.Type == EntryType.Contribution
+                     || e.Type == EntryType.ProjectContribution),
+            ct);
+        var purchases = await _repo.ListForUsuariosAsync<CardPurchase>(
+            userIds,
+            p => p.CompetenceYm == ym && p.PurchasedAt <= until && categoryIds.Contains(p.CategoryId),
+            ct);
+
+        var byUser = userIds.ToDictionary(id => id, _ => 0m);
+        foreach (var entry in entries)
+            byUser[entry.UsuarioId] = byUser.GetValueOrDefault(entry.UsuarioId) + entry.Amount;
+        foreach (var purchase in purchases)
+            byUser[purchase.UsuarioId] = byUser.GetValueOrDefault(purchase.UsuarioId) + purchase.Amount;
+
+        var names = userIds.ToDictionary(id => id, id => id == _family.RequireUserId() ? "Você" : "Membro");
+        var group = await _family.GetGroupAsync(ct);
+        foreach (var member in group.Members)
+            names[member.UsuarioId] = member.IsSelf ? $"{member.Name} (você)" : member.Name;
+
+        var rows = byUser
+            .OrderByDescending(kv => kv.Value)
+            .Select(kv => new CategoryMemberBreakdownRow(kv.Key, names.GetValueOrDefault(kv.Key, "—"), kv.Value))
+            .ToList();
+        return new CategoryMemberBreakdownResponse(
+            ym,
+            local.Code ?? local.Id.ToString(),
+            local.Name,
+            scope,
+            rows.Sum(r => r.Amount),
+            rows);
     }
 
     public async Task<BudgetResponse> CopyFromPreviousAsync(
@@ -597,23 +721,39 @@ public sealed class BudgetService
         string ym,
         IReadOnlyList<Guid> userIds,
         bool multi,
+        SharingScope scope,
         CancellationToken ct)
     {
         var until = ActualUntilUtc(ym);
+        var selfId = _family.RequireUserId();
+        var allowedCategoryIds = (await _repo.ListForUsuariosAsync<Category>(
+                userIds, c => c.SharingScope == scope && c.Level == CategoryLevel.Analytical, ct))
+            .Select(c => c.Id)
+            .ToHashSet();
+
         if (multi)
         {
             return (await _repo.ListForUsuariosAsync<Entry>(
                 userIds,
                 e => e.CompetenceYm == ym
                      && e.Type == EntryType.Income
-                     && e.OccurredAt <= until, ct)).Sum(e => e.Amount);
+                     && e.OccurredAt <= until
+                     && (
+                         (e.CategoryId != null && allowedCategoryIds.Contains(e.CategoryId.Value))
+                         || (e.UsuarioId == selfId && e.CategoryId == null)),
+                ct)).Sum(e => e.Amount);
         }
 
         return await _repo.SumAsync<Entry>(
-            e => e.CompetenceYm == ym && e.Type == EntryType.Income && e.OccurredAt <= until,
+            e => e.CompetenceYm == ym
+                 && e.Type == EntryType.Income
+                 && e.OccurredAt <= until
+                 && (
+                     (e.CategoryId != null && allowedCategoryIds.Contains(e.CategoryId.Value))
+                     || e.CategoryId == null),
             e => e.Amount, ct);
     }
 
     private static CategoryResponse ToResponse(Category c)
-        => new(c.Id, c.ParentId, c.Name, c.Code, c.DisplayNumber, c.Level, c.Section, c.IsSystem, c.IsActive, c.SortOrder, c.AcceptsPosting);
+        => new(c.Id, c.ParentId, c.Name, c.Code, c.DisplayNumber, c.Level, c.Section, c.IsSystem, c.IsActive, c.SortOrder, c.AcceptsPosting, c.SharingScope);
 }

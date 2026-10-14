@@ -42,7 +42,10 @@ public sealed record BudgetResponse(
     decimal MonthResult,
     IReadOnlyList<BudgetIncomeSourceResponse> IncomeSources,
     IReadOnlyList<BudgetSectionResponse> Sections,
-    IReadOnlyList<BudgetLineResponse> Lines);
+    IReadOnlyList<BudgetLineResponse> Lines,
+    SharingScope SharingScope = SharingScope.Personal,
+    bool CanEdit = true,
+    Guid? BudgetOwnerUsuarioId = null);
 
 public sealed record BudgetYearMonthCell(string CompetenceYm, decimal PlannedAmount, decimal ActualAmount);
 

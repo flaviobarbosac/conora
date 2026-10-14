@@ -27,6 +27,9 @@ public static class CategoryEndpoints
         group.MapPut("/{id:guid}", async (Guid id, UpdateCategoryRequest request, CategoryService service, CancellationToken ct) =>
             Results.Ok(await service.UpdateAsync(id, request, ct)));
 
+        group.MapPut("/{id:guid}/sharing", async (Guid id, UpdateCategorySharingRequest request, CategoryService service, CancellationToken ct) =>
+            Results.Ok(await service.UpdateSharingAsync(id, request, ct)));
+
         group.MapDelete("/{id:guid}", async (Guid id, CategoryService service, CancellationToken ct) =>
         {
             await service.DeleteAsync(id, ct);

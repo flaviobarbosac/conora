@@ -67,6 +67,8 @@ public class LifeProject : ModelBase, ITenantOwned
 
     public void MoveCategory(Guid categoryId) => CategoryId = categoryId;
 
+    public void SetScope(LifeProjectScope scope) => Scope = scope;
+
     /// <summary>Adds (or removes, when negative) a contribution. No yield is modeled (spec C10).</summary>
     public void ApplyContribution(decimal delta) => AccumulatedAmount = Math.Max(0, AccumulatedAmount + delta);
 }

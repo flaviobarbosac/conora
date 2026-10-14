@@ -17,6 +17,7 @@ public sealed class LgpdService
     private readonly ITenantContext _tenant;
     private readonly ICorrelationContext _correlation;
     private readonly IEmailSender _email;
+    private readonly FamilyGroupService _family;
 
     public LgpdService(
         IUserRepository users,
@@ -26,7 +27,8 @@ public sealed class LgpdService
         IUnitOfWork uow,
         ITenantContext tenant,
         ICorrelationContext correlation,
-        IEmailSender email)
+        IEmailSender email,
+        FamilyGroupService family)
     {
         _users = users;
         _audits = audits;
@@ -36,6 +38,7 @@ public sealed class LgpdService
         _tenant = tenant;
         _correlation = correlation;
         _email = email;
+        _family = family;
     }
 
     public async Task<LgpdExportResponse> ExportAsync(CancellationToken ct)
@@ -62,6 +65,11 @@ public sealed class LgpdService
     public async Task DeleteAsync(CancellationToken ct)
     {
         var user = await RequireUserAsync(ct);
+        if (await _family.IsBudgetOwnerWithPeersAsync(ct))
+            throw new ValidationException(
+                "account",
+                "Responsável pelo orçamento familiar precisa transferir o orçamento antes de excluir a conta.");
+
         var request = LgpdRequest.Deletion();
         _requests.Add(request);
         await _refreshTokens.RevokeAllForUserAsync(ct);

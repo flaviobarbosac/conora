@@ -77,6 +77,39 @@ public sealed class FamilyGroupRepository : IFamilyGroupRepository
 
     public void AddInvite(FamilyInvite invite) => _db.FamilyInvites.Add(invite);
 
+    public void AddOwnerTransfer(FamilyOwnerTransfer transfer) => _db.FamilyOwnerTransfers.Add(transfer);
+
+    public Task<FamilyOwnerTransfer?> FindOwnerTransferByTokenAsync(string token, CancellationToken ct = default, bool track = false)
+    {
+        IQueryable<FamilyOwnerTransfer> query = _db.FamilyOwnerTransfers;
+        if (!track)
+            query = query.AsNoTracking();
+        return query.FirstOrDefaultAsync(t => t.Token == token && t.DeletedAt == null, ct);
+    }
+
+    public Task<FamilyOwnerTransfer?> FindOpenOwnerTransferAsync(Guid familyGroupId, CancellationToken ct = default, bool track = false)
+    {
+        IQueryable<FamilyOwnerTransfer> query = _db.FamilyOwnerTransfers;
+        if (!track)
+            query = query.AsNoTracking();
+        return query.FirstOrDefaultAsync(
+            t => t.FamilyGroupId == familyGroupId
+                 && t.DeletedAt == null
+                 && t.AcceptedAt == null
+                 && t.CancelledAt == null
+                 && t.ExpiresAt > DateTime.UtcNow, ct);
+    }
+
+    public Task<List<FamilyOwnerTransfer>> ListOpenOwnerTransfersForUserAsync(Guid usuarioId, CancellationToken ct = default)
+        => _db.FamilyOwnerTransfers.AsNoTracking()
+            .Where(t => t.DeletedAt == null
+                        && t.AcceptedAt == null
+                        && t.CancelledAt == null
+                        && t.ExpiresAt > DateTime.UtcNow
+                        && (t.FromUsuarioId == usuarioId || t.ToUsuarioId == usuarioId))
+            .OrderByDescending(t => t.CreatedAt)
+            .ToListAsync(ct);
+
     public Task<List<FamilyNotice>> ListNoticesAsync(Guid usuarioId, int take, CancellationToken ct = default)
         => _db.FamilyNotices.AsNoTracking()
             .Where(n => n.UsuarioId == usuarioId && n.DeletedAt == null)

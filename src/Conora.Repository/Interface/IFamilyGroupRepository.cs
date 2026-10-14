@@ -20,6 +20,11 @@ public interface IFamilyGroupRepository
     Task<List<FamilyInvite>> ListOpenInvitesByGroupAsync(Guid familyGroupId, CancellationToken ct = default);
     void AddInvite(FamilyInvite invite);
 
+    void AddOwnerTransfer(FamilyOwnerTransfer transfer);
+    Task<FamilyOwnerTransfer?> FindOwnerTransferByTokenAsync(string token, CancellationToken ct = default, bool track = false);
+    Task<FamilyOwnerTransfer?> FindOpenOwnerTransferAsync(Guid familyGroupId, CancellationToken ct = default, bool track = false);
+    Task<List<FamilyOwnerTransfer>> ListOpenOwnerTransfersForUserAsync(Guid usuarioId, CancellationToken ct = default);
+
     Task<List<FamilyNotice>> ListNoticesAsync(Guid usuarioId, int take, CancellationToken ct = default);
     Task<FamilyNotice?> GetNoticeAsync(Guid noticeId, Guid usuarioId, CancellationToken ct = default);
     void AddNotice(FamilyNotice notice);
