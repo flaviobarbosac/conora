@@ -1,5 +1,6 @@
 using System.Linq.Expressions;
 using Conora.Domain.Entities;
+using Conora.Domain.Enums;
 using Conora.Infrastructure.Persistence;
 using Conora.Repository.Interface;
 using Microsoft.EntityFrameworkCore;
@@ -96,6 +97,30 @@ public sealed class FinanceRepository : IFinanceRepository
 
         entity.DeletedAt = DateTime.UtcNow;
         entity.Version += 1;
+    }
+
+    public Task<int> SetCategorySharingForUsuarioAsync(Guid usuarioId, SharingScope scope, CancellationToken ct = default)
+    {
+        var now = DateTime.UtcNow;
+        return _context.Set<Category>().IgnoreQueryFilters()
+            .Where(c => c.DeletedAt == null
+                        && c.UsuarioId == usuarioId
+                        && c.Level == CategoryLevel.Analytical)
+            .ExecuteUpdateAsync(setters => setters
+                .SetProperty(c => c.SharingScope, scope)
+                .SetProperty(c => c.UpdatedAt, now)
+                .SetProperty(c => c.Version, c => c.Version + 1), ct);
+    }
+
+    public Task<int> SetLifeProjectScopeForUsuarioAsync(Guid usuarioId, LifeProjectScope scope, CancellationToken ct = default)
+    {
+        var now = DateTime.UtcNow;
+        return _context.Set<LifeProject>().IgnoreQueryFilters()
+            .Where(p => p.DeletedAt == null && p.UsuarioId == usuarioId)
+            .ExecuteUpdateAsync(setters => setters
+                .SetProperty(p => p.Scope, scope)
+                .SetProperty(p => p.UpdatedAt, now)
+                .SetProperty(p => p.Version, p => p.Version + 1), ct);
     }
 
     private IQueryable<T> ForUsuariosQuery<T>(IReadOnlyCollection<Guid> allowedUsuarioIds, bool track = true)

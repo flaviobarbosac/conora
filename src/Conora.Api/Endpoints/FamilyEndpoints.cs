@@ -19,6 +19,12 @@ public static class FamilyEndpoints
         group.MapPut("/profile", async (UpdateProfileRequest request, FamilyGroupService service, CancellationToken ct) =>
             Results.Ok(await service.UpdateProfileAsync(request, ct)));
 
+        group.MapPut("/preferences", async (UpdatePreferencesRequest request, FamilyGroupService service, CancellationToken ct) =>
+            Results.Ok(await service.UpdatePreferencesAsync(request, ct)));
+
+        group.MapPost("/onboarding/complete", async (FamilyGroupService service, CancellationToken ct) =>
+            Results.Ok(await service.CompleteOnboardingAsync(ct)));
+
         group.MapGet("/group", async (FamilyGroupService service, CancellationToken ct) =>
             Results.Ok(await service.GetGroupAsync(ct)));
 
@@ -45,6 +51,18 @@ public static class FamilyEndpoints
             await service.RemoveMemberAsync(usuarioId, ct);
             return Results.NoContent();
         });
+
+        group.MapPost("/owner-transfer", async (FamilyOwnerTransferRequest request, FamilyGroupService service, CancellationToken ct) =>
+            Results.Ok(await service.RequestOwnerTransferAsync(request, ct)));
+
+        group.MapDelete("/owner-transfer", async (FamilyGroupService service, CancellationToken ct) =>
+        {
+            await service.CancelOwnerTransferAsync(ct);
+            return Results.NoContent();
+        });
+
+        group.MapPost("/owner-transfer/{token}/accept", async (string token, FamilyGroupService service, CancellationToken ct) =>
+            Results.Ok(await service.AcceptOwnerTransferAsync(token, ct)));
 
         group.MapPost("/notices/{id:guid}/read", async (Guid id, FamilyGroupService service, CancellationToken ct) =>
         {

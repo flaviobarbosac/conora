@@ -39,6 +39,7 @@ public class AppDbContext : DbContext
     public DbSet<FamilyGroup> FamilyGroups => Set<FamilyGroup>();
     public DbSet<FamilyGroupMember> FamilyGroupMembers => Set<FamilyGroupMember>();
     public DbSet<FamilyInvite> FamilyInvites => Set<FamilyInvite>();
+    public DbSet<FamilyOwnerTransfer> FamilyOwnerTransfers => Set<FamilyOwnerTransfer>();
     public DbSet<FamilyNotice> FamilyNotices => Set<FamilyNotice>();
     public DbSet<WorkspaceSubscription> WorkspaceSubscriptions => Set<WorkspaceSubscription>();
     public DbSet<ImportBatch> ImportBatches => Set<ImportBatch>();

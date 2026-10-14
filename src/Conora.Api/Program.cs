@@ -182,6 +182,7 @@ app.MapPatrimonyEndpoints();
 app.MapDashboardEndpoints();
 app.MapMemberEndpoints();
 app.MapFamilyEndpoints();
+app.MapGamificationEndpoints();
 app.MapPlanEndpoints();
 app.MapFeedbackEndpoints();
 app.MapHelpEndpoints();

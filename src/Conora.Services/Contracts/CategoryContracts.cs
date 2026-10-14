@@ -13,8 +13,11 @@ public sealed record CategoryResponse(
     bool IsSystem,
     bool IsActive,
     int SortOrder,
-    bool AcceptsPosting);
+    bool AcceptsPosting,
+    SharingScope SharingScope);
 
 public sealed record CreateCategoryRequest(string Name, Guid ParentId);
 
-public sealed record UpdateCategoryRequest(string Name, bool IsActive = true);
+public sealed record UpdateCategoryRequest(string Name, bool IsActive = true, SharingScope? SharingScope = null);
+
+public sealed record UpdateCategorySharingRequest(SharingScope SharingScope);

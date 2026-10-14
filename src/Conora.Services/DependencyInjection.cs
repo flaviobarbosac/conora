@@ -26,6 +26,7 @@ public static class DependencyInjection
         services.AddScoped<LifeProjectService>();
         services.AddScoped<PatrimonyService>();
         services.AddScoped<DashboardService>();
+        services.AddScoped<GamificationService>();
         services.AddScoped<GeminiService>();
         services.AddScoped<IanReportService>();
         services.AddScoped<WhatsAppService>();
