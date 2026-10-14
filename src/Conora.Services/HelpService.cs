@@ -56,33 +56,52 @@ public sealed class HelpService
         new("grupo-familiar", "Grupo familiar",
             "Vínculo entre duas contas Conora (ex.: casal). Serve para ver orçamento, início e relatórios somados. Não cria conta bancária compartilhada nem permite editar o lançamento do outro."),
         new("alerta-70", "Alertas 70% / 100%",
-            "Abaixo de 70% está ok; de 70% a 99% atenção; 100% no limite; acima estourou. Planejado zero com gasto conta como estourou.")
+            "Abaixo de 70% está ok; de 70% a 99% atenção; 100% no limite; acima estourou. Planejado zero com gasto conta como estourou."),
+        new("escopo-familia", "Escopo Família (categoria)",
+            "Conta do plano marcada como Família. Entra no Raio-X e no Orçamento da visão consolidada do casal. É o padrão ao criar categoria (modelo Família-primeiro)."),
+        new("escopo-pessoal", "Escopo Pessoal (categoria)",
+            "Conta do plano só sua. Não entra no consolidado familiar. Use quando aquele gasto ou receita não deve aparecer na visão do outro membro."),
+        new("familia-primeiro", "Família-primeiro",
+            "O Conora assume Família como padrão: categorias novas nascem Família; Orçamento e Raio-X abrem na visão Família. Pessoal é a exceção (opt-out), não a regra."),
+        new("responsavel-orcamento", "Responsável pelo orçamento",
+            "No grupo familiar, só essa pessoa edita o planejado consolidado. Quem está sozinho (sem grupo) edita o próprio orçamento normalmente. A responsabilidade pode ser transferida em Membros."),
+        new("emails-conora", "E-mails do Conora",
+            "Preferência em Configurações. Ligado: você recebe avisos e convites. Desligado: o Conora para de enviar e-mails do sistema (opt-out). Bounce/reclamação do provedor continua protegendo o endereço."),
+        new("visao-familia-pessoal", "Visão Família / Pessoal",
+            "Seletor em Orçamento e Raio-X quando você está em grupo. Família (consolidado) soma o que for de escopo Família; Pessoal mostra só as suas contas marcadas como Pessoal."),
+        new("onboarding", "Onboarding (jornada Raio X)",
+            "Passos iniciais após o cadastro: diagnosticar, organizar, planejar, registrar, acompanhar, corrigir e construir. Concluir marca a jornada como feita na conta.")
     ];
 
     private static readonly IReadOnlyList<HelpModuleResponse> Modules =
     [
-        new("membros", "Grupo familiar — vincular e desvincular",
-            "Cada usuário tem a própria conta Conora. O grupo só une a visão de algumas telas; os registros de cada um continuam separados.",
+        new("membros", "Grupo familiar — vincular, orçamento e desvincular",
+            "Cada usuário tem a própria conta Conora. O grupo une a visão consolidada (Família-primeiro); os registros de cada um continuam separados. Lançamentos e contas bancárias nunca se misturam.",
             [
                 new("Visão geral", "Vocês são duas contas independentes. Cada um lança na própria conta, no próprio cartão e nas próprias contas do plano. O grupo não mistura saldos nem deixa um editar o lançamento do outro."),
-                new("O que fica pessoal", "Contas bancárias, cartões, lançamentos, diagnóstico de renda, WhatsApp, importação e perfil. Só você vê e altera."),
-                new("O que fica em comum (só leitura somada)", "Início (totais do mês), Raio-X planejado × realizado e relatórios do mês — somam os dois membros. Projetos de vida podem ser pessoais ou do grupo (quando marcados assim)."),
-                new("Como vincular (convidar)", "Abra Cadastros → Membros. Informe o e-mail da outra pessoa e envie o convite. Ela precisa já ter (ou criar) login no Conora com esse e-mail."),
-                new("Como aceitar o convite", "A pessoa abre o link do e-mail, entra com a conta do e-mail convidado e confirma. O vínculo é criado; quem convidou recebe aviso no app."),
-                new("Regras do convite", "O link é de uso único, com prazo. Outro e-mail não entra. Se o convite expirar ou for cancelado, envie outro."),
-                new("Como desvincular (sair)", "Em Membros, use Sair do grupo. Seu orçamento e telas voltam a ser só pessoais. O grupo se encerra para os dois."),
+                new("Modelo Família-primeiro", "Categorias novas nascem com escopo Família. Orçamento e Raio-X abrem na visão Família (consolidado). Marque como Pessoal só o que não deve entrar na soma do casal."),
+                new("O que fica pessoal", "Contas bancárias, cartões, lançamentos, diagnóstico de renda, WhatsApp, importação, perfil e preferências (tema, e-mails, ritmo). Só você vê e altera."),
+                new("O que fica em comum (visão somada)", "Início (totais do mês), Raio-X e Orçamento na visão Família, relatórios do mês — somam o que for de escopo Família. Projetos de vida podem ser pessoais ou do grupo."),
+                new("Responsável pelo orçamento", "Quem cria o grupo (ou quem recebe a transferência) é o responsável. Só essa pessoa edita o planejado consolidado enquanto houver dois membros. Sem grupo (sozinho), você edita o próprio orçamento sem bloqueio."),
+                new("Transferir responsabilidade", "Em Membros, o responsável pode pedir transferência ao outro. O outro precisa aceitar. Enquanto a transferência estiver pendente, dá para cancelar."),
+                new("Como vincular (convidar)", "Abra Cadastros → Membros. Informe o e-mail da outra pessoa e envie o convite. Ela precisa já ter (ou criar) login no Conora com esse e-mail. O e-mail sai pelo remetente do Conora (se a pessoa não desligou e-mails nas Configurações)."),
+                new("Como aceitar o convite", "A pessoa abre o link do e-mail, entra com a conta do e-mail convidado e confirma. O vínculo é criado; quem convidou recebe aviso no app e, se habilitado, e-mail."),
+                new("Regras do convite", "O link é de uso único, com prazo, preso ao e-mail convidado. Outro e-mail não entra. Se expirar ou for cancelado, envie outro. Segundo clique no mesmo link informa que já está no grupo."),
+                new("Como desvincular (sair)", "Em Membros, use Sair do grupo. Seu orçamento e telas voltam a ser só seus. O grupo se encerra para os dois. Projetos do grupo ficam com quem criou."),
                 new("Como desvincular (remover o outro)", "Quem está no grupo pode Remover o outro membro. O efeito é o mesmo: o grupo acaba."),
                 new("Cancelar convite pendente", "Se o outro ainda não aceitou, cancele o convite em Membros. O link deixa de valer."),
                 new("Nome de exibição", "Em Perfil (menu da conta) ou em Membros: como você aparece no grupo e nos avisos."),
-                new("Uma pessoa, um grupo", "Cada conta fica em um grupo por vez. Aceitar outro convite não cria segundo grupo paralelo.")
+                new("Uma pessoa, um grupo", "Cada conta fica em um grupo por vez. Aceitar outro convite não cria segundo grupo paralelo."),
+                new("Exclusão de conta (LGPD)", "Se você for o responsável pelo orçamento e ainda houver outro membro ativo, o Conora pede para transferir a responsabilidade ou encerrar o grupo antes de excluir a conta.")
             ]),
 
         new("inicio", "Início",
-            "Painel do mês: pizzas de renda e despesa, comparação em barra, e os blocos Orçamento, Patrimônio e Projetos de vida. Em grupo familiar, os totais somam os dois membros.",
+            "Painel do mês: pizzas de renda e despesa, comparação em barra, e os blocos Orçamento, Patrimônio e Projetos de vida. Em grupo familiar, os totais somam o que for de escopo Família (modelo Família-primeiro).",
             [
                 new("Renda e despesa", "Duas pizzas com legenda: detalhamento da renda e da despesa realizadas no mês."),
                 new("Comparativo", "Barra horizontal com o total de renda frente ao total de despesa."),
                 new("Visão macro", "Três blocos: orçamento (previsto × realizado), patrimônio (ativo e passivo) e projetos de vida (horizontes)."),
+                new("Grupo familiar", "Com vínculo ativo, os totais refletem a visão consolidada (categorias Família). Contas Pessoal do outro membro não entram na sua soma."),
                 new("Projetos de vida", "Três barras: verde curto, amarelo médio, azul longo. Vermelho só quando o acumulado passa a meta (Acima da meta). Clique abre a lista filtrada."),
                 new("Alertas", "Avisos de orçamento, limite de cartão e mês negativo.")
             ]),
@@ -104,28 +123,33 @@ public sealed class HelpService
             ]),
 
         new("raio-x", "Raio-X",
-            "Listagem do mês na ordem das categorias. Só visão — o cadastro do planejado fica em Orçamento.",
+            "Listagem do mês na ordem das categorias. Só visão — o cadastro do planejado fica em Orçamento. Padrão: visão Família quando você está em grupo.",
             [
                 new("Indicadores", "No topo: saldo do mês anterior, renda recebida, descontos, renda gastável, projetos de vida e saldo do mês. Toque nos do meio destaca a seção na lista."),
+                new("Visão Família / Pessoal", "Com grupo ativo, o seletor Visão aparece. Família (consolidado) é o padrão e mostra o plano Família-primeiro. Pessoal filtra só as suas categorias de escopo Pessoal."),
                 new("Patrimônio", "Card com ativo, passivo e patrimônio líquido (resultado, não conta)."),
                 new("Projetos de vida", "Quanto foi separado no período, com atalho para Projetos."),
                 new("Período", "Arraste de 1 a 24 meses até a competência escolhida."),
                 new("Estado inicial", "Só o primeiro nível: Renda, Despesa e Patrimônio."),
                 new("Navegar", "Clique desce a cadeia de contas. Só o item lançado (lançamento, projeto ou patrimônio) abre a tela de registro."),
                 new("Totais", "Cada linha soma as contas de baixo."),
-                new("% do previsto", "Com orçamento, mostra o progresso. Sem orçamento lançado, aparece 0% em amarelo. Legenda: Amarelo = sem orçamento lançado.")
+                new("% do previsto", "Com orçamento, mostra o progresso. Sem orçamento lançado, aparece 0% em amarelo. Legenda: Amarelo = sem orçamento lançado."),
+                new("Sem categorias na visão", "Se a visão filtrada não tiver contas (ex.: Pessoal sem nenhuma marcada), a lista fica vazia — não fica carregando sem fim.")
             ]),
 
         new("orcamento", "Orçamento",
-            "Cadastro do planejado do mês.",
+            "Cadastro do planejado do mês. Modelo Família-primeiro: abre na visão Família; Pessoal é opt-out.",
             [
                 new("Renda gastável", "Soma dos líquidos do diagnóstico do mês (base do percentual dos blocos)."),
                 new("Renda", "Também recebe valor planejado, além das despesas e dos outros blocos."),
+                new("Visão Família / Pessoal", "Em grupo, use o seletor Visão. Família (consolidado) lista categorias de escopo Família. Pessoal lista só as suas privadas. Sozinho, o orçamento é o seu plano (padrão Família nas categorias)."),
+                new("Quem pode editar", "Sozinho: você edita normalmente. Em grupo: só o responsável pelo orçamento grava o planejado consolidado. Se não for o responsável, os campos ficam bloqueados."),
+                new("Lista vazia", "Se não houver categoria na visão escolhida, aparece mensagem clara (não um carregamento infinito). Em Pessoal: \"Nenhuma categoria pessoal…\". Em Família: \"Nenhuma categoria para montar o orçamento.\""),
                 new("Contas", "Cada conta analítica, na ordem do plano: seções fixas e, dentro delas, grupos e itens em ordem alfabética. Grupos começam fechados."),
                 new("Busca", "Filtra a lista pelo nome da conta e abre o ramo encontrado."),
                 new("% do previsto", "Sem valor planejado, mostra 0% em amarelo. Legenda: Amarelo = sem orçamento lançado."),
-                new("Salvar", "Grava os valores planejados da competência. Cancelar descarta o rascunho. Um aviso confirma quando gravou."),
-                new("Copiar mês anterior", "Traz os planejados do mês passado. Pergunta antes de sobrescrever."),
+                new("Salvar", "Grava os valores planejados da competência. Cancelar descarta o rascunho. Um aviso confirma quando gravou. Dados só persistem ao Salvar — sair com alterações pede confirmação."),
+                new("Copiar mês anterior", "Traz os planejados do mês passado. Pergunta antes de sobrescrever (pode copiar só contas vazias)."),
                 new("Repetir", "Na visão do ano da conta: copia o previsto cheio para os meses seguintes."),
                 new("Parcelar", "Na visão do ano da conta: divide o valor total a partir deste mês."),
                 new("Visão do ano", "Planejado e realizado de janeiro a dezembro. Toque no nome da conta.")
@@ -158,15 +182,18 @@ public sealed class HelpService
             ]),
 
         new("categorias", "Categorias",
-            "Orçamento (o que entra e sai no mês) e Patrimônio (o que você tem e o que deve). O lançamento entra na categoria analítica; as de cima só somam.",
+            "Orçamento (o que entra e sai no mês) e Patrimônio (o que você tem e o que deve). O lançamento entra na categoria analítica; as de cima só somam. Escopo Família ou Pessoal define o que entra no consolidado.",
             [
                 new("Tipo", "Combo selecionável (Orçamento, Essencial, Cuidados pessoais…). Digite para achar e filtre a árvore."),
                 new("Buscar", "Campo ao lado do tipo: digite o nome (aluguel, salário…) para achar a categoria."),
                 new("Numeração", "Número só de tela (1, 1.1, 2.1), gerado pelo sistema. Você não edita. Criar ou excluir renumera os irmãos. Não altera lançamentos."),
                 new("Categoria sintética", "Orçamento, Despesa, Patrimônio e os grupos (Habitação, Curto prazo…). Não recebem valor."),
                 new("Categoria analítica", "Linha que recebe o lançamento (Salário, Aluguel…)."),
-                new("Padrão", "Categoria do sistema: não renomeia nem exclui."),
-                new("Sua categoria", "Analítica que você cria sob Renda, Descontos sobre renda, Projetos de vida, Essencial, Social, Ativo ou Passivo."),
+                new("Padrão", "Categoria do sistema: não renomeia nem exclui. Contas do plano padrão também seguem o modelo Família-primeiro."),
+                new("Sua categoria", "Analítica que você cria sob Renda, Descontos sobre renda, Projetos de vida, Essencial, Social, Ativo ou Passivo. Nova categoria nasce com escopo Família."),
+                new("Escopo Família", "Entra no Orçamento e no Raio-X da visão Família (consolidado). Padrão para contas novas e para o plano oficial."),
+                new("Escopo Pessoal", "Fica só na sua visão Pessoal. No grupo, marque Pessoal as contas que não devem entrar no Raio-X consolidado (ex.: gasto particular)."),
+                new("Trocar escopo", "Em Categorias, alterne Família ↔ Pessoal na conta. A mudança vale na hora para filtros de Orçamento e Raio-X."),
                 new("Desativar", "Tira a categoria dos seletores e mantém o histórico.")
             ]),
 
@@ -264,19 +291,40 @@ public sealed class HelpService
             [
                 new("Menu principal", "Início, Lançamentos, Raio-X, Orçamento e Relatórios."),
                 new("Cadastros", "Guia recolhida no menu: Contas, Cartões, Categorias, Projetos, Patrimônio e Membros."),
-                new("Menu da conta", "Avatar no topo: Perfil, tema (Claro/Escuro), Plano, Central de ajuda e Sair."),
+                new("Configurações", "Item no rodapé do menu lateral (ícone de engrenagem). Preferências de ritmo, e-mails, reserva e retrospectiva."),
+                new("Menu da conta", "Avatar no topo: Perfil, Temas, Plano, Central de ajuda e Sair. Temas abre o submenu com todos os temas do app."),
                 new("Recolher menu", "No desktop largo, deixa só os ícones para ganhar espaço."),
-                new("Tema", "No menu da conta: se o tema atual for claro, aparece Escuro — e o contrário."),
-                new("Salvar", "Ao gravar um cadastro ou lançamento, um aviso confirma que salvou."),
+                new("Tema", "No menu da conta → Temas: escolha Claro, Noite, Contraste e demais opções. Fica neste aparelho."),
+                new("Marca Conora", "Logo e wordmark Conora na tela de login, splash e ícones do PWA/app. Onra aparece só como assinatura da empresa."),
+                new("Salvar", "Ao gravar um cadastro ou lançamento, um aviso confirma que salvou. Cancelar descarta o rascunho."),
                 new("Versão", "Número do app no rodapé do menu (ex.: 0.1.2).")
             ]),
 
         new("configuracoes", "Configurações",
-            "Preferências de cada usuário. Abra pelo item Perfil no menu da conta.",
+            "Preferências de cada usuário. Abra pelo item Configurações no rodapé do menu lateral.",
             [
-                new("Tema", "Claro ou escuro; fica neste aparelho. Também pode trocar pelo menu da conta."),
-                new("Menu lateral", "Expandido ou só ícones no desktop."),
-                new("Nome de exibição", "Como você aparece no grupo e nos avisos; gravado na conta.")
+                new("Modo discreto", "Desligado: mostra jornada e celebrações. Ligado: só números, sem celebrações."),
+                new("E-mails do Conora", "Receber (padrão) ou Não receber. Desligar grava opt-out: o sistema para de enviar avisos e convites para o seu e-mail. Religar remove só o opt-out seu — não apaga bloqueios por bounce ou reclamação do provedor."),
+                new("O que os e-mails cobrem", "Convites de grupo, avisos de vínculo aceito e outras mensagens transacionais do Conora. Layout com identidade visual do produto."),
+                new("Meta da reserva (meses)", "Quantos meses de despesas essenciais você mira na reserva (1 a 24; padrão 6)."),
+                new("Dia de fechamento do mês", "Dia da competência (1 a 31) em que você costuma fechar o mês. Separado do dia de fechamento do cartão."),
+                new("Retrospectiva", "Incluir ou não valores absolutos (além de percentuais e marcos) na retrospectiva."),
+                new("Salvar / Cancelar", "Só grava ao tocar Salvar. Cancelar descarta o rascunho e volta ao último estado salvo."),
+                new("Conta", "Atalhos para Plano e Perfil; exportar dados (LGPD) ou excluir a conta."),
+                new("Nome de exibição", "Como você aparece no grupo e nos avisos — edite em Perfil."),
+                new("Tema", "Troque em Configurações indiretamente pelo menu da conta → Temas (fica neste aparelho).")
+            ]),
+
+        new("familia-primeiro", "Família-primeiro (visão consolidada)",
+            "Como o Conora trata o plano de contas e as telas analíticas depois do modelo Família-primeiro.",
+            [
+                new("Ideia", "O casal (ou a família) vê o mesmo plano consolidado por padrão. O que for só de um fica marcado Pessoal e some da visão Família."),
+                new("Categorias", "Novas contas analíticas nascem Família. Contas já existentes do plano oficial também seguem Família. Troque para Pessoal em Categorias quando precisar."),
+                new("Orçamento e Raio-X", "Com grupo, o seletor Visão padrão é Família (consolidado). Pessoal mostra só o privado. Sem categorias na visão, a tela mostra estado vazio — não fica em \"Carregando…\"."),
+                new("Sozinho", "Sem grupo ativo, você usa o próprio plano (categorias Família por padrão) e edita o orçamento sem precisar de responsável."),
+                new("Em grupo", "Só o responsável pelo orçamento edita o planejado consolidado. O outro membro vê a visão Família em leitura para o planejado."),
+                new("Projetos", "Continua à parte: ao criar o projeto, escolha Pessoal ou Família (grupo). Não é o mesmo campo do escopo da categoria."),
+                new("Isolamento", "Mesmo na visão Família, ninguém edita lançamento, conta bancária ou cartão do outro. A soma é de leitura e de planejado compartilhado, não de caixa único.")
             ])
     ];
 
