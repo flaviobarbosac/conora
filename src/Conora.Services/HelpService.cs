@@ -191,10 +191,10 @@ public sealed class HelpService
                 new("Categoria analítica", "Linha que recebe o lançamento (Salário, Aluguel…)."),
                 new("Padrão", "Categoria do sistema: não renomeia nem exclui. Contas do plano padrão também seguem o modelo Família-primeiro."),
                 new("Sua categoria", "Analítica que você cria sob Renda, Descontos sobre renda, Projetos de vida, Essencial, Social, Ativo ou Passivo. Nova categoria nasce com escopo Família."),
-                new("Escopo Família", "Entra no Orçamento e no Raio-X da visão Família (consolidado) e é copiada para todos do grupo, no mesmo lugar. Padrão para contas novas e para o plano oficial."),
-                new("Escopo Pessoal", "Fica só com quem criou. No grupo, só essa pessoa pode marcar Pessoal — a categoria sai do plano dos outros."),
-                new("Quem criou", "No grupo, o nome de quem cadastrou aparece ao lado de Família. Só essa pessoa renomeia, muda Família/Pessoal ou exclui."),
-                new("Trocar escopo", "Em Categorias, quem criou a conta alterna Família ↔ Pessoal. A mudança vale na hora para o grupo inteiro."),
+                new("Plano compartilhado", "No grupo o plano de categorias é o mesmo para todos. Só o responsável pelo orçamento cria, renomeia ou exclui."),
+                new("Sob análise", "Quando alguém entra no grupo, o que for novo no plano dela vai para o responsável marcar Aceitar ou Recusar. Enquanto isso, não entra em lançamento nem relatório."),
+                new("Aceitar", "A categoria entra no plano e é copiada para quem ainda não tem."),
+                new("Recusar", "Remove a categoria do responsável e de quem trouxe (soft delete)."),
                 new("Desativar", "Tira a categoria dos seletores e mantém o histórico.")
             ]),
 
@@ -260,7 +260,8 @@ public sealed class HelpService
             "Trava a competência para não alterar o histórico sem querer.",
             [
                 new("Competência", "Mês que será fechado ou reaberto."),
-                new("Fechar", "Impede novos lançamentos naquele mês."),
+                new("Fechar", "Impede novos lançamentos naquele mês. No mês atual, só após o dia configurado em Preferências."),
+                new("Mês fechado", "Por ora não há lançamento retroativo; reabra o mês se precisar corrigir."),
                 new("Reabrir", "Exige motivo; só quem fechou (dono) reabre."),
                 new("No grupo", "Cada pessoa fecha o próprio mês; a visão somada avisa se um ainda está aberto.")
             ]),
@@ -319,8 +320,8 @@ public sealed class HelpService
         new("familia-primeiro", "Família-primeiro (visão consolidada)",
             "Como o Conora trata o plano de contas e as telas analíticas depois do modelo Família-primeiro.",
             [
-                new("Ideia", "O casal (ou a família) vê o mesmo plano consolidado por padrão. O que for só de um fica marcado Pessoal e some da visão Família."),
-                new("Categorias", "Novas contas analíticas nascem Família e são copiadas para todos do grupo. Quem entra depois recebe o plano do responsável, com o nome de quem criou cada conta. Só quem criou troca para Pessoal ou exclui."),
+                new("Ideia", "O casal (ou a família) vê o mesmo plano de categorias. A visão Pessoal/Família soma valores, não esconde linhas do plano."),
+                new("Categorias", "O plano é o mesmo para o grupo. Quem entra traz só o que for novo para o responsável analisar. Aceitar copia para todos; recusar remove dos dois."),
                 new("Orçamento e Raio-X", "Com grupo, o seletor Visão padrão é Família (consolidado). Pessoal mostra só o privado. Sem categorias na visão, a tela mostra estado vazio — não fica em \"Carregando…\"."),
                 new("Sozinho", "Sem grupo ativo, você usa o próprio plano (categorias Família por padrão) e edita o orçamento sem precisar de responsável."),
                 new("Em grupo", "Só o responsável pelo orçamento edita o planejado consolidado. O outro membro vê a visão Família em leitura para o planejado."),

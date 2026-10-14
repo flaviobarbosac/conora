@@ -148,11 +148,11 @@ public sealed class FinanceRepository : IFinanceRepository
             INSERT INTO categories (
                 "Id", "UsuarioId", "ParentId", "Name", "Code", "DisplayNumber", "Level", "Section",
                 "IsSystem", "IsActive", "SortOrder", "SharingScope", "CreatedByUsuarioId", "FamilyKey",
-                "CreatedAt", "UpdatedAt", "DeletedAt", "Version")
+                "IsPendingReview", "CreatedAt", "UpdatedAt", "DeletedAt", "Version")
             VALUES (
                 {row.Id}, {row.UsuarioId}, {row.ParentId}, {row.Name}, {null}, {row.DisplayNumber}, {level}, {section},
                 {false}, {row.IsActive}, {row.SortOrder}, {scope}, {row.CreatedByUsuarioId}, {row.FamilyKey},
-                {now}, {now}, {null}, {1L})
+                {row.IsPendingReview}, {now}, {now}, {null}, {1L})
             """, ct);
     }
 
@@ -171,6 +171,7 @@ public sealed class FinanceRepository : IFinanceRepository
                 .SetProperty(c => c.SharingScope, SharingScope.Family)
                 .SetProperty(c => c.CreatedByUsuarioId, row.CreatedByUsuarioId)
                 .SetProperty(c => c.FamilyKey, row.FamilyKey)
+                .SetProperty(c => c.IsPendingReview, row.IsPendingReview)
                 .SetProperty(c => c.UpdatedAt, now)
                 .SetProperty(c => c.Version, c => c.Version + 1), ct);
     }
@@ -191,6 +192,7 @@ public sealed class FinanceRepository : IFinanceRepository
                 .SetProperty(c => c.SharingScope, SharingScope.Family)
                 .SetProperty(c => c.CreatedByUsuarioId, row.CreatedByUsuarioId)
                 .SetProperty(c => c.FamilyKey, row.FamilyKey)
+                .SetProperty(c => c.IsPendingReview, row.IsPendingReview)
                 .SetProperty(c => c.UpdatedAt, now)
                 .SetProperty(c => c.Version, c => c.Version + 1), ct);
     }
@@ -198,7 +200,7 @@ public sealed class FinanceRepository : IFinanceRepository
     public async Task SoftDeleteFamilyReplicasAsync(
         Guid familyKey,
         IReadOnlyCollection<Guid> usuarioIds,
-        Guid exceptCategoryId,
+        Guid? exceptCategoryId,
         CancellationToken ct = default)
     {
         EnsureAllowList(usuarioIds);
@@ -207,9 +209,37 @@ public sealed class FinanceRepository : IFinanceRepository
             .Where(c => c.DeletedAt == null
                         && c.FamilyKey == familyKey
                         && usuarioIds.Contains(c.UsuarioId)
-                        && c.Id != exceptCategoryId)
+                        && (exceptCategoryId == null || c.Id != exceptCategoryId))
             .ExecuteUpdateAsync(setters => setters
                 .SetProperty(c => c.DeletedAt, now)
+                .SetProperty(c => c.UpdatedAt, now)
+                .SetProperty(c => c.Version, c => c.Version + 1), ct);
+    }
+
+    public async Task SetCategoryPendingReviewAsync(
+        IReadOnlyCollection<Guid> categoryIds,
+        bool isPendingReview,
+        CancellationToken ct = default)
+    {
+        if (categoryIds.Count == 0)
+            return;
+
+        var now = DateTime.UtcNow;
+        await _context.Set<Category>().IgnoreQueryFilters()
+            .Where(c => categoryIds.Contains(c.Id))
+            .ExecuteUpdateAsync(setters => setters
+                .SetProperty(c => c.IsPendingReview, isPendingReview)
+                .SetProperty(c => c.UpdatedAt, now)
+                .SetProperty(c => c.Version, c => c.Version + 1), ct);
+    }
+
+    public async Task SetCategoryDisplayNumberAsync(Guid categoryId, string? displayNumber, CancellationToken ct = default)
+    {
+        var now = DateTime.UtcNow;
+        await _context.Set<Category>().IgnoreQueryFilters()
+            .Where(c => c.Id == categoryId)
+            .ExecuteUpdateAsync(setters => setters
+                .SetProperty(c => c.DisplayNumber, displayNumber)
                 .SetProperty(c => c.UpdatedAt, now)
                 .SetProperty(c => c.Version, c => c.Version + 1), ct);
     }

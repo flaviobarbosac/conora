@@ -373,6 +373,11 @@ namespace Conora.Infrastructure.Persistence.Migrations
                     b.Property<bool>("IsActive")
                         .HasColumnType("boolean");
 
+                    b.Property<bool>("IsPendingReview")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("boolean")
+                        .HasDefaultValue(false);
+
                     b.Property<bool>("IsSystem")
                         .HasColumnType("boolean");
 
@@ -419,6 +424,9 @@ namespace Conora.Infrastructure.Persistence.Migrations
                         .IsUnique()
                         .HasDatabaseName("IX_categories_UsuarioId_Code")
                         .HasFilter("\"Code\" IS NOT NULL AND \"DeletedAt\" IS NULL");
+
+                    b.HasIndex("UsuarioId", "IsPendingReview")
+                        .HasDatabaseName("IX_categories_UsuarioId_IsPendingReview");
 
                     b.HasIndex("UsuarioId", "ParentId");
 

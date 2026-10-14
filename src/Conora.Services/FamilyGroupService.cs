@@ -431,7 +431,8 @@ public sealed class FamilyGroupService
 
         AuditRecorder.Record(_audits, _correlation, "FamilyInvite", invite.Id, "FamilyInviteAccepted", new { invite.Email, self });
         await _uow.SaveChangesAsync(ct);
-        await _categories.SyncFamilyCategoriesAsync(ct);
+        await _categories.EnsureDefaultsAsync(ct);
+        await _categories.MergeOnJoinAsync(group.BudgetOwnerUsuarioId, self, ct);
         return await GetGroupAsync(ct);
     }
 

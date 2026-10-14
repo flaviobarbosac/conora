@@ -23,7 +23,9 @@ public sealed class MonthClosedException : DomainException
     public string CompetenceYm { get; }
 
     public MonthClosedException(string competenceYm)
-        : base($"O mês {competenceYm} está fechado e não aceita alterações. Reabra o mês para editar.")
+        : base(
+            $"O mês {competenceYm} está fechado. Por ora o Conora não permite lançamento retroativo. " +
+            "Reabra o mês em Fechar mês se precisar corrigir.")
     {
         CompetenceYm = competenceYm;
     }

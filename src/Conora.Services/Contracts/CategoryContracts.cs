@@ -16,7 +16,8 @@ public sealed record CategoryResponse(
     bool AcceptsPosting,
     SharingScope SharingScope,
     Guid? CreatedByUsuarioId = null,
-    string? CreatedByName = null);
+    string? CreatedByName = null,
+    bool IsPendingReview = false);
 
 public sealed record CreateCategoryRequest(string Name, Guid ParentId);
 
