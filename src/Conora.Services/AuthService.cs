@@ -5,6 +5,7 @@ using Conora.Domain.Ports;
 using Conora.Repository.Interface;
 using Conora.Services.Common;
 using Conora.Services.Contracts;
+using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
 
 namespace Conora.Services;
@@ -21,6 +22,7 @@ public sealed class AuthService
     private readonly ITokenService _tokens;
     private readonly IGoogleTokenValidator _google;
     private readonly IEmailSender _email;
+    private readonly IConfiguration _config;
     private readonly CategoryService _categories;
     private readonly ILogger<AuthService> _logger;
 
@@ -35,6 +37,7 @@ public sealed class AuthService
         ITokenService tokens,
         IGoogleTokenValidator google,
         IEmailSender email,
+        IConfiguration config,
         CategoryService categories,
         ILogger<AuthService> logger)
     {
@@ -48,6 +51,7 @@ public sealed class AuthService
         _tokens = tokens;
         _google = google;
         _email = email;
+        _config = config;
         _categories = categories;
         _logger = logger;
     }
@@ -169,7 +173,21 @@ public sealed class AuthService
         {
             try
             {
-                await _email.SendAsync(user.Email, "Bem-vindo ao Conora", "Sua conta no Conora foi criada.", ct);
+                await _email.SendAsync(user.Email, "Bem-vindo ao Conora", new EmailContent(
+                    $"Bem-vindo ao Conora, {user.Name}.",
+                    ["Para aproveitar ao máximo, comece por estes três passos:"])
+                {
+                    Preheader = "Sua conta está pronta. Veja como dar os primeiros passos no Conora.",
+                    Subtitle = "Sua vida financeira, com clareza. Sua conta já está pronta para uso.",
+                    Steps =
+                    [
+                        new EmailStep("Cadastre suas contas", "Banco, cartão e carteira em um só painel."),
+                        new EmailStep("Defina seu orçamento do mês", "Limites por categoria e alertas automáticos."),
+                        new EmailStep("Convide sua família", "Acompanhem metas e despesas juntos.")
+                    ],
+                    ActionLabel = "Acessar minha conta",
+                    ActionUrl = $"{PublicWebBase()}/app/"
+                }, ct);
             }
             catch (Exception ex)
             {
@@ -179,5 +197,16 @@ public sealed class AuthService
         }
 
         return new AuthResponse(user.Id, user.Email, pair.AccessToken, pair.RefreshToken, pair.AccessExpiresAtUtc);
+    }
+
+    private string PublicWebBase()
+    {
+        var configured = _config["App:PublicWebUrl"];
+        if (!string.IsNullOrWhiteSpace(configured))
+            return configured.TrimEnd('/');
+        var cors = _config["Cors:Origins:0"];
+        if (!string.IsNullOrWhiteSpace(cors))
+            return cors.TrimEnd('/');
+        return "https://conora.com.br";
     }
 }

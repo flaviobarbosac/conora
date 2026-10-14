@@ -20,6 +20,7 @@ public class UserConfiguration : IEntityTypeConfiguration<User>
         builder.Property(u => u.OnboardingCompleted).IsRequired();
         builder.Property(u => u.ThemeId).IsRequired().HasMaxLength(40);
         builder.Property(u => u.QuietMode).IsRequired();
+        builder.Property(u => u.EmailsEnabled).IsRequired().HasDefaultValue(true);
         builder.Property(u => u.ReserveTargetMonths).IsRequired();
         builder.Property(u => u.MonthCloseDay).IsRequired();
         builder.Property(u => u.IncludeAbsoluteValuesInRetrospective).IsRequired();

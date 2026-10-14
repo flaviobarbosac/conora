@@ -390,6 +390,7 @@ namespace Conora.Infrastructure.Persistence.Migrations
 
                     b.Property<string>("SharingScope")
                         .IsRequired()
+                        .ValueGeneratedOnAdd()
                         .HasMaxLength(20)
                         .HasColumnType("character varying(20)")
                         .HasDefaultValue("Family");
@@ -1416,6 +1417,11 @@ namespace Conora.Infrastructure.Persistence.Migrations
 
                     b.Property<bool>("EmailVerified")
                         .HasColumnType("boolean");
+
+                    b.Property<bool>("EmailsEnabled")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("boolean")
+                        .HasDefaultValue(true);
 
                     b.Property<string>("GoogleId")
                         .HasMaxLength(100)

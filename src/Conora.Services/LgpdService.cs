@@ -77,7 +77,14 @@ public sealed class LgpdService
         request.Complete();
         AuditRecorder.Record(_audits, _correlation, "User", user.Id, "LgpdDeletion", new { user.Email });
         await _uow.SaveChangesAsync(ct);
-        await _email.SendAsync(user.Email, "Exclusão de dados", "Seu pedido de exclusão foi registrado.", ct);
+        await _email.SendAsync(
+            user.Email,
+            "Exclusão de dados",
+            new EmailContent("Exclusão de dados", ["Seu pedido de exclusão foi registrado."])
+            {
+                Preheader = "Pedido de exclusão registrado no Conora."
+            },
+            ct);
     }
 
     public async Task PurgeExpiredAsync(CancellationToken ct)

@@ -21,6 +21,7 @@ public sealed class FamilyGroupService
     private readonly IUnitOfWork _uow;
     private readonly ITenantContext _tenant;
     private readonly IEmailSender _email;
+    private readonly IEmailSuppressionStore _emailSuppressions;
     private readonly IConfiguration _config;
     private readonly IAuditEventRepository _audits;
     private readonly ICorrelationContext _correlation;
@@ -32,6 +33,7 @@ public sealed class FamilyGroupService
         IUnitOfWork uow,
         ITenantContext tenant,
         IEmailSender email,
+        IEmailSuppressionStore emailSuppressions,
         IConfiguration config,
         IAuditEventRepository audits,
         ICorrelationContext correlation,
@@ -42,6 +44,7 @@ public sealed class FamilyGroupService
         _uow = uow;
         _tenant = tenant;
         _email = email;
+        _emailSuppressions = emailSuppressions;
         _config = config;
         _audits = audits;
         _correlation = correlation;
@@ -157,10 +160,17 @@ public sealed class FamilyGroupService
         user.UpdatePreferences(
             ThemeCatalog.Normalize(request.ThemeId),
             request.QuietMode,
+            request.EmailsEnabled,
             request.ReserveTargetMonths,
             request.MonthCloseDay,
             request.IncludeAbsoluteValuesInRetrospective);
         await _uow.SaveChangesAsync(ct);
+
+        if (request.EmailsEnabled)
+            await _emailSuppressions.RemoveUserOptOutAsync(user.Email, ct);
+        else
+            await _emailSuppressions.UpsertAsync(user.Email, EmailSuppression.ReasonUserOptOut, null, ct);
+
         return ToProfile(user);
     }
 
@@ -268,7 +278,18 @@ public sealed class FamilyGroupService
             await _email.SendAsync(
                 email,
                 $"{me.Name} convidou você para o grupo no Conora",
-                $"Olá,\n\n{me.Name} convidou você para compartilhar o orçamento familiar no Conora.\n\nCrie sua conta neste link (use este e-mail): {link}\n\nSe já tiver conta, entre e abra: {PublicWebBase()}/app/grupo/convite/{invite.Token}\n\nO convite vale até {invite.ExpiresAt:dd/MM/yyyy HH:mm} UTC.\n",
+                new EmailContent(
+                    $"{me.Name} convidou você",
+                    [
+                        $"{me.Name} convidou você para compartilhar o orçamento familiar no Conora.",
+                        "Crie sua conta com este mesmo e-mail, ou entre se já tiver conta e abra o convite."
+                    ])
+                {
+                    Preheader = "Convite para o grupo familiar no Conora.",
+                    ActionLabel = "Aceitar convite",
+                    ActionUrl = link,
+                    Note = $"O convite vale até {invite.ExpiresAt:dd/MM/yyyy HH:mm} UTC."
+                },
                 ct);
         }
         catch (Exception ex)
@@ -382,7 +403,12 @@ public sealed class FamilyGroupService
                 await _email.SendAsync(
                     inviter.Email,
                     $"{user.Name} entrou no seu grupo no Conora",
-                    $"Olá,\n\n{user.Name} ({user.Email}) aceitou seu convite e agora faz parte do grupo familiar no Conora.\n",
+                    new EmailContent(
+                        $"{user.Name} entrou no grupo",
+                        [$"{user.Name} ({user.Email}) aceitou seu convite e agora faz parte do grupo familiar no Conora."])
+                    {
+                        Preheader = "Novo membro no grupo familiar."
+                    },
                     ct);
             }
             catch (Exception ex)
@@ -467,7 +493,18 @@ public sealed class FamilyGroupService
             await _email.SendAsync(
                 to.Email,
                 $"{from.Name} quer transferir o orçamento familiar no Conora",
-                $"Olá,\n\n{from.Name} pediu que você assuma o orçamento do grupo familiar no Conora.\n\nAo aceitar, você passa a ser o único que edita o orçamento familiar e recebe as linhas de planejamento atuais.\n\nAceite neste link: {link}\n\nO pedido vale até {transfer.ExpiresAt:dd/MM/yyyy HH:mm} UTC.\n",
+                new EmailContent(
+                    "Transferência do orçamento familiar",
+                    [
+                        $"{from.Name} pediu que você assuma o orçamento do grupo familiar no Conora.",
+                        "Ao aceitar, você passa a ser o único que edita o orçamento familiar e recebe as linhas de planejamento atuais."
+                    ])
+                {
+                    Preheader = "Pedido de transferência do orçamento familiar.",
+                    ActionLabel = "Aceitar transferência",
+                    ActionUrl = link,
+                    Note = $"O pedido vale até {transfer.ExpiresAt:dd/MM/yyyy HH:mm} UTC."
+                },
                 ct);
         }
         catch (Exception ex)
@@ -675,6 +712,7 @@ public sealed class FamilyGroupService
             user.OnboardingCompleted,
             user.ThemeId,
             user.QuietMode,
+            user.EmailsEnabled,
             user.ReserveTargetMonths,
             user.MonthCloseDay,
             user.IncludeAbsoluteValuesInRetrospective);

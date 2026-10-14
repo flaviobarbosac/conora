@@ -16,6 +16,8 @@ public class User : ModelBase
     public bool OnboardingCompleted { get; private set; }
     public string ThemeId { get; private set; } = ThemeCatalog.Clareza;
     public bool QuietMode { get; private set; }
+    /// <summary>When false, Conora system e-mails are not sent (user opt-out).</summary>
+    public bool EmailsEnabled { get; private set; } = true;
     public int ReserveTargetMonths { get; private set; } = 6;
     public int MonthCloseDay { get; private set; } = 1;
     public bool IncludeAbsoluteValuesInRetrospective { get; private set; }
@@ -72,6 +74,7 @@ public class User : ModelBase
     public void UpdatePreferences(
         string themeId,
         bool quietMode,
+        bool emailsEnabled,
         int reserveTargetMonths,
         int monthCloseDay,
         bool includeAbsoluteValuesInRetrospective)
@@ -89,6 +92,7 @@ public class User : ModelBase
 
         ThemeId = theme;
         QuietMode = quietMode;
+        EmailsEnabled = emailsEnabled;
         ReserveTargetMonths = reserveTargetMonths;
         MonthCloseDay = monthCloseDay;
         IncludeAbsoluteValuesInRetrospective = includeAbsoluteValuesInRetrospective;
