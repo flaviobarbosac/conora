@@ -50,7 +50,10 @@ public sealed record EntryResponse(
     string Description,
     string? RecurrenceKey,
     int? InstallmentNumber,
-    int? InstallmentCount);
+    int? InstallmentCount,
+    Guid UsuarioId = default,
+    string? PostedByName = null,
+    bool CanEdit = true);
 
 public sealed record EntryFilter(
     string? CompetenceYm = null,
@@ -59,6 +62,7 @@ public sealed record EntryFilter(
     Guid? AccountId = null,
     string? Search = null,
     int Skip = 0,
-    int Take = 50);
+    int Take = 50,
+    SharingScope? Scope = null);
 
 public sealed record CategorySuggestionResponse(Guid? CategoryId, string? CategoryName);
