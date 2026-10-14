@@ -43,7 +43,7 @@ public sealed record BudgetResponse(
     IReadOnlyList<BudgetIncomeSourceResponse> IncomeSources,
     IReadOnlyList<BudgetSectionResponse> Sections,
     IReadOnlyList<BudgetLineResponse> Lines,
-    SharingScope SharingScope = SharingScope.Personal,
+    SharingScope SharingScope = SharingScope.Family,
     bool CanEdit = true,
     Guid? BudgetOwnerUsuarioId = null);
 
