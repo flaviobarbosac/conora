@@ -33,7 +33,21 @@ public sealed record ConsoleReadModel(
     IReadOnlyList<ConsoleDayRaw> ErrorDays,
     IReadOnlyList<ConsoleStatusRaw> ErrorsByStatus,
     IReadOnlyList<ConsoleAreaRaw> ErrorsByArea,
-    IReadOnlyList<ConsoleErrorRowRaw> ErrorRows);
+    IReadOnlyList<ConsoleErrorRowRaw> ErrorRows,
+    IReadOnlyList<ConsoleMonthRaw> Months);
+
+public sealed record ConsoleMonthRaw(
+    string CompetenceYm,
+    int Base,
+    int WithBudget,
+    int BudgetWithin,
+    int BudgetOver,
+    int BudgetEmpty,
+    int WithEntry,
+    int Closed,
+    int ClosedWithin,
+    int Signups,
+    int Errors);
 
 public sealed record ConsoleFeatureRaw(string Key, int Users, int Events);
 public sealed record ConsoleWeekRaw(DateOnly WeekStart, int Signups, int Active, int Budgets, int Closes, int Errors);

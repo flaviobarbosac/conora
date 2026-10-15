@@ -12,9 +12,9 @@ public sealed class ConsoleService
         ["budgets"] = "Orçamento",
         ["months"] = "Fechamento",
         ["diagnosis"] = "Diagnóstico",
-        ["accounts"] = "Contas",
+        ["accounts"] = "Conta bancária",
         ["cards"] = "Cartões",
-        ["categories"] = "Categorias",
+        ["categories"] = "Plano de contas",
         ["projects"] = "Projetos de vida",
         ["patrimony"] = "Patrimônio",
         ["imports"] = "Importação",
@@ -32,9 +32,9 @@ public sealed class ConsoleService
         ["budgets"] = "Orçamento",
         ["months"] = "Fechamento",
         ["diagnosis"] = "Diagnóstico",
-        ["accounts"] = "Contas",
+        ["accounts"] = "Conta bancária",
         ["credit-cards"] = "Cartões",
-        ["categories"] = "Categorias",
+        ["categories"] = "Plano de contas",
         ["life-projects"] = "Projetos de vida",
         ["patrimony"] = "Patrimônio",
         ["imports"] = "Importação",
@@ -51,7 +51,7 @@ public sealed class ConsoleService
         ["feedback"] = "Feedback",
         ["gamification"] = "Jornada",
         ["users"] = "Usuários",
-        ["me"] = "Conta",
+        ["me"] = "Conta do usuário",
         ["help"] = "Ajuda",
         ["console"] = "Console",
         ["audit-events"] = "Auditoria"
@@ -131,7 +131,29 @@ public sealed class ConsoleService
                 row.StatusCode,
                 row.Title,
                 Label(AreaLabels, row.Area),
-                row.Count)).ToList());
+                row.Count)).ToList(),
+            data.Months.Select(month =>
+            {
+                var without = Math.Max(0, month.Base - month.WithBudget);
+                var closedOver = Math.Max(0, month.Closed - month.ClosedWithin);
+                return new ConsoleMonthResponse(
+                    month.CompetenceYm,
+                    month.Base,
+                    month.WithBudget,
+                    without,
+                    month.BudgetWithin,
+                    month.BudgetOver,
+                    month.BudgetEmpty,
+                    month.WithEntry,
+                    month.Closed,
+                    month.ClosedWithin,
+                    closedOver,
+                    month.Signups,
+                    month.Errors,
+                    Percent(month.WithBudget, month.Base),
+                    Percent(month.BudgetWithin, month.WithBudget),
+                    Percent(month.Closed, month.WithEntry));
+            }).ToList());
     }
 
     private static ConsoleMetricResponse Metric(string key, string label, int count, int baseline)

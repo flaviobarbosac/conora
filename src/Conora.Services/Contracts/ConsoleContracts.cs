@@ -23,7 +23,26 @@ public sealed record ConsoleKpisResponse(
     IReadOnlyList<ConsoleMetricResponse> ErrorDays,
     IReadOnlyList<ConsoleMetricResponse> ErrorsByStatus,
     IReadOnlyList<ConsoleMetricResponse> ErrorsByArea,
-    IReadOnlyList<ConsoleErrorRowResponse> ErrorRows);
+    IReadOnlyList<ConsoleErrorRowResponse> ErrorRows,
+    IReadOnlyList<ConsoleMonthResponse> Months);
+
+public sealed record ConsoleMonthResponse(
+    string CompetenceYm,
+    int Base,
+    int WithBudget,
+    int WithoutBudget,
+    int BudgetWithin,
+    int BudgetOver,
+    int BudgetEmpty,
+    int WithEntry,
+    int Closed,
+    int ClosedWithin,
+    int ClosedOver,
+    int Signups,
+    int Errors,
+    decimal BudgetPercent,
+    decimal WithinPercent,
+    decimal ClosedPercent);
 
 public sealed record ConsoleMetricResponse(string Key, string Label, int Count, int Base, decimal Percent);
 

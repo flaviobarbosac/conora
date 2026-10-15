@@ -9,6 +9,7 @@ namespace Conora.Repository;
 
 public sealed class ConsoleRepository : IConsoleRepository
 {
+    private const int HistoryMonths = 24;
     private static readonly EntryType[] SpentTypes =
     [
         EntryType.Expense,
@@ -92,7 +93,10 @@ public sealed class ConsoleRepository : IConsoleRepository
             .Where(m => m.DeletedAt == null && m.IsClosed && m.CompetenceYm == previous)
             .Select(m => m.UsuarioId), active, ct);
 
-        var competences = closedEver.Select(m => m.CompetenceYm).Append(competence).Append(previous).Distinct().ToList();
+        var historyYms = Enumerable.Range(0, HistoryMonths)
+            .Select(offset => Competence.AddMonths(competence, offset - (HistoryMonths - 1)))
+            .ToList();
+        var competences = closedEver.Select(m => m.CompetenceYm).Concat(historyYms).Distinct().ToList();
         var cells = await AdherenceAsync(competences, active, ct);
 
         var withinEver = closedEver
@@ -126,13 +130,16 @@ public sealed class ConsoleRepository : IConsoleRepository
             .Select(m => new WhenRow(m.UsuarioId, m.ClosedAt!.Value))
             .ToListAsync(ct);
 
+        var historyStart = Competence.Start(historyYms[0]);
+        var failureSince = historyStart < sinceWeeks ? historyStart : sinceWeeks;
         var failures = await _db.RequestFailures.AsNoTracking()
-            .Where(f => f.DeletedAt == null && f.OccurredAt >= sinceWeeks)
+            .Where(f => f.DeletedAt == null && f.OccurredAt >= failureSince)
             .Select(f => new FailureRow(f.StatusCode, f.Title, f.Area, f.OccurredAt))
             .ToListAsync(ct);
 
         var weeks = Weeks(weekStart, users, hits, budgetCreated.Where(r => active.Contains(r.UsuarioId)), closes.Where(r => active.Contains(r.UsuarioId)), failures);
         var recent = failures.Where(f => f.OccurredAt >= since30).ToList();
+        var months = await HistoryAsync(historyYms, users, cells, failures, ct);
 
         return new ConsoleReadModel(
             now,
@@ -178,7 +185,85 @@ public sealed class ConsoleRepository : IConsoleRepository
                 .OrderByDescending(g => g.Day)
                 .ThenByDescending(g => g.Count)
                 .Take(40)
-                .ToList());
+                .ToList(),
+            months);
+    }
+
+    private async Task<List<ConsoleMonthRaw>> HistoryAsync(
+        IReadOnlyList<string> competences,
+        IReadOnlyList<UserRow> users,
+        IReadOnlyDictionary<(Guid UserId, string Ym), (decimal Planned, decimal Spent)> cells,
+        IReadOnlyList<FailureRow> failures,
+        CancellationToken ct)
+    {
+        var active = users.Select(user => user.Id).ToHashSet();
+        var born = users.ToDictionary(user => user.Id, user => user.CreatedAt);
+
+        var budgets = await _db.Budgets.IgnoreQueryFilters().AsNoTracking()
+            .Where(budget => budget.DeletedAt == null && competences.Contains(budget.CompetenceYm))
+            .GroupBy(budget => new { budget.UsuarioId, budget.CompetenceYm })
+            .Select(group => new MonthRow(group.Key.UsuarioId, group.Key.CompetenceYm))
+            .ToListAsync(ct);
+        var entries = await _db.Entries.IgnoreQueryFilters().AsNoTracking()
+            .Where(entry => entry.DeletedAt == null && competences.Contains(entry.CompetenceYm))
+            .GroupBy(entry => new { entry.UsuarioId, entry.CompetenceYm })
+            .Select(group => new MonthRow(group.Key.UsuarioId, group.Key.CompetenceYm))
+            .ToListAsync(ct);
+        var closed = await _db.MonthLocks.IgnoreQueryFilters().AsNoTracking()
+            .Where(month => month.DeletedAt == null && month.IsClosed && competences.Contains(month.CompetenceYm))
+            .GroupBy(month => new { month.UsuarioId, month.CompetenceYm })
+            .Select(group => new MonthRow(group.Key.UsuarioId, group.Key.CompetenceYm))
+            .ToListAsync(ct);
+
+        var budgetByMonth = Group(budgets, active);
+        var entryByMonth = Group(entries, active);
+        var closedByMonth = Group(closed, active);
+
+        var rows = new List<ConsoleMonthRaw>(competences.Count);
+        foreach (var ym in competences)
+        {
+            var start = Competence.Start(ym);
+            var end = Competence.EndExclusive(ym);
+            var baseline = users.Count(user => user.CreatedAt < end);
+            var budgetIds = InWindow(budgetByMonth, ym, born, end);
+            var entryIds = InWindow(entryByMonth, ym, born, end);
+            var closedIds = InWindow(closedByMonth, ym, born, end);
+            var (within, over, empty) = SplitBudget(budgetIds, ym, cells);
+            var closedWithin = closedIds.Count(id =>
+                cells.TryGetValue((id, ym), out var cell) && MethodAdherence.IsWithin(cell.Planned, cell.Spent));
+            rows.Add(new ConsoleMonthRaw(
+                ym,
+                baseline,
+                budgetIds.Count,
+                within,
+                over,
+                empty,
+                entryIds.Count,
+                closedIds.Count,
+                closedWithin,
+                users.Count(user => user.CreatedAt >= start && user.CreatedAt < end),
+                failures.Count(failure => failure.OccurredAt >= start && failure.OccurredAt < end)));
+        }
+
+        return rows;
+    }
+
+    private static Dictionary<string, HashSet<Guid>> Group(IEnumerable<MonthRow> rows, HashSet<Guid> active)
+    {
+        return rows.Where(row => active.Contains(row.UsuarioId))
+            .GroupBy(row => row.CompetenceYm)
+            .ToDictionary(group => group.Key, group => group.Select(row => row.UsuarioId).ToHashSet());
+    }
+
+    private static HashSet<Guid> InWindow(
+        Dictionary<string, HashSet<Guid>> source,
+        string ym,
+        Dictionary<Guid, DateTime> born,
+        DateTime end)
+    {
+        if (!source.TryGetValue(ym, out var ids))
+            return [];
+        return ids.Where(id => born.TryGetValue(id, out var created) && created < end).ToHashSet();
     }
 
     private async Task<Dictionary<(Guid UserId, string Ym), (decimal Planned, decimal Spent)>> AdherenceAsync(
@@ -285,7 +370,7 @@ public sealed class ConsoleRepository : IConsoleRepository
     private static (int Within, int Over, int Empty) SplitBudget(
         HashSet<Guid> budgetUsers,
         string competence,
-        Dictionary<(Guid UserId, string Ym), (decimal Planned, decimal Spent)> cells)
+        IReadOnlyDictionary<(Guid UserId, string Ym), (decimal Planned, decimal Spent)> cells)
     {
         var within = 0;
         var over = 0;
