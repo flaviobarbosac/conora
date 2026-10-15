@@ -40,10 +40,14 @@ public class FamilyOwnerTransfer : ModelBase
 
     public void Accept(Guid acceptorUsuarioId)
     {
-        if (!IsOpen)
-            throw new ValidationException("token", "Esta transferência não está mais aberta.");
+        if (CancelledAt is not null)
+            throw new ValidationException("token", "Esta transferência foi cancelada.");
         if (acceptorUsuarioId != ToUsuarioId)
             throw new ValidationException("token", "Só o membro convidado pode aceitar.");
+        if (AcceptedAt is not null)
+            return;
+        if (ExpiresAt <= DateTime.UtcNow)
+            throw new ValidationException("token", "Esta transferência não está mais aberta.");
         AcceptedAt = DateTime.UtcNow;
     }
 

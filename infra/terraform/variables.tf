@@ -66,9 +66,37 @@ variable "google_client_id" {
   default = "943760588490-ugpetcnbu8s0sac6rkss5r8ingn6g2pl.apps.googleusercontent.com"
 }
 
+variable "apple_client_id" {
+  type    = string
+  default = "br.com.conora.app"
+}
+
+variable "apple_services_id" {
+  type    = string
+  default = "br.com.conora.web"
+}
+
 variable "ses_from" {
   type    = string
   default = "noreply@conora.com.br"
+}
+
+variable "brevo_smtp_login" {
+  type        = string
+  default     = ""
+  description = "Brevo SMTP login (xxx@smtp-brevo.com). Empty = send through SES."
+}
+
+variable "brevo_domain_code" {
+  type        = string
+  default     = "1bc795b875b530afc4d7b40c5bf29f6e"
+  description = "Brevo domain ownership code (Senders, domains, IPs > Domains)."
+}
+
+variable "brevo_smtp_key" {
+  type      = string
+  default   = ""
+  sensitive = true
 }
 
 variable "budget_limit_usd" {

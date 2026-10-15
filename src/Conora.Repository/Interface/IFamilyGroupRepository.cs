@@ -32,4 +32,7 @@ public interface IFamilyGroupRepository
     Task<User?> FindUserByIdAsync(Guid id, CancellationToken ct = default, bool track = false);
     Task<User?> FindUserByEmailAsync(string email, CancellationToken ct = default);
     Task<List<User>> ListUsersByIdsAsync(IEnumerable<Guid> ids, CancellationToken ct = default);
+
+    /// <summary>Another workspace's subscription (cross-tenant), used when a family plan covers its members.</summary>
+    Task<WorkspaceSubscription?> FindSubscriptionAsync(Guid usuarioId, CancellationToken ct = default);
 }

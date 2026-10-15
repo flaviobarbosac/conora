@@ -52,7 +52,8 @@ aws s3 cp (Join-Path $DockerDir 'Caddyfile') "s3://$Bucket/Caddyfile" | Out-Null
 aws s3 cp (Join-Path $PSScriptRoot 'generate-env.sh') "s3://$Bucket/generate-env.sh" | Out-Null
 
 $deployTemplate = Get-Content (Join-Path $TerraformDir 'templates\deploy.sh') -Raw
-$deployScript = $deployTemplate.Replace('$${', '${').
+# bash on the host rejects CRLF ("set: pipefail : invalid option name").
+$deployScript = $deployTemplate.Replace("`r`n", "`n").Replace('$${', '${').
     Replace('${aws_region}', $Region).
     Replace('${config_bucket}', $Bucket).
     Replace('${account_id}', $Account).

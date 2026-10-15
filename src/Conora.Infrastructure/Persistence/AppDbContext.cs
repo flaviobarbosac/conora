@@ -17,6 +17,7 @@ public class AppDbContext : DbContext
 
     public DbSet<User> Users => Set<User>();
     public DbSet<AuditEvent> AuditEvents => Set<AuditEvent>();
+    public DbSet<RequestFailure> RequestFailures => Set<RequestFailure>();
     public DbSet<RefreshToken> RefreshTokens => Set<RefreshToken>();
     public DbSet<LgpdRequest> LgpdRequests => Set<LgpdRequest>();
     public DbSet<EmailSuppression> EmailSuppressions => Set<EmailSuppression>();

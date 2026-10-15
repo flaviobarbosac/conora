@@ -75,3 +75,10 @@ public sealed class GoogleAuthDisabledException : DomainException
     {
     }
 }
+
+public sealed class AppleAuthDisabledException : DomainException
+{
+    public AppleAuthDisabledException() : base("Login Apple não configurado.")
+    {
+    }
+}

@@ -420,6 +420,10 @@ namespace Conora.Infrastructure.Persistence.Migrations
 
                     b.HasKey("Id");
 
+                    b.HasIndex("FamilyKey")
+                        .HasDatabaseName("IX_categories_FamilyKey")
+                        .HasFilter("\"FamilyKey\" IS NOT NULL AND \"DeletedAt\" IS NULL");
+
                     b.HasIndex("UsuarioId", "Code")
                         .IsUnique()
                         .HasDatabaseName("IX_categories_UsuarioId_Code")
@@ -434,10 +438,6 @@ namespace Conora.Infrastructure.Persistence.Migrations
 
                     b.HasIndex("UsuarioId", "SharingScope")
                         .HasDatabaseName("IX_categories_UsuarioId_SharingScope");
-
-                    b.HasIndex("FamilyKey")
-                        .HasDatabaseName("IX_categories_FamilyKey")
-                        .HasFilter("\"FamilyKey\" IS NOT NULL AND \"DeletedAt\" IS NULL");
 
                     b.ToTable("categories", (string)null);
                 });
@@ -1356,6 +1356,51 @@ namespace Conora.Infrastructure.Persistence.Migrations
                     b.ToTable("refresh_tokens", (string)null);
                 });
 
+            modelBuilder.Entity("Conora.Domain.Entities.RequestFailure", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("Area")
+                        .IsRequired()
+                        .HasMaxLength(40)
+                        .HasColumnType("character varying(40)");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<DateTime?>("DeletedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<DateTime>("OccurredAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<int>("StatusCode")
+                        .HasColumnType("integer");
+
+                    b.Property<string>("Title")
+                        .IsRequired()
+                        .HasMaxLength(80)
+                        .HasColumnType("character varying(80)");
+
+                    b.Property<DateTime>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<long>("Version")
+                        .HasColumnType("bigint");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("OccurredAt")
+                        .HasDatabaseName("IX_RequestFailures_OccurredAt");
+
+                    b.HasIndex("Area", "StatusCode")
+                        .HasDatabaseName("IX_RequestFailures_Area_Status");
+
+                    b.ToTable("request_failures", (string)null);
+                });
+
             modelBuilder.Entity("Conora.Domain.Entities.Supplier", b =>
                 {
                     b.Property<Guid>("Id")
@@ -1417,6 +1462,10 @@ namespace Conora.Infrastructure.Persistence.Migrations
                     b.Property<Guid>("Id")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("uuid");
+
+                    b.Property<string>("AppleId")
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)");
 
                     b.Property<string>("Cpf")
                         .HasMaxLength(11)
@@ -1481,6 +1530,11 @@ namespace Conora.Infrastructure.Persistence.Migrations
                         .HasColumnType("bigint");
 
                     b.HasKey("Id");
+
+                    b.HasIndex("AppleId")
+                        .IsUnique()
+                        .HasDatabaseName("IX_Users_AppleId")
+                        .HasFilter("\"AppleId\" IS NOT NULL AND \"DeletedAt\" IS NULL");
 
                     b.HasIndex("Cpf")
                         .IsUnique()

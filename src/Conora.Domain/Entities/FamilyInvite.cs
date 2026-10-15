@@ -34,6 +34,15 @@ public class FamilyInvite : ModelBase
 
     public void BindGroup(Guid familyGroupId) => FamilyGroupId = familyGroupId;
 
+    public void ReassignInviter(Guid usuarioId)
+    {
+        if (usuarioId == Guid.Empty)
+            throw new ValidationException("usuarioId", "Membro inválido.");
+        if (AcceptedAt is not null || CancelledAt is not null)
+            return;
+        InviterUsuarioId = usuarioId;
+    }
+
     public void Cancel()
     {
         if (AcceptedAt is not null)

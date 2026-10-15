@@ -37,6 +37,19 @@ public sealed class PlanReadOnlyException : DomainException
         : base("Assinatura vencida: o Conora está em modo somente leitura. Renove o plano para lançar ou editar.")
     {
     }
+
+    public PlanReadOnlyException(string message) : base(message)
+    {
+    }
+}
+
+public sealed class PlanBlockedException : DomainException
+{
+    public PlanBlockedException()
+        : base("Seu período de acesso terminou e a conta está bloqueada. Assine um plano para voltar a usar o Conora " +
+               "ou abra um chamado no suporte para recuperar seus dados.")
+    {
+    }
 }
 
 public sealed class ForbiddenException : DomainException

@@ -27,6 +27,10 @@ public sealed class UserRepository : BaseRepository<User>, IUserRepository
         => Set.IgnoreQueryFilters()
             .FirstOrDefaultAsync(u => u.GoogleId == googleId && u.DeletedAt == null, ct);
 
+    public Task<User?> FindByAppleIdAsync(string appleId, CancellationToken ct = default)
+        => Set.IgnoreQueryFilters()
+            .FirstOrDefaultAsync(u => u.AppleId == appleId && u.DeletedAt == null, ct);
+
     public async Task<IReadOnlyList<User>> ListExpiredDeletionsAsync(DateTime cutoffUtc, CancellationToken ct = default)
         => await Set.IgnoreQueryFilters()
             .Where(u => u.DeletedAt != null && u.DeletedAt < cutoffUtc)

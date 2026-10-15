@@ -149,6 +149,7 @@ app.UseAuthentication();
 app.UseMiddleware<CorrelationIdMiddleware>();
 app.UseMiddleware<TenantMiddleware>();
 app.UseAuthorization();
+app.UseMiddleware<PlanAccessMiddleware>();
 
 if (app.Environment.IsDevelopment())
 {
@@ -168,6 +169,7 @@ app.MapHealthChecks("/health/ready", new HealthCheckOptions
 app.MapAuthEndpoints();
 app.MapUserEndpoints();
 app.MapAuditEndpoints();
+app.MapConsoleEndpoints();
 app.MapLgpdEndpoints();
 app.MapCategoryEndpoints();
 app.MapDiagnosisEndpoints();

@@ -9,7 +9,16 @@ resource "aws_ses_domain_dkim" "main" {
 }
 
 resource "aws_ses_configuration_set" "transactional" {
-  name = "${local.name_prefix}-transactional"
+  name                       = "${local.name_prefix}-transactional"
+  reputation_metrics_enabled = true
+}
+
+# Custom MAIL FROM (mail.conora.com.br). Without it SES uses amazonses.com and
+# reviewers treat the domain as only partially authenticated.
+resource "aws_ses_domain_mail_from" "main" {
+  domain                 = aws_ses_domain_identity.main.domain
+  mail_from_domain       = "mail.${aws_ses_domain_identity.main.domain}"
+  behavior_on_mx_failure = "UseDefaultValue"
 }
 
 # Bounce / complaint feedback → SNS → API webhook (auto-suppression) + ops e-mail.
@@ -178,7 +187,11 @@ resource "aws_route53_record" "ses_spf" {
   name    = aws_ses_domain_identity.main.domain
   type    = "TXT"
   ttl     = 3600
-  records = ["v=spf1 include:amazonses.com ~all"]
+  # Single TXT record set at the apex: SPF for SES + Brevo, plus Brevo's ownership code.
+  records = [
+    "v=spf1 include:amazonses.com include:spf.brevo.com ~all",
+    "brevo-code:${var.brevo_domain_code}",
+  ]
 }
 
 resource "aws_route53_record" "ses_dmarc" {
@@ -187,4 +200,20 @@ resource "aws_route53_record" "ses_dmarc" {
   type    = "TXT"
   ttl     = 3600
   records = ["v=DMARC1; p=none; rua=mailto:dmarc@${aws_ses_domain_identity.main.domain}; pct=100"]
+}
+
+resource "aws_route53_record" "ses_mail_from_mx" {
+  zone_id = aws_route53_zone.main.zone_id
+  name    = aws_ses_domain_mail_from.main.mail_from_domain
+  type    = "MX"
+  ttl     = 600
+  records = ["10 feedback-smtp.${var.aws_region}.amazonses.com"]
+}
+
+resource "aws_route53_record" "ses_mail_from_spf" {
+  zone_id = aws_route53_zone.main.zone_id
+  name    = aws_ses_domain_mail_from.main.mail_from_domain
+  type    = "TXT"
+  ttl     = 600
+  records = ["v=spf1 include:amazonses.com ~all"]
 }
