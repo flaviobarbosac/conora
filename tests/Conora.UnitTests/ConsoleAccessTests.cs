@@ -9,7 +9,7 @@ public class ConsoleAccessTests
     [Theory]
     [InlineData("flaviobarbosa.vix@gmail.com")]
     [InlineData("FLAVIOBARBOSA.VIX@GMAIL.COM")]
-    [InlineData(" leolelcampos2009@gmail.com ")]
+    [InlineData(" lelcampos2009@gmail.com ")]
     public void Allows_operators(string email) => Assert.True(ConsoleAccess.IsAllowed(email));
 
     [Theory]
