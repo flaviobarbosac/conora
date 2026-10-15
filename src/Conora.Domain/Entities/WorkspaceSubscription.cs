@@ -1,3 +1,4 @@
+using Conora.Domain.Catalog;
 using Conora.Domain.Enums;
 
 namespace Conora.Domain.Entities;
@@ -13,12 +14,9 @@ public class WorkspaceSubscription : ModelBase, ITenantOwned
     {
     }
 
-    public static decimal PriceOf(PlanKind plan) => plan switch
-    {
-        PlanKind.Monthly1490 => 14.90m,
-        PlanKind.Yearly14990 => 149.90m,
-        _ => throw new ArgumentOutOfRangeException(nameof(plan))
-    };
+    public static decimal PriceOf(PlanKind plan) => PlanCatalog.PriceOf(plan);
+
+    public PlanTier Tier => PlanCatalog.TierOf(Plan);
 
     public static WorkspaceSubscription Activate(PlanKind plan, DateTime now) => new()
     {
@@ -44,10 +42,6 @@ public class WorkspaceSubscription : ModelBase, ITenantOwned
 
     public bool IsWritable(DateTime now) => EffectiveStatus(now) == SubscriptionStatus.Active;
 
-    private static DateTime ExpiryFrom(PlanKind plan, DateTime from) => plan switch
-    {
-        PlanKind.Monthly1490 => from.AddMonths(1),
-        PlanKind.Yearly14990 => from.AddYears(1),
-        _ => throw new ArgumentOutOfRangeException(nameof(plan))
-    };
+    private static DateTime ExpiryFrom(PlanKind plan, DateTime from)
+        => PlanCatalog.IsYearly(plan) ? from.AddYears(1) : from.AddMonths(1);
 }

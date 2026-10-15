@@ -16,6 +16,7 @@ public class UserConfiguration : IEntityTypeConfiguration<User>
         builder.Property(u => u.Cpf).HasMaxLength(11);
         builder.Property(u => u.PasswordHash).HasMaxLength(500);
         builder.Property(u => u.GoogleId).HasMaxLength(100);
+        builder.Property(u => u.AppleId).HasMaxLength(100);
         builder.Property(u => u.EmailVerified).IsRequired();
         builder.Property(u => u.OnboardingCompleted).IsRequired();
         builder.Property(u => u.ThemeId).IsRequired().HasMaxLength(40);
@@ -38,6 +39,11 @@ public class UserConfiguration : IEntityTypeConfiguration<User>
             .IsUnique()
             .HasFilter("\"GoogleId\" IS NOT NULL AND \"DeletedAt\" IS NULL")
             .HasDatabaseName("IX_Users_GoogleId");
+
+        builder.HasIndex(u => u.AppleId)
+            .IsUnique()
+            .HasFilter("\"AppleId\" IS NOT NULL AND \"DeletedAt\" IS NULL")
+            .HasDatabaseName("IX_Users_AppleId");
 
         builder.HasIndex(u => u.Cpf)
             .IsUnique()

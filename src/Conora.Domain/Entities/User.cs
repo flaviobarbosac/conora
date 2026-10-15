@@ -11,6 +11,7 @@ public class User : ModelBase
     public string? Cpf { get; private set; }
     public string? PasswordHash { get; private set; }
     public string? GoogleId { get; private set; }
+    public string? AppleId { get; private set; }
     public bool EmailVerified { get; private set; }
 
     public bool OnboardingCompleted { get; private set; }
@@ -57,6 +58,12 @@ public class User : ModelBase
     public void SetGoogleId(string googleId)
     {
         GoogleId = googleId;
+        EmailVerified = true;
+    }
+
+    public void SetAppleId(string appleId)
+    {
+        AppleId = appleId;
         EmailVerified = true;
     }
 

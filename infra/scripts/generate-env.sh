@@ -66,6 +66,13 @@ if [ -z "$DB_CONNECTION" ] || [ -z "$JWT_KEY" ]; then
   exit 1
 fi
 
+# SES needs the configuration set header for bounce/complaint events; other SMTP relays must not get it.
+# Older secrets have no configurationSet field, so fall back to the SES default when the host is SES.
+EMAIL_CONFIGURATION_SET=$(get_int .email.configurationSet)
+if [ -z "$EMAIL_CONFIGURATION_SET" ] && [[ "$(get_int .email.smtpHost)" == *amazonaws.com ]]; then
+  EMAIL_CONFIGURATION_SET="conora-${ENV_NAME}-transactional"
+fi
+
 umask 077
 
 cat > "${OUT_DIR}/.env" <<EOF
@@ -89,7 +96,7 @@ Email__SmtpPort=$(get_int .email.smtpPort)
 Email__User=$(get_int .email.user)
 Email__Password=$(esc "$(get_int .email.password)")
 Email__UseSsl=$(get_int .email.useSsl)
-Email__ConfigurationSet=conora-${ENV_NAME}-transactional
+Email__ConfigurationSet=${EMAIL_CONFIGURATION_SET}
 WhatsApp__VerifyToken=$(esc "$(get_int .whatsapp.verifyToken)")
 WhatsApp__AppSecret=$(esc "$(get_int .whatsapp.appSecret)")
 WhatsApp__AccessToken=$(esc "$(get_int .whatsapp.accessToken)")
@@ -100,6 +107,15 @@ Cors__Origins__2=https://www.${DOMAIN}
 Cors__Origins__3=http://www.${DOMAIN}
 OpenTelemetry__OtlpEndpoint=
 EOF
+
+APPLE_CLIENT_ID=$(get_int .apple.clientId)
+APPLE_SERVICES_ID=$(get_int .apple.servicesId)
+if [ -n "$APPLE_CLIENT_ID" ]; then
+  printf 'Apple__ClientId=%s\n' "$APPLE_CLIENT_ID" >> "${OUT_DIR}/.env.app"
+fi
+if [ -n "$APPLE_SERVICES_ID" ]; then
+  printf 'Apple__ServicesId=%s\n' "$APPLE_SERVICES_ID" >> "${OUT_DIR}/.env.app"
+fi
 
 # Allow provisional access via the instance public IP (same-origin front+API on :80).
 if PUBLIC_IP=$(curl -fsS --connect-timeout 2 -H "X-aws-ec2-metadata-token: $(curl -fsS -X PUT --connect-timeout 2 -H 'X-aws-ec2-metadata-token-ttl-seconds: 60' http://169.254.169.254/latest/api/token)" http://169.254.169.254/latest/meta-data/public-ipv4 2>/dev/null); then

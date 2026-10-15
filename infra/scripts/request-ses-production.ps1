@@ -23,62 +23,62 @@ if ($Profile) { $env:AWS_PROFILE = $Profile }
 $env:AWS_REGION = $Region
 
 $UseCase = @"
-Conora (https://conora.com.br) is a personal finance web application for families in Brazil.
+Conora (https://conora.com.br) is a personal-finance web app for families in Brazil. Mail is TRANSACTIONAL only. We do not send newsletters, promotions, or purchased lists.
 
-Mail type: TRANSACTIONAL only. No marketing, newsletters, or bulk campaigns.
+Concrete messages, each triggered by a user action:
+- Welcome after the person creates an account (form or Google) at https://conora.com.br/app/register.
+- Family-group invite, sent only to an address an existing member typed.
+- Notice to the inviter when that invite is accepted.
+- Notice when the family-budget owner asks another member to take over the budget.
+- Confirmation when the account holder requests LGPD data deletion.
 
-How users opt in:
-- A person creates an account voluntarily at https://conora.com.br/app/register (name, e-mail, CPF, password) or signs in with Google/Apple.
-- Family-group invites are sent only to an e-mail address typed by an existing member.
-- We send: welcome after signup, family invite, invite-accepted notice to the inviter, and LGPD deletion confirmation. Recipients are always addresses the user provided.
+Recipients are the account e-mail or an address the member entered. There is no bulk send. In Settings the user can turn system e-mail off; that address is then skipped. Expected volume: 2,000 to 5,000 messages per month.
 
-Website and compliance pages (public):
-- https://conora.com.br/
-- https://conora.com.br/privacidade
-- https://conora.com.br/termos
+Authentication on conora.com.br (Route 53, sa-east-1): DKIM (SUCCESS), SPF (include:amazonses.com), DMARC (p=none), and custom MAIL FROM mail.conora.com.br.
 
-Bounce and complaint handling (automatic):
-- SES identity notifications and the transactional configuration set publish Bounce and Complaint to SNS topic conora-dev-ses-feedback.
-- HTTPS subscription https://api.conora.com.br/webhooks/ses confirms the SNS subscription and writes the recipient to table email_suppressions.
-- SmtpEmailSender checks that table before every send and skips suppressed addresses.
-- Account-level SES suppression is enabled for BOUNCE and COMPLAINT.
-- Ops also receive the SNS notifications by e-mail.
+Bounce and complaint: configuration set conora-dev-transactional publishes Bounce and Complaint to SNS topic conora-dev-ses-feedback. HTTPS subscriber https://api.conora.com.br/webhooks/ses writes the address to email_suppressions, and the SMTP sender skips that address. Account-level SES suppression is on for BOUNCE and COMPLAINT.
 
-Authentication / reputation:
-- SPF, DKIM and DMARC are configured for conora.com.br in Route 53.
-- Expected volume: 100-500 e-mails per day initially.
+Public pages: https://conora.com.br/ https://conora.com.br/privacidade https://conora.com.br/termos
 "@.Trim()
 
 $SupportReply = @"
 Hello,
 
-This is a follow-up to support case $SupportCaseId regarding Amazon SES production access for account 371664303999 (region sa-east-1). The previous request was denied while we were still in the sandbox.
+Please re-open the review on case $SupportCaseId (account 371664303999, sa-east-1). This is not a new request. Production access is still disabled and the last review status is DENIED. Since the earlier reply we finished domain authentication and confirmed the bounce path in the account.
 
-We have completed the remediation items and kindly ask you to re-review production access.
+What we send
+Transactional mail only, for the personal-finance app at https://conora.com.br. No marketing and no purchased lists. Each message is caused by something the user did:
+- welcome after signup (https://conora.com.br/app/register, form or Google);
+- family-group invite, only to an address an existing member typed;
+- notice to the inviter when the invite is accepted;
+- notice when the budget owner asks another member to take over the family budget;
+- confirmation of an LGPD deletion request made by the account holder.
+Volume we expect: 2,000 to 5,000 messages per month. The user can turn system e-mail off in Settings; that address is then not mailed.
 
-1) Public website and privacy policy
-- Landing: https://conora.com.br/
-- Privacy (LGPD): https://conora.com.br/privacidade
-- Terms: https://conora.com.br/termos
-- The application SPA remains at https://conora.com.br/app/
+Domain authentication (verified in this account today)
+- Identity conora.com.br: VerificationStatus SUCCESS, DKIM SUCCESS (Easy DKIM, RSA 2048).
+- SPF on conora.com.br: v=spf1 include:amazonses.com ~all.
+- DMARC: v=DMARC1; p=none; rua=mailto:dmarc@conora.com.br.
+- Custom MAIL FROM: mail.conora.com.br (MX to feedback-smtp.sa-east-1.amazonses.com, SPF on that host).
 
-2) Automatic bounce and complaint handling
-- SES Bounce and Complaint notifications for the verified domain conora.com.br go to SNS topic conora-dev-ses-feedback.
-- An HTTPS subscriber at https://api.conora.com.br/webhooks/ses processes those events and adds the recipient to our application suppression list (email_suppressions).
-- Our SMTP sender refuses to send to suppressed addresses.
-- SES account-level suppression is enabled for BOUNCE and COMPLAINT.
-- The transactional configuration set also forwards bounce/complaint events to the same SNS topic.
+Bounce and complaint
+- Configuration set conora-dev-transactional sends Bounce and Complaint to SNS topic conora-dev-ses-feedback. Reputation metrics on that set are enabled.
+- The HTTPS subscription https://api.conora.com.br/webhooks/ses is confirmed. It stores the address in email_suppressions. The sender checks that table before every message.
+- Account suppression attributes: BOUNCE and COMPLAINT.
+- A separate topic, conora-dev-ses-alarms, alerts us before SES review thresholds (bounce 3%, complaint 0.05%).
 
-3) Use case / opt-in
-- Conora is a personal finance app for families in Brazil.
-- Users register voluntarily (form or Google/Apple). We send only transactional mail (welcome, family invites, LGPD confirmation) to addresses they supplied. No marketing.
-- Expected volume: 100-500 messages/day. SPF, DKIM and DMARC are configured for conora.com.br.
+Public pages
+- https://conora.com.br/
+- https://conora.com.br/privacidade
+- https://conora.com.br/termos
+- The app itself is at https://conora.com.br/app/
 
-Please let us know if any additional detail is required.
+Please tell us if anything else is missing for production access.
 
 Thank you,
 Flavio Barbosa
-flavio@redfivesistemas.com.br / flavio@elroy.com.br
+flavio@elroy.com.br
+flavio@redfivesistemas.com.br
 "@.Trim()
 
 Write-Host ''

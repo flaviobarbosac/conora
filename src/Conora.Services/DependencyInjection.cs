@@ -8,6 +8,7 @@ public static class DependencyInjection
     {
         services.AddScoped<UserService>();
         services.AddScoped<AuditService>();
+        services.AddScoped<ConsoleService>();
         services.AddScoped<AuthService>();
         services.AddScoped<LgpdService>();
 

@@ -21,6 +21,7 @@ public sealed class AuthService
     private readonly IPasswordHasher _passwords;
     private readonly ITokenService _tokens;
     private readonly IGoogleTokenValidator _google;
+    private readonly IAppleTokenValidator _apple;
     private readonly IEmailSender _email;
     private readonly IConfiguration _config;
     private readonly CategoryService _categories;
@@ -36,6 +37,7 @@ public sealed class AuthService
         IPasswordHasher passwords,
         ITokenService tokens,
         IGoogleTokenValidator google,
+        IAppleTokenValidator apple,
         IEmailSender email,
         IConfiguration config,
         CategoryService categories,
@@ -50,6 +52,7 @@ public sealed class AuthService
         _passwords = passwords;
         _tokens = tokens;
         _google = google;
+        _apple = apple;
         _email = email;
         _config = config;
         _categories = categories;
@@ -112,6 +115,36 @@ public sealed class AuthService
             user.SetGoogleId(identity.GoogleId);
 
         return await IssueForExistingUserAsync(user, "UserGoogleLoggedIn", ct);
+    }
+
+    public async Task<AuthResponse> AppleAsync(AppleLoginRequest request, CancellationToken ct)
+    {
+        var identity = await _apple.ValidateAsync(request.IdentityToken, ct);
+        var email = !string.IsNullOrWhiteSpace(identity.Email)
+            ? identity.Email
+            : request.Email?.Trim().ToLowerInvariant();
+
+        if (!string.IsNullOrWhiteSpace(identity.Email) && !identity.EmailVerified)
+            throw new InvalidTokenException();
+
+        var user = await _users.FindByAppleIdAsync(identity.AppleId, ct)
+                   ?? (string.IsNullOrWhiteSpace(email) ? null : await _users.FindByEmailAsync(email, ct));
+
+        if (user is null)
+        {
+            if (string.IsNullOrWhiteSpace(email))
+                throw new ValidationException("email", "Não foi possível obter o e-mail da Apple. Autorize o compartilhamento de e-mail.");
+
+            var name = string.IsNullOrWhiteSpace(request.Name) ? email : request.Name.Trim();
+            user = User.Create(name, email);
+            user.SetAppleId(identity.AppleId);
+            return await IssueForNewUserAsync(user, "UserAppleRegistered", ct);
+        }
+
+        if (string.IsNullOrEmpty(user.AppleId))
+            user.SetAppleId(identity.AppleId);
+
+        return await IssueForExistingUserAsync(user, "UserAppleLoggedIn", ct);
     }
 
     public async Task<AuthResponse> RefreshAsync(RefreshRequest request, CancellationToken ct)

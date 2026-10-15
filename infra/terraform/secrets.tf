@@ -4,6 +4,8 @@ resource "random_password" "jwt" {
 }
 
 locals {
+  use_brevo = var.brevo_smtp_login != ""
+
   # Npgsql connection string (ConnectionStrings:Postgres)
   db_connection_string = join("", [
     "Host=", aws_db_instance.main.address,
@@ -23,17 +25,31 @@ locals {
     google = {
       clientId = var.google_client_id
     }
+    apple = {
+      clientId   = var.apple_client_id
+      servicesId = var.apple_services_id
+    }
     gemini = {
       apiKey = var.gemini_api_key
       model  = var.gemini_model
     }
-    email = {
-      from     = var.ses_from
-      smtpHost = local.ses_smtp_host
-      smtpPort = 587
-      user     = aws_iam_access_key.ses_smtp.id
-      password = aws_iam_access_key.ses_smtp.ses_smtp_password_v4
-      useSsl   = true
+    # Brevo when its SMTP login is set; SES otherwise (kept for rollback).
+    email = local.use_brevo ? {
+      from             = var.ses_from
+      smtpHost         = "smtp-relay.brevo.com"
+      smtpPort         = 587
+      user             = var.brevo_smtp_login
+      password         = var.brevo_smtp_key
+      useSsl           = true
+      configurationSet = ""
+      } : {
+      from             = var.ses_from
+      smtpHost         = local.ses_smtp_host
+      smtpPort         = 587
+      user             = aws_iam_access_key.ses_smtp.id
+      password         = aws_iam_access_key.ses_smtp.ses_smtp_password_v4
+      useSsl           = true
+      configurationSet = "${var.project}-${var.environment}-transactional"
     }
     whatsapp = {
       verifyToken   = var.whatsapp_verify_token

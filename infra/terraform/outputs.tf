@@ -104,6 +104,14 @@ output "ses_dmarc_txt" {
   }
 }
 
+output "ses_mail_from" {
+  value = {
+    domain = aws_ses_domain_mail_from.main.mail_from_domain
+    mx     = "10 feedback-smtp.${var.aws_region}.amazonses.com"
+    spf    = "v=spf1 include:amazonses.com ~all"
+  }
+}
+
 output "ses_smtp_endpoint" {
   value = local.ses_smtp_host
 }

@@ -22,6 +22,9 @@ public static class AuthEndpoints
         group.MapPost("/google", async (GoogleLoginRequest request, AuthService service, CancellationToken ct) =>
             Results.Ok(await service.GoogleAsync(request, ct)));
 
+        group.MapPost("/apple", async (AppleLoginRequest request, AuthService service, CancellationToken ct) =>
+            Results.Ok(await service.AppleAsync(request, ct)));
+
         group.MapPost("/refresh", async (RefreshRequest request, AuthService service, CancellationToken ct) =>
             Results.Ok(await service.RefreshAsync(request, ct)));
 

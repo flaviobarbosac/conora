@@ -27,6 +27,7 @@ public sealed class FamilyGroupService
     private readonly ICorrelationContext _correlation;
     private readonly ILogger<FamilyGroupService> _logger;
     private readonly CategoryService _categories;
+    private readonly PlanService _plan;
 
     public FamilyGroupService(
         IFamilyGroupRepository family,
@@ -39,8 +40,10 @@ public sealed class FamilyGroupService
         IAuditEventRepository audits,
         ICorrelationContext correlation,
         ILogger<FamilyGroupService> logger,
-        CategoryService categories)
+        CategoryService categories,
+        PlanService plan)
     {
+        _plan = plan;
         _family = family;
         _repo = repo;
         _uow = uow;
@@ -253,6 +256,8 @@ public sealed class FamilyGroupService
             throw new ValidationException("email", "Você não pode convidar a si mesmo.");
 
         var membership = await _family.FindActiveMembershipAsync(self, ct);
+        var now = DateTime.UtcNow;
+        int extraPeople;
         if (membership is not null)
         {
             var group = await _family.GetGroupAsync(membership.FamilyGroupId, ct)
@@ -263,7 +268,17 @@ public sealed class FamilyGroupService
             var count = await _family.CountActiveMembersAsync(membership.FamilyGroupId, ct);
             if (count >= FamilyGroup.MaxMembers)
                 throw new ValidationException("email", $"O grupo já tem {FamilyGroup.MaxMembers} membros.");
+
+            var openInvites = await _family.ListOpenInvitesByGroupAsync(membership.FamilyGroupId, ct);
+            extraPeople = count - 1 + openInvites.Count(i => i.ExpiresAt > now);
         }
+        else
+        {
+            var openInvites = await _family.ListInvitesByInviterAsync(self, ct);
+            extraPeople = openInvites.Count(i => i.ExpiresAt > now);
+        }
+
+        await _plan.EnsureCanAddFamilyMemberAsync(extraPeople, ct);
 
         var invitee = await _family.FindUserByEmailAsync(email, ct);
         if (invitee is not null)
@@ -553,31 +568,50 @@ public sealed class FamilyGroupService
 
     public async Task<FamilyGroupResponse> AcceptOwnerTransferAsync(string token, CancellationToken ct)
     {
+        await _uow.ExecuteInTransactionAsync(innerCt => CompleteOwnerTransferAsync(token, innerCt), ct);
+        return await GetGroupAsync(ct);
+    }
+
+    private async Task CompleteOwnerTransferAsync(string token, CancellationToken ct)
+    {
         var self = RequireUserId();
         var transfer = await _family.FindOwnerTransferByTokenAsync(token, ct, track: true)
                        ?? throw new ValidationException("token", "Transferência inválida.");
+        var wasOpen = transfer.IsOpen;
         transfer.Accept(self);
 
         var group = await _family.GetGroupAsync(transfer.FamilyGroupId, ct)
                     ?? throw new ValidationException("token", "Grupo não encontrado.");
-        if (!group.IsBudgetOwner(transfer.FromUsuarioId))
-            throw new ValidationException("token", "O solicitante não é mais o responsável.");
+        var members = await _family.ListActiveMembersAsync(group.Id, ct);
+        if (members.All(m => m.UsuarioId != self))
+            throw new ValidationException("token", "Você não faz mais parte deste grupo.");
 
-        await CopyOwnerBudgetsAsync(transfer.FromUsuarioId, self, ct);
-        group.TransferBudgetOwner(self);
-        var openInvites = await _family.ListOpenInvitesByGroupAsync(group.Id, ct);
-        foreach (var invite in openInvites)
-            invite.Cancel();
+        if (!group.IsBudgetOwner(self))
+        {
+            if (!group.IsBudgetOwner(transfer.FromUsuarioId))
+                throw new ValidationException("token", "O solicitante não é mais o responsável.");
 
-        _family.AddNotice(FamilyNotice.Create(
-            transfer.FromUsuarioId,
-            "OwnerTransferAccepted",
-            "A transferência do orçamento familiar foi aceita."));
+            group.TransferBudgetOwner(self);
+            await CopyOwnerBudgetsAsync(transfer.FromUsuarioId, self, ct);
+            await _repo.ReassignCategoryCreatorAsync(transfer.FromUsuarioId, self, ct);
 
-        AuditRecorder.Record(_audits, _correlation, "FamilyOwnerTransfer", transfer.Id, "OwnerTransferAccepted",
-            new { transfer.FromUsuarioId, to = self });
+            var openInvites = await _family.ListOpenInvitesByGroupAsync(group.Id, ct);
+            foreach (var invite in openInvites)
+                invite.ReassignInviter(self);
+        }
+
+        if (wasOpen)
+        {
+            _family.AddNotice(FamilyNotice.Create(
+                transfer.FromUsuarioId,
+                "OwnerTransferAccepted",
+                "A transferência do orçamento familiar foi aceita."));
+
+            AuditRecorder.Record(_audits, _correlation, "FamilyOwnerTransfer", transfer.Id, "OwnerTransferAccepted",
+                new { transfer.FromUsuarioId, to = self });
+        }
+
         await _uow.SaveChangesAsync(ct);
-        return await GetGroupAsync(ct);
     }
 
     public async Task MarkNoticeReadAsync(Guid noticeId, CancellationToken ct)
@@ -667,9 +701,14 @@ public sealed class FamilyGroupService
             .Where(c => !string.IsNullOrWhiteSpace(c.Code))
             .GroupBy(c => c.Code!, StringComparer.OrdinalIgnoreCase)
             .ToDictionary(g => g.Key, g => g.First(), StringComparer.OrdinalIgnoreCase);
+        var toByFamilyKey = toCategories
+            .Where(c => c.FamilyKey is not null)
+            .GroupBy(c => c.FamilyKey!.Value)
+            .ToDictionary(g => g.Key, g => g.First());
         var toByName = toCategories
             .GroupBy(c => c.Name, StringComparer.OrdinalIgnoreCase)
             .ToDictionary(g => g.Key, g => g.First(), StringComparer.OrdinalIgnoreCase);
+        var stagedLines = new Dictionary<(Guid BudgetId, Guid CategoryId), BudgetLine>();
 
         foreach (var fromBudget in fromBudgets)
         {
@@ -684,7 +723,10 @@ public sealed class FamilyGroupService
             {
                 toBudget = Budget.Create(fromBudget.CompetenceYm, fromBudget.Mode);
                 _repo.Add(toBudget);
-                await _uow.SaveChangesAsync(ct);
+            }
+            else
+            {
+                toBudget.SetMode(fromBudget.Mode);
             }
 
             var fromCategories = await _repo.ListForUsuariosAsync<Category>(
@@ -695,19 +737,36 @@ public sealed class FamilyGroupService
                 var fromCat = fromCategories.FirstOrDefault(c => c.Id == line.CategoryId);
                 if (fromCat is null)
                     continue;
+
                 Category? toCat = null;
                 if (!string.IsNullOrWhiteSpace(fromCat.Code))
                     toByCode.TryGetValue(fromCat.Code, out toCat);
+                if (toCat is null && fromCat.FamilyKey is Guid familyKey)
+                    toByFamilyKey.TryGetValue(familyKey, out toCat);
                 toCat ??= toByName.GetValueOrDefault(fromCat.Name);
                 if (toCat is null)
                     continue;
 
+                var key = (toBudget.Id, toCat.Id);
+                if (stagedLines.TryGetValue(key, out var staged))
+                {
+                    staged.SetPlanned(line.PlannedAmount);
+                    continue;
+                }
+
                 var existing = await _repo.FirstOrDefaultAsync<BudgetLine>(
                     l => l.BudgetId == toBudget.Id && l.CategoryId == toCat.Id, ct, track: true);
                 if (existing is null)
-                    _repo.Add(BudgetLine.Create(toBudget.Id, toCat.Id, line.PlannedAmount));
+                {
+                    var created = BudgetLine.Create(toBudget.Id, toCat.Id, line.PlannedAmount);
+                    _repo.Add(created);
+                    stagedLines[key] = created;
+                }
                 else
+                {
                     existing.SetPlanned(line.PlannedAmount);
+                    stagedLines[key] = existing;
+                }
             }
         }
     }
