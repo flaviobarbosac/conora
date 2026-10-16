@@ -15,6 +15,7 @@ public class UserConfiguration : IEntityTypeConfiguration<User>
         builder.Property(u => u.Email).IsRequired().HasMaxLength(320);
         builder.Property(u => u.Cpf).HasMaxLength(11);
         builder.Property(u => u.PasswordHash).HasMaxLength(500);
+        builder.Property(u => u.PasswordResetTokenHash).HasMaxLength(64);
         builder.Property(u => u.GoogleId).HasMaxLength(100);
         builder.Property(u => u.AppleId).HasMaxLength(100);
         builder.Property(u => u.EmailVerified).IsRequired();
@@ -49,5 +50,10 @@ public class UserConfiguration : IEntityTypeConfiguration<User>
             .IsUnique()
             .HasFilter("\"Cpf\" IS NOT NULL AND \"DeletedAt\" IS NULL")
             .HasDatabaseName("IX_Users_Cpf");
+
+        builder.HasIndex(u => u.PasswordResetTokenHash)
+            .IsUnique()
+            .HasFilter("\"PasswordResetTokenHash\" IS NOT NULL")
+            .HasDatabaseName("IX_Users_PasswordResetTokenHash");
     }
 }

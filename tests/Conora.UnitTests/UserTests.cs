@@ -21,4 +21,21 @@ public class UserTests
     {
         Assert.Throws<ArgumentException>(() => User.Create(name, email));
     }
+
+    [Fact]
+    public void ApplyPassword_sets_local_password_and_keeps_google()
+    {
+        var user = User.Create("Ana", "ana@example.com");
+        user.SetGoogleId("google-1");
+        user.IssuePasswordReset("hash", DateTime.UtcNow.AddMinutes(30));
+
+        Assert.True(user.PasswordResetIsActive("hash"));
+
+        user.ApplyPassword("hashed-password");
+
+        Assert.Equal("hashed-password", user.PasswordHash);
+        Assert.Equal("google-1", user.GoogleId);
+        Assert.True(user.EmailVerified);
+        Assert.False(user.PasswordResetIsActive("hash"));
+    }
 }
