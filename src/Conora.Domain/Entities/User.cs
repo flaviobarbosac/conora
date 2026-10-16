@@ -10,6 +10,8 @@ public class User : ModelBase
     public string Email { get; private set; } = default!;
     public string? Cpf { get; private set; }
     public string? PasswordHash { get; private set; }
+    public string? PasswordResetTokenHash { get; private set; }
+    public DateTime? PasswordResetExpiresAtUtc { get; private set; }
     public string? GoogleId { get; private set; }
     public string? AppleId { get; private set; }
     public bool EmailVerified { get; private set; }
@@ -53,6 +55,37 @@ public class User : ModelBase
     public void SetPasswordHash(string passwordHash)
     {
         PasswordHash = passwordHash;
+    }
+
+    public void IssuePasswordReset(string tokenHash, DateTime expiresAtUtc)
+    {
+        if (string.IsNullOrWhiteSpace(tokenHash))
+            throw new ArgumentException("Token inválido.", nameof(tokenHash));
+        if (expiresAtUtc <= DateTime.UtcNow)
+            throw new ArgumentException("Prazo inválido.", nameof(expiresAtUtc));
+
+        PasswordResetTokenHash = tokenHash;
+        PasswordResetExpiresAtUtc = expiresAtUtc;
+    }
+
+    public bool PasswordResetIsActive(string tokenHash)
+        => !string.IsNullOrEmpty(PasswordResetTokenHash)
+           && string.Equals(PasswordResetTokenHash, tokenHash, StringComparison.Ordinal)
+           && PasswordResetExpiresAtUtc > DateTime.UtcNow;
+
+    /// <summary>
+    /// Sets a local password and clears the reset token. Google and Apple ids stay,
+    /// so the same account can sign in with e-mail and password afterwards.
+    /// </summary>
+    public void ApplyPassword(string passwordHash)
+    {
+        if (string.IsNullOrWhiteSpace(passwordHash))
+            throw new ArgumentException("Senha inválida.", nameof(passwordHash));
+
+        PasswordHash = passwordHash;
+        PasswordResetTokenHash = null;
+        PasswordResetExpiresAtUtc = null;
+        EmailVerified = true;
     }
 
     public void SetGoogleId(string googleId)

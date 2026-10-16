@@ -25,6 +25,18 @@ public static class AuthEndpoints
         group.MapPost("/apple", async (AppleLoginRequest request, AuthService service, CancellationToken ct) =>
             Results.Ok(await service.AppleAsync(request, ct)));
 
+        group.MapPost("/forgot-password", async (ForgotPasswordRequest request, AuthService service, CancellationToken ct) =>
+        {
+            await service.RequestPasswordResetAsync(request, ct);
+            return Results.NoContent();
+        });
+
+        group.MapPost("/reset-password", async (ResetPasswordRequest request, AuthService service, CancellationToken ct) =>
+        {
+            await service.ResetPasswordAsync(request, ct);
+            return Results.NoContent();
+        });
+
         group.MapPost("/refresh", async (RefreshRequest request, AuthService service, CancellationToken ct) =>
             Results.Ok(await service.RefreshAsync(request, ct)));
 

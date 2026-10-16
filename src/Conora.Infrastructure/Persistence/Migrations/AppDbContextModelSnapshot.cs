@@ -1512,6 +1512,13 @@ namespace Conora.Infrastructure.Persistence.Migrations
                         .HasMaxLength(500)
                         .HasColumnType("character varying(500)");
 
+                    b.Property<DateTime?>("PasswordResetExpiresAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("PasswordResetTokenHash")
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)");
+
                     b.Property<bool>("QuietMode")
                         .HasColumnType("boolean");
 
@@ -1550,6 +1557,11 @@ namespace Conora.Infrastructure.Persistence.Migrations
                         .IsUnique()
                         .HasDatabaseName("IX_Users_GoogleId")
                         .HasFilter("\"GoogleId\" IS NOT NULL AND \"DeletedAt\" IS NULL");
+
+                    b.HasIndex("PasswordResetTokenHash")
+                        .IsUnique()
+                        .HasDatabaseName("IX_Users_PasswordResetTokenHash")
+                        .HasFilter("\"PasswordResetTokenHash\" IS NOT NULL");
 
                     b.ToTable("users", (string)null);
                 });

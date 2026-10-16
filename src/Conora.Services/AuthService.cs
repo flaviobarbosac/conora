@@ -1,4 +1,5 @@
-﻿using Conora.Domain;
+﻿using System.Security.Cryptography;
+using Conora.Domain;
 using Conora.Domain.Entities;
 using Conora.Domain.Exceptions;
 using Conora.Domain.Ports;
@@ -74,24 +75,7 @@ public sealed class AuthService
 
     public async Task<AuthResponse> LoginAsync(LoginRequest request, CancellationToken ct)
     {
-        var raw = (request.Usuario ?? request.Email ?? string.Empty).Trim();
-        if (string.IsNullOrWhiteSpace(raw))
-            throw new ValidationException("usuario", "Informe CPF ou e-mail.");
-
-        User? user;
-        if (LoginIdentifier.IsEmail(raw))
-        {
-            user = await _users.FindByEmailAsync(raw.ToLowerInvariant(), ct);
-        }
-        else if (BrazilianCpf.TryNormalize(raw, out var cpf))
-        {
-            user = await _users.FindByCpfAsync(cpf, ct);
-        }
-        else
-        {
-            throw new ValidationException("usuario", "Informe um CPF ou e-mail válido.");
-        }
-
+        var user = await FindByLoginIdentifierAsync(request.Usuario ?? request.Email, ct);
         if (user is null)
             throw new InvalidCredentialsException();
 
@@ -100,7 +84,7 @@ public sealed class AuthService
             if (!string.IsNullOrEmpty(user.GoogleId) || !string.IsNullOrEmpty(user.AppleId))
                 throw new ValidationException(
                     "usuario",
-                    "Esta conta entra com Google ou Apple. Use o botão correspondente.");
+                    "Esta conta ainda não tem senha. Use Esqueci a senha para criar uma, ou entre com Google ou Apple.");
             throw new InvalidCredentialsException();
         }
 
@@ -170,6 +154,75 @@ public sealed class AuthService
         _tenant.Set(stored.UsuarioId);
         var user = await _users.GetByIdAsync(stored.UsuarioId, ct) ?? throw new InvalidTokenException();
         return await IssueForExistingUserAsync(user, "TokenRefreshed", ct);
+    }
+
+    public async Task RequestPasswordResetAsync(ForgotPasswordRequest request, CancellationToken ct)
+    {
+        var user = await FindByLoginIdentifierAsync(request.Usuario, ct);
+        if (user is null)
+            return;
+
+        var token = Convert.ToHexString(RandomNumberGenerator.GetBytes(32));
+        user.IssuePasswordReset(_tokens.HashRefreshToken(token), DateTime.UtcNow.AddMinutes(30));
+        _tenant.Set(user.Id);
+        AuditRecorder.Record(_audits, _correlation, "User", user.Id, "PasswordResetRequested", new { user.Email });
+        await _uow.SaveChangesAsync(ct);
+
+        var link = $"{PublicWebBase()}/app/redefinir-senha?token={token}";
+        try
+        {
+            await _email.SendAsync(user.Email, "Redefinir senha do Conora", new EmailContent(
+                "Defina sua senha",
+                [
+                    "Recebemos um pedido para criar ou trocar a senha desta conta.",
+                    "O link vale também para quem entrou com Google ou Apple. A senha nova passa a funcionar junto com o botão que você já usa."
+                ])
+            {
+                Preheader = "Link para definir a senha da sua conta Conora. Vale por 30 minutos.",
+                ActionLabel = "Definir senha",
+                ActionUrl = link,
+                Note = "O link expira em 30 minutos. Se você não pediu, ignore este e-mail."
+            }, ct);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "Password reset email failed for {Email}.", user.Email);
+        }
+    }
+
+    public async Task ResetPasswordAsync(ResetPasswordRequest request, CancellationToken ct)
+    {
+        if (string.IsNullOrWhiteSpace(request.Password) || request.Password.Length < 8)
+            throw new ValidationException("password", "Senha deve ter no mínimo 8 caracteres.");
+
+        if (string.IsNullOrWhiteSpace(request.Token))
+            throw new ValidationException("token", "Link inválido ou expirado. Peça outro em Esqueci a senha.");
+
+        var tokenHash = _tokens.HashRefreshToken(request.Token.Trim());
+        var user = await _users.FindByPasswordResetHashAsync(tokenHash, ct);
+        if (user is null || !user.PasswordResetIsActive(tokenHash))
+            throw new ValidationException("token", "Link inválido ou expirado. Peça outro em Esqueci a senha.");
+
+        user.ApplyPassword(_passwords.Hash(request.Password));
+        _tenant.Set(user.Id);
+        await _refreshTokens.RevokeAllForUserAsync(ct);
+        AuditRecorder.Record(_audits, _correlation, "User", user.Id, "PasswordResetCompleted", new { user.Email });
+        await _uow.SaveChangesAsync(ct);
+    }
+
+    private async Task<User?> FindByLoginIdentifierAsync(string? rawValue, CancellationToken ct)
+    {
+        var raw = (rawValue ?? string.Empty).Trim();
+        if (string.IsNullOrWhiteSpace(raw))
+            throw new ValidationException("usuario", "Informe CPF ou e-mail.");
+
+        if (LoginIdentifier.IsEmail(raw))
+            return await _users.FindByEmailAsync(raw.ToLowerInvariant(), ct);
+
+        if (BrazilianCpf.TryNormalize(raw, out var cpf))
+            return await _users.FindByCpfAsync(cpf, ct);
+
+        throw new ValidationException("usuario", "Informe um CPF ou e-mail válido.");
     }
 
     public async Task LogoutAsync(CancellationToken ct)
