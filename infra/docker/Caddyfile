@@ -6,6 +6,14 @@
 conora.com.br, www.conora.com.br {
 	encode zstd gzip
 
+	handle /privacidade/ {
+		redir /privacidade permanent
+	}
+
+	handle /termos/ {
+		redir /termos permanent
+	}
+
 	handle /privacidade {
 		root * /srv/public
 		rewrite * /privacidade.html
