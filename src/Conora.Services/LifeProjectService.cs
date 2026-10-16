@@ -103,6 +103,16 @@ public sealed class LifeProjectService
         if (project.UsuarioId != self)
             throw new ForbiddenException("Só o dono pode editar o projeto.");
 
+        if (decimal.Round(request.GoalAmount, 2) != project.GoalAmount
+            || Competence.From(request.DueDate) != Competence.From(project.DueDate)
+            || Competence.Require(request.ContributionStartYm, "contributionStartYm") != project.ContributionStartYm
+            || request.CategoryId != project.CategoryId)
+        {
+            throw new ValidationException(
+                "goalAmount",
+                "Meta, prazo, início do aporte e conta não podem mudar depois da criação. O previsto vem do rateio no orçamento.");
+        }
+
         if (request.Scope == LifeProjectScope.Group)
         {
             var peers = await _family.GetReadableUsuarioIdsAsync(ct);
@@ -110,21 +120,15 @@ public sealed class LifeProjectService
                 throw new ValidationException("scope", "Sem grupo ativo não dá para marcar o projeto como do grupo.");
         }
 
-        var categoryId = await RequireLifeProjectAccountAsync(request.CategoryId, ct);
-        EnsureContributionWindow(request.ContributionStartYm, request.DueDate, project.ContributionStartYm);
-        var previousAccountId = project.CategoryId;
-        var previousMonths = MonthsOf(project);
         project.Update(
             request.Name,
-            decimal.Round(request.GoalAmount, 2),
-            request.DueDate,
-            request.ContributionStartYm,
-            categoryId,
+            project.GoalAmount,
+            project.DueDate,
+            project.ContributionStartYm,
+            project.CategoryId,
             request.Scope,
             request.DetailedDescription);
         await _uow.SaveChangesAsync(ct);
-        await RebuildBudgetForAccountAsync(previousAccountId, previousMonths, ct);
-        await RebuildBudgetForAccountAsync(project.CategoryId, MonthsOf(project), ct);
         return await GetAsync(id, ct);
     }
 
@@ -278,8 +282,15 @@ public sealed class LifeProjectService
             if (months.Count == 0)
                 continue;
             var parcel = decimal.Round(item.GoalAmount / months.Count, 2);
-            foreach (var ym in months)
-                plannedByMonth[ym] = plannedByMonth.GetValueOrDefault(ym) + parcel;
+            var allocated = 0m;
+            for (var i = 0; i < months.Count; i++)
+            {
+                var value = i == months.Count - 1
+                    ? item.GoalAmount - allocated
+                    : parcel;
+                allocated += value;
+                plannedByMonth[months[i]] = plannedByMonth.GetValueOrDefault(months[i]) + value;
+            }
         }
 
         var allMonths = (seedMonths ?? []).Concat(plannedByMonth.Keys).Distinct().OrderBy(m => m).ToList();

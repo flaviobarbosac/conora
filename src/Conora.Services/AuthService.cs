@@ -92,7 +92,19 @@ public sealed class AuthService
             throw new ValidationException("usuario", "Informe um CPF ou e-mail válido.");
         }
 
-        if (user is null || string.IsNullOrEmpty(user.PasswordHash) || !_passwords.Verify(request.Password, user.PasswordHash))
+        if (user is null)
+            throw new InvalidCredentialsException();
+
+        if (string.IsNullOrEmpty(user.PasswordHash))
+        {
+            if (!string.IsNullOrEmpty(user.GoogleId) || !string.IsNullOrEmpty(user.AppleId))
+                throw new ValidationException(
+                    "usuario",
+                    "Esta conta entra com Google ou Apple. Use o botão correspondente.");
+            throw new InvalidCredentialsException();
+        }
+
+        if (!_passwords.Verify(request.Password, user.PasswordHash))
             throw new InvalidCredentialsException();
 
         return await IssueForExistingUserAsync(user, "UserLoggedIn", ct);

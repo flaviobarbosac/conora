@@ -19,6 +19,12 @@ public sealed record FamilyInviteResponse(
     DateTime? CancelledAt,
     bool IsOpen);
 
+public sealed record FamilyQrInviteResponse(
+    Guid Id,
+    string Token,
+    DateTime ExpiresAt,
+    string JoinUrl);
+
 public sealed record FamilyInvitePreviewResponse(
     string Status,
     string InviterName,
