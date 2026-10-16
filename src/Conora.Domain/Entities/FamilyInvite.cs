@@ -6,6 +6,7 @@ public class FamilyInvite : ModelBase
 {
     public Guid InviterUsuarioId { get; private set; }
     public Guid? FamilyGroupId { get; private set; }
+    /// <summary>Empty for QR invites (presence join); e-mail invites store the invitee address.</summary>
     public string Email { get; private set; } = default!;
     public string Token { get; private set; } = default!;
     public DateTime ExpiresAt { get; private set; }
@@ -27,10 +28,24 @@ public class FamilyInvite : ModelBase
             InviterUsuarioId = inviterUsuarioId,
             FamilyGroupId = familyGroupId,
             Email = email.Trim().ToLowerInvariant(),
-            Token = Convert.ToHexString(Guid.CreateVersion7().ToByteArray()) + Convert.ToHexString(Guid.CreateVersion7().ToByteArray()),
+            Token = NewToken(),
             ExpiresAt = DateTime.UtcNow.Add(ttl)
         };
     }
+
+    public static FamilyInvite CreateQr(Guid inviterUsuarioId, Guid? familyGroupId, TimeSpan ttl)
+    {
+        return new FamilyInvite
+        {
+            InviterUsuarioId = inviterUsuarioId,
+            FamilyGroupId = familyGroupId,
+            Email = string.Empty,
+            Token = NewToken(),
+            ExpiresAt = DateTime.UtcNow.Add(ttl)
+        };
+    }
+
+    public bool IsQrInvite => string.IsNullOrEmpty(Email);
 
     public void BindGroup(Guid familyGroupId) => FamilyGroupId = familyGroupId;
 
@@ -57,4 +72,7 @@ public class FamilyInvite : ModelBase
     }
 
     public bool IsOpen => AcceptedAt is null && CancelledAt is null && ExpiresAt > DateTime.UtcNow;
+
+    private static string NewToken()
+        => Convert.ToHexString(Guid.CreateVersion7().ToByteArray()) + Convert.ToHexString(Guid.CreateVersion7().ToByteArray());
 }

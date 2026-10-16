@@ -14,6 +14,7 @@ namespace Conora.Services;
 public sealed class FamilyGroupService
 {
     private static readonly TimeSpan InviteTtl = TimeSpan.FromDays(7);
+    private static readonly TimeSpan QrInviteTtl = TimeSpan.FromMinutes(10);
     private static readonly TimeSpan OwnerTransferTtl = TimeSpan.FromDays(7);
 
     private readonly IFamilyGroupRepository _family;
@@ -294,8 +295,7 @@ public sealed class FamilyGroupService
         var invite = FamilyInvite.Create(self, email, membership?.FamilyGroupId, InviteTtl);
         _family.AddInvite(invite);
 
-        var returnTo = Uri.EscapeDataString($"/grupo/convite/{invite.Token}");
-        var link = $"{PublicWebBase()}/app/register?email={Uri.EscapeDataString(email)}&returnTo={returnTo}";
+        var link = $"{PublicWebBase()}/app/grupo/convite/{invite.Token}";
         try
         {
             await _email.SendAsync(
@@ -305,7 +305,7 @@ public sealed class FamilyGroupService
                     $"{me.Name} convidou você",
                     [
                         $"{me.Name} convidou você para compartilhar o orçamento familiar no Conora.",
-                        "Crie sua conta com este mesmo e-mail, ou entre se já tiver conta e abra o convite."
+                        "Abra o link, entre se já tiver conta ou crie com este mesmo e-mail."
                     ])
                 {
                     Preheader = "Convite para o grupo familiar no Conora.",
@@ -323,6 +323,49 @@ public sealed class FamilyGroupService
         AuditRecorder.Record(_audits, _correlation, "FamilyInvite", invite.Id, "FamilyInviteSent", new { email });
         await _uow.SaveChangesAsync(ct);
         return ToInvite(invite);
+    }
+
+    public async Task<FamilyQrInviteResponse> CreateQrInviteAsync(CancellationToken ct)
+    {
+        var self = RequireUserId();
+        var membership = await _family.FindActiveMembershipAsync(self, ct);
+        var now = DateTime.UtcNow;
+        int extraPeople;
+        if (membership is not null)
+        {
+            var group = await _family.GetGroupAsync(membership.FamilyGroupId, ct)
+                        ?? throw new ValidationException("group", "Grupo não encontrado.");
+            if (!group.IsBudgetOwner(self))
+                throw new ForbiddenException("Só o responsável pelo orçamento gera o QR do grupo.");
+
+            var count = await _family.CountActiveMembersAsync(group.Id, ct);
+            if (count >= FamilyGroup.MaxMembers)
+                throw new ValidationException("group", $"O grupo já tem {FamilyGroup.MaxMembers} membros.");
+
+            var openInvites = await _family.ListOpenInvitesByGroupAsync(membership.FamilyGroupId, ct);
+            extraPeople = count - 1 + openInvites.Count(i => i.ExpiresAt > now && !i.IsQrInvite);
+        }
+        else
+        {
+            var openInvites = await _family.ListInvitesByInviterAsync(self, ct);
+            extraPeople = openInvites.Count(i => i.ExpiresAt > now && i.IsOpen && !i.IsQrInvite);
+        }
+
+        await _plan.EnsureCanAddFamilyMemberAsync(extraPeople, ct);
+
+        var openQr = (await _family.ListInvitesByInviterAsync(self, ct))
+            .Where(i => i.IsOpen && i.IsQrInvite)
+            .ToList();
+        foreach (var previous in openQr)
+            previous.Cancel();
+
+        var invite = FamilyInvite.CreateQr(self, membership?.FamilyGroupId, QrInviteTtl);
+        _family.AddInvite(invite);
+        AuditRecorder.Record(_audits, _correlation, "FamilyInvite", invite.Id, "FamilyQrInviteCreated", null);
+        await _uow.SaveChangesAsync(ct);
+
+        var joinUrl = $"{PublicWebBase()}/app/grupo/convite/{invite.Token}";
+        return new FamilyQrInviteResponse(invite.Id, invite.Token, invite.ExpiresAt, joinUrl);
     }
 
     public async Task CancelInviteAsync(Guid inviteId, CancellationToken ct)
@@ -369,7 +412,8 @@ public sealed class FamilyGroupService
             throw new ValidationException("token", "Este convite expirou.");
         if (invite.AcceptedAt is not null)
             throw new ValidationException("token", "Este convite já foi usado.");
-        if (!string.Equals(user.Email, invite.Email, StringComparison.OrdinalIgnoreCase))
+        if (!invite.IsQrInvite
+            && !string.Equals(user.Email, invite.Email, StringComparison.OrdinalIgnoreCase))
             throw new ValidationException("token", "Entre com o e-mail convidado para aceitar.");
 
         var existing = await _family.FindActiveMembershipAsync(self, ct);

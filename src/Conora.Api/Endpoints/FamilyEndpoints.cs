@@ -31,6 +31,9 @@ public static class FamilyEndpoints
         group.MapPost("/invites", async (FamilyInviteRequest request, FamilyGroupService service, CancellationToken ct) =>
             Results.Ok(await service.InviteAsync(request, ct)));
 
+        group.MapPost("/invites/qr", async (FamilyGroupService service, CancellationToken ct) =>
+            Results.Ok(await service.CreateQrInviteAsync(ct)));
+
         group.MapDelete("/invites/{id:guid}", async (Guid id, FamilyGroupService service, CancellationToken ct) =>
         {
             await service.CancelInviteAsync(id, ct);

@@ -369,6 +369,7 @@ public sealed class BudgetService
             var account = await _categories.RequireAnalyticalAsync(input.CategoryId, ct);
             if (!BudgetSections.Contains(account.Section))
                 throw new ValidationException("lines", $"A conta '{account.Name}' não aceita orçamento (somente receita e despesa).");
+            await EnsureManualPlanAllowedAsync(input.CategoryId, account, ct);
 
             await SetLineAsync(budget, input.CategoryId, decimal.Round(input.PlannedAmount, 2), ct);
         }
@@ -387,6 +388,7 @@ public sealed class BudgetService
 
         var ym = Competence.Require(competenceYm);
         await _months.EnsureOpenAsync(ym, ct);
+        await EnsureManualPlanAllowedAsync(categoryId, account, ct);
 
         var budget = await _repo.FirstOrDefaultAsync<Budget>(b => b.CompetenceYm == ym, ct)
                      ?? throw new NotFoundException($"Orçamento de {ym} não encontrado.");
@@ -480,6 +482,8 @@ public sealed class BudgetService
         {
             if (!overwrite && await GetPlannedAsync(budget.Id, line.CategoryId, ct) > 0)
                 continue;
+            if (await HasLifeProjectAsync(line.CategoryId, ct))
+                continue;
             await SetLineAsync(budget, line.CategoryId, line.PlannedAmount, ct);
         }
 
@@ -498,6 +502,7 @@ public sealed class BudgetService
         var account = await _categories.RequireAnalyticalAsync(request.CategoryId, ct);
         if (!BudgetSections.Contains(account.Section))
             throw new ValidationException("categoryId", $"A conta '{account.Name}' não aceita orçamento.");
+        await EnsureManualPlanAllowedAsync(request.CategoryId, account, ct);
 
         await _months.EnsureOpenAsync(startYm, ct);
         var startBudget = await GetOrCreateBudgetAsync(startYm, BudgetMode.Detailed, ct);
@@ -540,6 +545,7 @@ public sealed class BudgetService
         var account = await _categories.RequireAnalyticalAsync(request.CategoryId, ct);
         if (!BudgetSections.Contains(account.Section))
             throw new ValidationException("categoryId", $"A conta '{account.Name}' não aceita orçamento.");
+        await EnsureManualPlanAllowedAsync(request.CategoryId, account, ct);
 
         var total = decimal.Round(request.TotalAmount, 2);
         var each = decimal.Round(total / request.InstallmentCount, 2);
@@ -752,6 +758,19 @@ public sealed class BudgetService
                      (e.CategoryId != null && allowedCategoryIds.Contains(e.CategoryId.Value))
                      || e.CategoryId == null),
             e => e.Amount, ct);
+    }
+
+    private Task<bool> HasLifeProjectAsync(Guid categoryId, CancellationToken ct)
+        => _repo.AnyAsync<LifeProject>(p => p.CategoryId == categoryId, ct);
+
+    private async Task EnsureManualPlanAllowedAsync(Guid categoryId, Category account, CancellationToken ct)
+    {
+        if (account.Section != CategorySection.LifeProject)
+            return;
+        if (await HasLifeProjectAsync(categoryId, ct))
+            throw new ValidationException(
+                "categoryId",
+                "O previsto desta conta vem do projeto de vida. Crie o projeto pela conta ou apague o projeto para liberar o valor.");
     }
 
     private static CategoryResponse ToResponse(Category c)
