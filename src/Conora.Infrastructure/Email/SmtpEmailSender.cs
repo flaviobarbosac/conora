@@ -39,7 +39,7 @@ public sealed class SmtpEmailSender : IEmailSender
         }
 
         var port = int.TryParse(_configuration["Email:SmtpPort"], out var parsed) ? parsed : 587;
-        var from = _configuration["Email:From"] ?? "noreply@localhost";
+        var from = ResolveFrom(_configuration["Email:From"]);
         var configurationSet = _configuration["Email:ConfigurationSet"];
 
         using var client = new SmtpClient(host, port)
@@ -51,17 +51,33 @@ public sealed class SmtpEmailSender : IEmailSender
         };
 
         var renderer = CreateRenderer();
-        using var message = new MailMessage(from, to, subject, renderer.RenderText(content))
+        using var message = new MailMessage
         {
+            From = from,
+            Sender = from,
+            Subject = subject,
+            Body = renderer.RenderText(content),
             SubjectEncoding = Encoding.UTF8,
             BodyEncoding = Encoding.UTF8
         };
+        message.To.Add(to);
+        message.ReplyToList.Add(from);
         message.AlternateViews.Add(
             AlternateView.CreateAlternateViewFromString(renderer.RenderHtml(content), Encoding.UTF8, "text/html"));
         if (!string.IsNullOrWhiteSpace(configurationSet))
             message.Headers.Add("X-SES-CONFIGURATION-SET", configurationSet);
 
         await client.SendMailAsync(message, ct);
+    }
+
+    private static MailAddress ResolveFrom(string? configured)
+    {
+        const string noreply = "noreply@conora.com.br";
+        var address = string.IsNullOrWhiteSpace(configured) ? noreply : configured.Trim();
+        if (address.EndsWith("@localhost", StringComparison.OrdinalIgnoreCase))
+            address = noreply;
+
+        return new MailAddress(address, "Conora");
     }
 
     private EmailLayoutRenderer CreateRenderer()

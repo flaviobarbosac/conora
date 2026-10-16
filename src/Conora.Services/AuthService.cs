@@ -187,6 +187,7 @@ public sealed class AuthService
         catch (Exception ex)
         {
             _logger.LogWarning(ex, "Password reset email failed for {Email}.", user.Email);
+            throw new ValidationException("usuario", "Não foi possível enviar o e-mail. Tente de novo.");
         }
     }
 
