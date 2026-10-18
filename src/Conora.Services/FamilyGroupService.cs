@@ -795,6 +795,7 @@ public sealed class FamilyGroupService
                 if (stagedLines.TryGetValue(key, out var staged))
                 {
                     staged.SetPlanned(line.PlannedAmount);
+                    staged.SetExpenseDay(line.ExpenseDay);
                     continue;
                 }
 
@@ -802,13 +803,14 @@ public sealed class FamilyGroupService
                     l => l.BudgetId == toBudget.Id && l.CategoryId == toCat.Id, ct, track: true);
                 if (existing is null)
                 {
-                    var created = BudgetLine.Create(toBudget.Id, toCat.Id, line.PlannedAmount);
+                    var created = BudgetLine.Create(toBudget.Id, toCat.Id, line.PlannedAmount, line.ExpenseDay);
                     _repo.Add(created);
                     stagedLines[key] = created;
                 }
                 else
                 {
                     existing.SetPlanned(line.PlannedAmount);
+                    existing.SetExpenseDay(line.ExpenseDay);
                     stagedLines[key] = existing;
                 }
             }

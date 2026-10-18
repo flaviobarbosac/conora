@@ -15,4 +15,7 @@ public interface IGeminiClient
         ReadOnlyMemory<byte> imageBytes,
         string mimeType,
         CancellationToken ct);
+
+    /// <summary>Spoken reply as a WAV clip, or null when speech is unavailable.</summary>
+    Task<byte[]?> SpeakAsync(string text, string voiceName, CancellationToken ct);
 }

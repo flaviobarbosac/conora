@@ -15,6 +15,17 @@ public static class AiEndpoints
         group.MapPost("/ian", async (IanAskRequest request, IanReportService service, CancellationToken ct) =>
             Results.Ok(await service.AskAsync(request, ct)));
 
+        group.MapPost("/voice", async (VoiceCommandRequest request, VoiceCommandService service, CancellationToken ct) =>
+            Results.Ok(await service.ClassifyAsync(request, ct)));
+
+        group.MapPost("/speak", async (SpeakRequest request, VoiceCommandService service, CancellationToken ct) =>
+        {
+            var wav = await service.SpeakAsync(request.Text ?? string.Empty, request.Voice, ct);
+            return wav is { Length: > 44 }
+                ? Results.File(wav, "audio/wav")
+                : Results.NoContent();
+        });
+
         group.MapPost("/ian/analyze", async (IanAnalyzeRequest request, IanReportService service, CancellationToken ct) =>
             Results.Ok(await service.AnalyzeAsync(request, ct)));
 

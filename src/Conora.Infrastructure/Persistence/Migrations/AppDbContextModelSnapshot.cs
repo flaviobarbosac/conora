@@ -212,6 +212,9 @@ namespace Conora.Infrastructure.Persistence.Migrations
                     b.Property<DateTime?>("DeletedAt")
                         .HasColumnType("timestamp with time zone");
 
+                    b.Property<int?>("ExpenseDay")
+                        .HasColumnType("integer");
+
                     b.Property<decimal>("PlannedAmount")
                         .HasPrecision(18, 2)
                         .HasColumnType("numeric(18,2)");
@@ -231,6 +234,10 @@ namespace Conora.Infrastructure.Persistence.Migrations
                         .IsUnique()
                         .HasDatabaseName("IX_budget_lines_Budget_Category")
                         .HasFilter("\"DeletedAt\" IS NULL");
+
+                    b.HasIndex("BudgetId", "ExpenseDay")
+                        .HasDatabaseName("IX_budget_lines_Budget_ExpenseDay")
+                        .HasFilter("\"ExpenseDay\" IS NOT NULL AND \"DeletedAt\" IS NULL");
 
                     b.ToTable("budget_lines", (string)null);
                 });

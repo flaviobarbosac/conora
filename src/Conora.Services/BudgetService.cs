@@ -152,6 +152,7 @@ public sealed class BudgetService
 
         var accounts = (await _categories.ListAsync(null, true, false, ct)).ToDictionary(c => c.Id);
         var plannedByCode = new Dictionary<string, decimal>(StringComparer.OrdinalIgnoreCase);
+        var dayByCode = new Dictionary<string, int?>(StringComparer.OrdinalIgnoreCase);
         var accountIdByCode = new Dictionary<string, Guid>(StringComparer.OrdinalIgnoreCase);
 
         foreach (var line in lines)
@@ -166,6 +167,8 @@ public sealed class BudgetService
 
             var key = account?.Code ?? account?.Name ?? line.CategoryId.ToString();
             plannedByCode[key] = plannedByCode.GetValueOrDefault(key) + line.PlannedAmount;
+            if (line.ExpenseDay is int expenseDay)
+                dayByCode[key] = expenseDay;
             if (account is not null)
             {
                 var local = accounts.Values.FirstOrDefault(c =>
@@ -202,7 +205,7 @@ public sealed class BudgetService
         var plannedPairs = plannedByCode.Select(kv =>
         {
             var id = accountIdByCode.GetValueOrDefault(kv.Key);
-            return (CategoryId: id == Guid.Empty ? Guid.NewGuid() : id, Planned: kv.Value);
+            return (CategoryId: id == Guid.Empty ? Guid.NewGuid() : id, Planned: kv.Value, ExpenseDay: dayByCode.GetValueOrDefault(kv.Key));
         }).ToList();
 
         foreach (var pair in plannedPairs.Where(p => !accounts.ContainsKey(p.CategoryId)))
@@ -371,7 +374,7 @@ public sealed class BudgetService
                 throw new ValidationException("lines", $"A conta '{account.Name}' não aceita orçamento (somente receita e despesa).");
             await EnsureManualPlanAllowedAsync(input.CategoryId, account, ct);
 
-            await SetLineAsync(budget, input.CategoryId, decimal.Round(input.PlannedAmount, 2), ct);
+            await SetLineAsync(budget, input.CategoryId, decimal.Round(input.PlannedAmount, 2), ct, input.ExpenseDay, updateDay: true);
         }
 
         await _uow.SaveChangesAsync(ct);
@@ -484,7 +487,7 @@ public sealed class BudgetService
                 continue;
             if (await HasLifeProjectAsync(line.CategoryId, ct))
                 continue;
-            await SetLineAsync(budget, line.CategoryId, line.PlannedAmount, ct);
+            await SetLineAsync(budget, line.CategoryId, line.PlannedAmount, ct, line.ExpenseDay, updateDay: true);
         }
 
         await _uow.SaveChangesAsync(ct);
@@ -515,6 +518,9 @@ public sealed class BudgetService
         if (request.PlannedAmount is not null)
             await SetLineAsync(startBudget, request.CategoryId, amount, ct);
 
+        var expenseDay = (await _repo.FirstOrDefaultAsync<BudgetLine>(
+            l => l.BudgetId == startBudget.Id && l.CategoryId == request.CategoryId, ct, track: false))?.ExpenseDay;
+
         for (var i = 1; i < request.MonthCount; i++)
         {
             var ym = Competence.AddMonths(startYm, i);
@@ -522,7 +528,7 @@ public sealed class BudgetService
             var budget = await GetOrCreateBudgetAsync(ym, BudgetMode.Detailed, ct);
             if (!request.Overwrite && await GetPlannedAsync(budget.Id, request.CategoryId, ct) > 0)
                 continue;
-            await SetLineAsync(budget, request.CategoryId, amount, ct);
+            await SetLineAsync(budget, request.CategoryId, amount, ct, expenseDay, updateDay: true);
         }
 
         await _uow.SaveChangesAsync(ct);
@@ -550,6 +556,11 @@ public sealed class BudgetService
         var total = decimal.Round(request.TotalAmount, 2);
         var each = decimal.Round(total / request.InstallmentCount, 2);
         var allocated = 0m;
+        var startBudget = await _repo.FirstOrDefaultAsync<Budget>(b => b.CompetenceYm == startYm, ct, track: false);
+        var expenseDay = startBudget is null
+            ? null
+            : (await _repo.FirstOrDefaultAsync<BudgetLine>(
+                l => l.BudgetId == startBudget.Id && l.CategoryId == request.CategoryId, ct, track: false))?.ExpenseDay;
 
         for (var i = 0; i < request.InstallmentCount; i++)
         {
@@ -561,7 +572,7 @@ public sealed class BudgetService
             var budget = await GetOrCreateBudgetAsync(ym, BudgetMode.Detailed, ct);
             if (!request.Overwrite && await GetPlannedAsync(budget.Id, request.CategoryId, ct) > 0)
                 continue;
-            await SetLineAsync(budget, request.CategoryId, value, ct);
+            await SetLineAsync(budget, request.CategoryId, value, ct, expenseDay, updateDay: true);
         }
 
         await _uow.SaveChangesAsync(ct);
@@ -604,13 +615,18 @@ public sealed class BudgetService
     }
 
     private static List<BudgetLineResponse> BuildDetailLines(
-        IReadOnlyList<(Guid CategoryId, decimal Planned)> lines,
+        IReadOnlyList<(Guid CategoryId, decimal Planned, int? ExpenseDay)> lines,
         Dictionary<Guid, decimal> actuals,
         Dictionary<Guid, CategoryResponse> accounts)
     {
         var planned = new Dictionary<Guid, decimal>();
-        foreach (var (categoryId, amount) in lines)
+        var days = new Dictionary<Guid, int?>();
+        foreach (var (categoryId, amount, expenseDay) in lines)
+        {
             planned[categoryId] = planned.GetValueOrDefault(categoryId) + amount;
+            if (expenseDay is not null)
+                days[categoryId] = expenseDay;
+        }
 
         var parents = accounts.Values.ToDictionary(a => a.Id);
         var responses = new List<BudgetLineResponse>();
@@ -618,7 +634,8 @@ public sealed class BudgetService
         {
             var plan = planned.GetValueOrDefault(id);
             var actual = actuals.GetValueOrDefault(id);
-            if (plan == 0 && actual == 0)
+            var expenseDay = days.GetValueOrDefault(id);
+            if (plan == 0 && actual == 0 && expenseDay is null)
                 continue;
 
             var account = accounts.GetValueOrDefault(id);
@@ -630,7 +647,7 @@ public sealed class BudgetService
             var (percent, status) = Evaluate(plan, actual);
             responses.Add(new BudgetLineResponse(
                 id, name, account?.ParentId, group, section, CategoryLevel.Analytical,
-                plan, actual, plan - actual, percent, status, IsGroup: false));
+                plan, actual, plan - actual, percent, status, IsGroup: false, expenseDay));
         }
 
         return responses
@@ -686,14 +703,24 @@ public sealed class BudgetService
         return budget;
     }
 
-    private async Task SetLineAsync(Budget budget, Guid categoryId, decimal planned, CancellationToken ct)
+    private async Task SetLineAsync(
+        Budget budget,
+        Guid categoryId,
+        decimal planned,
+        CancellationToken ct,
+        int? expenseDay = null,
+        bool updateDay = false)
     {
         var line = await _repo.FirstOrDefaultAsync<BudgetLine>(
             l => l.BudgetId == budget.Id && l.CategoryId == categoryId, ct);
         if (line is null)
-            _repo.Add(BudgetLine.Create(budget.Id, categoryId, planned));
+            _repo.Add(BudgetLine.Create(budget.Id, categoryId, planned, updateDay ? expenseDay : null));
         else
+        {
             line.SetPlanned(planned);
+            if (updateDay)
+                line.SetExpenseDay(expenseDay);
+        }
     }
 
     private async Task<decimal> GetPlannedAsync(Guid budgetId, Guid categoryId, CancellationToken ct)
