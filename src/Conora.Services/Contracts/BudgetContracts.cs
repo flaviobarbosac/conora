@@ -2,7 +2,7 @@
 
 namespace Conora.Services.Contracts;
 
-public sealed record BudgetLineInput(Guid CategoryId, decimal PlannedAmount);
+public sealed record BudgetLineInput(Guid CategoryId, decimal PlannedAmount, int? ExpenseDay = null);
 
 public sealed record UpsertBudgetRequest(BudgetMode Mode, IReadOnlyList<BudgetLineInput> Lines);
 
@@ -19,7 +19,8 @@ public sealed record BudgetLineResponse(
     decimal Remaining,
     decimal? Percent,
     string Status,
-    bool IsGroup);
+    bool IsGroup,
+    int? ExpenseDay = null);
 
 public sealed record BudgetIncomeSourceResponse(Guid Id, string Name, decimal NetSpendable);
 

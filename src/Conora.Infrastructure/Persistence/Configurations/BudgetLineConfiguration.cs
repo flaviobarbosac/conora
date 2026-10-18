@@ -12,6 +12,10 @@ public class BudgetLineConfiguration : IEntityTypeConfiguration<BudgetLine>
         builder.HasKey(e => e.Id);
         builder.Property(e => e.UsuarioId).IsRequired();
         builder.Property(e => e.PlannedAmount).HasPrecision(18, 2);
+        builder.Property(e => e.ExpenseDay);
+        builder.HasIndex(e => new { e.BudgetId, e.ExpenseDay })
+            .HasFilter("\"ExpenseDay\" IS NOT NULL AND \"DeletedAt\" IS NULL")
+            .HasDatabaseName("IX_budget_lines_Budget_ExpenseDay");
         builder.HasIndex(e => new { e.BudgetId, e.CategoryId })
             .IsUnique()
             .HasFilter("\"DeletedAt\" IS NULL")

@@ -707,6 +707,8 @@ public sealed class CategoryService
             if (clash is not null)
             {
                 clash.SetPlanned(clash.PlannedAmount + line.PlannedAmount);
+                if (clash.ExpenseDay is null)
+                    clash.SetExpenseDay(line.ExpenseDay);
                 _repo.SoftDelete(line);
             }
             else

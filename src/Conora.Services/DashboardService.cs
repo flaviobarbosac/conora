@@ -271,6 +271,10 @@ public sealed class DashboardService
         var budget = await _budgets.GetAsync(ym, ct);
         foreach (var line in budget.Lines.Where(l => l.Status != "Ok"))
         {
+            // Extra income is not a problem. Do not raise the red overrun alert for it.
+            if (line.Section == CategorySection.Income && line.Status == "Exceeded")
+                continue;
+
             alerts.Add(new AlertResponse(
                 $"BUDGET_{line.Status.ToUpperInvariant()}",
                 line.Status,
