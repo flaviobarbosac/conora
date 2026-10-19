@@ -1,4 +1,3 @@
-using System.Globalization;
 using System.Text.Json;
 using Conora.Domain.Entities;
 using Conora.Domain.Enums;
@@ -19,44 +18,55 @@ public sealed class VoiceCommandService
 
     private const string SystemInstruction =
         "Você classifica um comando de voz do app Conora. Responda só JSON. " +
-        "intent é navigate, action, report ou ask. " +
+        "intent é navigate, action ou ask. " +
         "navigate: o usuário quer abrir ou mudar de tela, inclusive 'ir pra', 'ir para', 'mover pra tela' e 'vai pra'. route é um destes caminhos: " +
         "/ /orcamento /raio-x /lancamentos /categorias /contas /cartoes /projetos /patrimonio /membros /marcos /relatorios /diagnostico /importar /mes /perfil /configuracoes /ajuda /plano /whatsapp. " +
-        "action: o usuário quer gravar um lançamento. action = create-entry. entry.type é Expense ou Income. " +
+        "action create-budget: o usuário quer registrar um valor de orçamento numa categoria, não abrir a tela. entry.type fica null. entry.categoryName é a categoria. entry.amount é o valor previsto. " +
+        "action create-entry: o usuário quer gravar um lançamento de despesa, de receita ou de aporte em projeto de vida. entry.type é Expense, Income ou ProjectContribution. " +
+        "Aporte ou aportar é ProjectContribution. Receita, renda ou a receber é Income. Despesa, a pagar ou conta de é Expense. " +
         "entry.amount é número ou null. entry.date é hoje, ontem ou yyyy-MM-dd, ou null. " +
         "entry.description é o referente. entry.categoryName é a categoria. entry.accountName é a conta bancária. " +
         "Preencha todo campo que a frase trouxe, de uma vez. Não peça campo a campo. " +
         "Se a frase já tiver tipo, valor, data, descrição, categoria e conta, deixe todos preenchidos. " +
-        "Preencha só o que foi dito. 'a pagar' é Expense. 'conta pessoal' é categoryName Pessoal. " +
-        "report: o usuário pediu um relatório financeiro (mês, evolução, composição, onde gastou). route e action ficam null. " +
-        "ask: qualquer outra pergunta, inclusive hora, data e conversa. Não transforme pergunta geral em relatório. route e action ficam null. " +
-        "reply é uma frase curta em português. Em ask, reply é a resposta direta, sem falar de relatório de despesa. " +
+        "Preencha só o que foi dito. 'a pagar' é Expense. 'a receber' é Income. 'conta pessoal' é categoryName Pessoal. " +
+        "ask: conversa. Você é o Ian. Fale pelo primeiro nome de quem está logado, de um jeito natural, como pessoa. " +
+        "Se a pessoa cumprimentar, se apresentar ou perguntar quem você é e o que você pode fazer, responda no diálogo, sem frase pronta. " +
+        "Se ela disser outro nome, reconheça, e continue tratando pelo primeiro nome da conta. " +
+        "O que você faz de fato: abrir uma tela do Conora, lançar despesa, receita ou aporte, registrar orçamento e comentar a receita só com números que já foram informados. " +
+        "Não invente valor, saldo, categoria nem dado que não veio. Se não souber, diga e pergunte. " +
+        "reply de ask é a fala curta para áudio, com o primeiro nome. " +
         "Se for action, reply só resume o que foi entendido, sem pedir confirmação e sem perguntar campo que já veio na frase. " +
         "Nunca diga que já gravou ou que já abriu a tela. " +
         "Se a mensagem trouxer uma conversa anterior, continue essa mesma conversa. Use o que já foi dito e não recomece do zero. " +
-        "Formato: {\"intent\":\"navigate|action|ask\",\"route\":null,\"action\":null,\"entry\":null,\"reply\":\"...\"}.";
+        "Formato: {\"intent\":\"navigate|action|ask\",\"route\":null,\"action\":\"create-entry|create-budget|null\",\"entry\":null,\"reply\":\"...\"}.";
 
     private readonly IGeminiClient _gemini;
     private readonly IFinanceRepository _repo;
+    private readonly IUserRepository _users;
+    private readonly ITenantContext _tenant;
     private readonly IAuditEventRepository _audits;
     private readonly IUnitOfWork _uow;
     private readonly ICorrelationContext _correlation;
-    private readonly IanReportService _ian;
+    private readonly BudgetService _budget;
 
     public VoiceCommandService(
         IGeminiClient gemini,
         IFinanceRepository repo,
+        IUserRepository users,
+        ITenantContext tenant,
         IAuditEventRepository audits,
         IUnitOfWork uow,
         ICorrelationContext correlation,
-        IanReportService ian)
+        BudgetService budget)
     {
         _gemini = gemini;
         _repo = repo;
+        _users = users;
+        _tenant = tenant;
         _audits = audits;
         _uow = uow;
         _correlation = correlation;
-        _ian = ian;
+        _budget = budget;
     }
 
     public Task<byte[]?> SpeakAsync(string text, string? voice, CancellationToken ct)
@@ -82,7 +92,13 @@ public sealed class VoiceCommandService
             return new SuggestCategoriesResponse([]);
 
         var income = string.Equals(request.Type, "Income", StringComparison.OrdinalIgnoreCase);
-        var sections = income ? [CategorySection.Income] : ExpenseSections;
+        var budget = string.Equals(request.Type, "Budget", StringComparison.OrdinalIgnoreCase);
+        var contribution = string.Equals(request.Type, "ProjectContribution", StringComparison.OrdinalIgnoreCase);
+        var sections = contribution
+            ? new[] { CategorySection.LifeProject }
+            : budget
+            ? ExpenseSections.Append(CategorySection.Income).ToArray()
+            : income ? [CategorySection.Income] : ExpenseSections;
         var categories = await _repo.ListAsync<Category>(
             c => c.Level == CategoryLevel.Analytical && c.IsActive && !c.IsPendingReview && sections.Contains(c.Section),
             ct);
@@ -222,10 +238,11 @@ public sealed class VoiceCommandService
             throw new ValidationException("transcript", $"O comando deve ter no máximo {MaxLength} caracteres.");
 
         var local = VoiceCommandClassifier.Classify(transcript);
+        var speaker = await SpeakerAsync(ct);
         if (!_gemini.IsConfigured || await OverHourlyLimitAsync(ct))
-            return await WithSpokenAnswerAsync(local, transcript, request.CompetenceYm, ct);
+            return await WithSpokenAnswerAsync(local, transcript, request.CompetenceYm, speaker, ct);
 
-        var raw = await _gemini.GenerateJsonAsync(SystemInstruction, PromptFor(request, transcript), ct);
+        var raw = await _gemini.GenerateJsonAsync(SystemInstruction, PromptFor(request, transcript, speaker), ct);
         AuditRecorder.Record(_audits, _correlation, "Gemini", Guid.NewGuid(), "GeminiUsed", new { Length = transcript.Length, Kind = "voice", Ok = raw is not null });
         await _uow.SaveChangesAsync(ct);
 
@@ -233,12 +250,41 @@ public sealed class VoiceCommandService
         var chosen = parsed ?? local;
         if (local.Intent == VoiceCommandClassifier.Navigate && chosen.Intent != VoiceCommandClassifier.Navigate)
             chosen = local;
-        if (chosen.Intent == VoiceCommandClassifier.Report && !VoiceCommandClassifier.LooksLikeReport(transcript))
-            chosen = local.Intent == VoiceCommandClassifier.Report ? local : chosen with { Intent = VoiceCommandClassifier.Ask };
-        if (local.Intent == VoiceCommandClassifier.Report && chosen.Intent == VoiceCommandClassifier.Ask)
-            chosen = local;
+        if (IanInsight.LooksLike(transcript) && local.Intent is not (VoiceCommandClassifier.Navigate or VoiceCommandClassifier.Action))
+            chosen = new VoiceCommandClassifier.Result(VoiceCommandClassifier.Ask, null, null, null, "");
+        else if (VoiceCommandClassifier.LooksLikeReport(transcript))
+            chosen = new VoiceCommandClassifier.Result(
+                VoiceCommandClassifier.Ask, null, null, null, VoiceCommandClassifier.ScopeReply);
         chosen = MergeEntry(chosen, local);
-        return await WithSpokenAnswerAsync(chosen, transcript, request.CompetenceYm, ct);
+        return await WithSpokenAnswerAsync(chosen, transcript, request.CompetenceYm, speaker, ct);
+    }
+
+    public async Task<VoiceUserResponse> CurrentUserAsync(CancellationToken ct)
+    {
+        var speaker = await SpeakerAsync(ct);
+        return new VoiceUserResponse(speaker?.Full ?? string.Empty, speaker?.First ?? string.Empty);
+    }
+
+    private async Task<(string Full, string First)?> SpeakerAsync(CancellationToken ct)
+    {
+        var id = _tenant.UsuarioId;
+        if (id is null)
+            return null;
+        var user = await _users.GetByIdAsync(id.Value, ct);
+        var full = user?.Name?.Trim();
+        if (string.IsNullOrEmpty(full))
+            return null;
+        var first = full.Split(' ', StringSplitOptions.RemoveEmptyEntries)[0];
+        return (full, first);
+    }
+
+    private static string Address((string Full, string First)? speaker, string reply)
+    {
+        if (speaker is null || string.IsNullOrWhiteSpace(reply))
+            return reply;
+        if (reply.Contains(speaker.Value.First, StringComparison.OrdinalIgnoreCase))
+            return reply;
+        return $"{speaker.Value.First}, {reply}";
     }
 
     private async Task<bool> OverHourlyLimitAsync(CancellationToken ct)
@@ -248,13 +294,21 @@ public sealed class VoiceCommandService
         return used >= MaxQuestionsPerHour;
     }
 
-    private static string PromptFor(VoiceCommandRequest request, string transcript)
+    private static string PromptFor(VoiceCommandRequest request, string transcript, (string Full, string First)? speaker)
     {
+        var lines = new System.Text.StringBuilder();
+        if (speaker is not null)
+            lines.Append("Pessoa logada: ").Append(speaker.Value.Full).Append(". Trate por ").Append(speaker.Value.First).AppendLine(".");
+
         var history = request.History;
         if (history is null || history.Count == 0)
-            return transcript;
+        {
+            if (lines.Length == 0)
+                return transcript;
+            lines.Append("Nova fala: ").Append(transcript);
+            return lines.ToString();
+        }
 
-        var lines = new System.Text.StringBuilder();
         lines.AppendLine("Conversa anterior. Continue a mesma conversa e use o que já foi dito:");
         foreach (var turn in history.TakeLast(12))
         {
@@ -307,7 +361,7 @@ public sealed class VoiceCommandService
                 return null;
 
             var intent = ReadString(root, "intent");
-            if (intent is not (VoiceCommandClassifier.Navigate or VoiceCommandClassifier.Action or VoiceCommandClassifier.Ask or VoiceCommandClassifier.Report))
+            if (intent is not (VoiceCommandClassifier.Navigate or VoiceCommandClassifier.Action or VoiceCommandClassifier.Ask or "report"))
                 return null;
 
             var route = ReadString(root, "route");
@@ -326,15 +380,19 @@ public sealed class VoiceCommandService
             if (intent == VoiceCommandClassifier.Action)
             {
                 var action = ReadString(root, "action");
-                if (action != VoiceCommandClassifier.CreateEntry || !root.TryGetProperty("entry", out var entry) || entry.ValueKind != JsonValueKind.Object)
+                if (action is not (VoiceCommandClassifier.CreateEntry or VoiceCommandClassifier.CreateBudget)
+                    || !root.TryGetProperty("entry", out var entry)
+                    || entry.ValueKind != JsonValueKind.Object)
                     return null;
                 var type = ReadString(entry, "type");
-                if (type is not ("Expense" or "Income"))
+                if (action == VoiceCommandClassifier.CreateBudget)
+                    type = "";
+                else if (type is not ("Expense" or "Income" or "ProjectContribution"))
                     type = "Expense";
                 return new VoiceCommandClassifier.Result(
                     VoiceCommandClassifier.Action,
                     null,
-                    VoiceCommandClassifier.CreateEntry,
+                    action,
                     new VoiceCommandClassifier.Entry(
                         type,
                         ReadAmount(entry),
@@ -345,13 +403,13 @@ public sealed class VoiceCommandService
                     ReadString(root, "reply") ?? "Entendi o lançamento.");
             }
 
-            if (intent == VoiceCommandClassifier.Report)
+            if (intent == "report")
                 return new VoiceCommandClassifier.Result(
-                    VoiceCommandClassifier.Report,
+                    VoiceCommandClassifier.Ask,
                     null,
                     null,
                     null,
-                    ReadString(root, "reply") ?? "Vou montar o relatório.");
+                    VoiceCommandClassifier.ScopeReply);
 
             return new VoiceCommandClassifier.Result(VoiceCommandClassifier.Ask, null, null, null, ReadString(root, "reply") ?? string.Empty);
         }
@@ -386,83 +444,67 @@ public sealed class VoiceCommandService
         VoiceCommandClassifier.Result result,
         string transcript,
         string? competenceYm,
+        (string Full, string First)? speaker,
         CancellationToken ct)
     {
-        if (result.Intent == VoiceCommandClassifier.Ask)
-            return ToResponse(result with { Reply = GeneralReply(transcript, result.Reply) });
-
-        if (result.Intent != VoiceCommandClassifier.Report)
-            return ToResponse(result);
-
-        var answer = await _ian.AskAsync(new IanAskRequest(transcript, competenceYm), ct);
-        var spoken = answer.Answer?.Trim() ?? string.Empty;
-        if (answer.Choices is { Count: > 0 })
-            spoken = string.IsNullOrEmpty(spoken)
-                ? string.Join(". ", answer.Choices)
-                : $"{spoken} {string.Join(". ", answer.Choices)}.";
-
-        return new VoiceCommandResponse(
-            VoiceCommandClassifier.Report,
-            null,
-            null,
-            null,
-            string.IsNullOrWhiteSpace(spoken) ? "Não consegui montar o relatório." : spoken,
-            answer.CanOpenReport ? answer.Query : null);
-    }
-
-    private static string GeneralReply(string transcript, string? modelReply)
-    {
-        var clock = ClockReply(transcript);
-        if (clock is not null)
-            return clock;
-        if (GeminiService.LooksLikeTradeAdvice(transcript))
-            return GeminiService.TradeAdviceRefusal;
-
-        var reply = modelReply?.Trim() ?? string.Empty;
-        var folded = IanSubjectMatcher.Normalize(reply);
-        var talksAboutReport = folded.Contains("relatorio");
-        if (reply.Length > 0 && !IsExpenseReportFallback(reply) && !(talksAboutReport && !VoiceCommandClassifier.LooksLikeReport(transcript)))
-            return reply;
-        return "Não tenho um relatório para isso. Pode perguntar de outro jeito, pedir uma tela ou um lançamento.";
-    }
-
-    private static bool IsExpenseReportFallback(string reply)
-    {
-        var text = IanSubjectMatcher.Normalize(reply);
-        return text.Contains("relatorio") && (text.Contains("despesa") || text.Contains("renda"));
-    }
-
-    private static string? ClockReply(string transcript)
-    {
-        var text = IanSubjectMatcher.Normalize(transcript);
-        var now = BrazilNow();
-        if (text.Contains("que horas") || text.Contains("qual e a hora") || text.Contains("hora agora") || text.Contains("me diz a hora"))
-            return $"Agora são {now:HH} horas e {now:mm} minutos.";
-        if (text.Contains("que dia") || text.Contains("data de hoje") || text.Contains("qual e a data"))
-            return $"Hoje é {now.ToString("dddd, d 'de' MMMM 'de' yyyy", CultureInfo.GetCultureInfo("pt-BR"))}.";
-        return null;
-    }
-
-    private static DateTime BrazilNow()
-    {
-        foreach (var id in new[] { "America/Sao_Paulo", "E. South America Standard Time" })
+        if (result.Intent != VoiceCommandClassifier.Ask)
+            return ToResponse(result with { Reply = Address(speaker, result.Reply) });
+        if (IanInsight.LooksLike(transcript))
         {
-            try
+            var insight = await ComposeInsightAsync(transcript, competenceYm, ct);
+            return ToResponse(result with { Reply = Address(speaker, insight) });
+        }
+        if (!string.IsNullOrWhiteSpace(result.Reply))
+            return ToResponse(result with { Reply = Address(speaker, result.Reply) });
+
+        var fallback = VoiceCommandClassifier.LooksLikeHelp(transcript)
+            ? VoiceCommandClassifier.HelpReply
+            : VoiceCommandClassifier.ScopeReply;
+        return ToResponse(result with { Reply = Address(speaker, fallback) });
+    }
+
+    private async Task<string> ComposeInsightAsync(string transcript, string? competenceYm, CancellationToken ct)
+    {
+        var end = Competence.IsValid(competenceYm) ? competenceYm! : Competence.From(DateTime.UtcNow);
+        var count = IanInsight.MonthCount(transcript);
+        var slices = new List<IanInsight.MonthSlice>(count);
+        var accounts = new Dictionary<string, decimal>(StringComparer.OrdinalIgnoreCase);
+        var focus = IanInsight.Focus(transcript);
+
+        for (var i = count - 1; i >= 0; i--)
+        {
+            var budget = await _budget.GetAsync(Competence.AddMonths(end, -i), ct);
+            slices.Add(new IanInsight.MonthSlice(
+                budget.ReceivedIncome,
+                Actual(budget, CategorySection.Discount),
+                Actual(budget, CategorySection.LifeProject),
+                Actual(budget, CategorySection.Essential),
+                Actual(budget, CategorySection.Social)));
+
+            if (focus is not CategorySection section)
+                continue;
+            var block = budget.Sections.FirstOrDefault(item => item.Section == section);
+            if (block is null)
+                continue;
+            foreach (var line in block.Lines)
             {
-                return TimeZoneInfo.ConvertTimeFromUtc(DateTime.UtcNow, TimeZoneInfo.FindSystemTimeZoneById(id));
-            }
-            catch (TimeZoneNotFoundException)
-            {
-                /* try the next id */
-            }
-            catch (InvalidTimeZoneException)
-            {
-                /* try the next id */
+                if (line.IsGroup || line.CategoryId is null || line.ActualAmount == 0)
+                    continue;
+                accounts[line.CategoryName] = accounts.GetValueOrDefault(line.CategoryName) + line.ActualAmount;
             }
         }
 
-        return DateTime.UtcNow.AddHours(-3);
+        if (focus is CategorySection focused)
+        {
+            var rows = accounts.Select(item => new IanInsight.AccountSlice(item.Key, item.Value)).ToList();
+            return IanInsight.DescribeSection(focused, rows, count);
+        }
+
+        return IanInsight.DescribeLeak(slices);
     }
+
+    private static decimal Actual(BudgetResponse budget, CategorySection section)
+        => budget.Sections.FirstOrDefault(item => item.Section == section)?.ActualAmount ?? 0;
 
     private static VoiceCommandResponse ToResponse(VoiceCommandClassifier.Result result)
         => new(

@@ -69,10 +69,19 @@ public class VoiceCommandClassifierTests
     }
 
     [Fact]
+    public void BudgetRegister_isABudget_notAScreen()
+    {
+        var result = VoiceCommandClassifier.Classify("registra o orçamento da categoria mercado no valor de 200 reais");
+        Assert.Equal(VoiceCommandClassifier.CreateBudget, result.Action);
+        Assert.Equal(200m, result.Entry?.Amount);
+        Assert.Contains("mercado", result.Entry?.CategoryName);
+    }
+
+    [Fact]
     public void BudgetQuestion_isAReport_notAScreen()
     {
         var result = VoiceCommandClassifier.Classify("como está o orçamento?");
-        Assert.Equal(VoiceCommandClassifier.Report, result.Intent);
+        Assert.Equal(VoiceCommandClassifier.Ask, result.Intent);
         Assert.Null(result.Route);
     }
 
@@ -80,7 +89,30 @@ public class VoiceCommandClassifierTests
     public void MonthQuestion_isAReport()
     {
         var result = VoiceCommandClassifier.Classify("como está meu mês?");
-        Assert.Equal(VoiceCommandClassifier.Report, result.Intent);
+        Assert.Equal(VoiceCommandClassifier.Ask, result.Intent);
+        Assert.Null(result.Action);
+    }
+
+    [Fact]
+    public void Aporte_isAProjectContribution()
+    {
+        var result = VoiceCommandClassifier.Classify("lança um aporte de 200 reais no projeto viagem");
+        Assert.Equal(VoiceCommandClassifier.Action, result.Intent);
+        Assert.Equal(VoiceCommandClassifier.CreateEntry, result.Action);
+        Assert.Equal("ProjectContribution", result.Entry?.Type);
+        Assert.Equal(200m, result.Entry?.Amount);
+    }
+
+    [Fact]
+    public void HelpQuestion_listsWhatIanCanDo()
+    {
+        var result = VoiceCommandClassifier.Classify("em que você pode me ajudar?");
+        Assert.Equal(VoiceCommandClassifier.Ask, result.Intent);
+        Assert.Equal(VoiceCommandClassifier.HelpReply, result.Reply);
+        Assert.Contains("despesa", result.Reply, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("receita", result.Reply, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("orçamento", result.Reply, StringComparison.OrdinalIgnoreCase);
+        Assert.Null(result.Route);
         Assert.Null(result.Action);
     }
 

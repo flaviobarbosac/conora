@@ -8,6 +8,8 @@ public sealed record SuggestCategoriesRequest(string Term, string? Type);
 
 public sealed record SuggestCategoriesResponse(IReadOnlyList<string> Names);
 
+public sealed record VoiceUserResponse(string Name, string FirstName);
+
 public sealed record VoiceCommandRequest(
     string Transcript,
     string? CompetenceYm = null,
@@ -22,8 +24,7 @@ public sealed record VoiceCommandResponse(
     string? Route,
     string? Action,
     VoiceEntryDraft? Entry,
-    string Reply,
-    IanReportQuery? Report = null);
+    string Reply);
 
 public sealed record VoiceEntryDraft(
     string Type,
