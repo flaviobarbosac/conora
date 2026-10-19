@@ -23,7 +23,6 @@ public sealed partial class GeminiService
         "Não posso indicar compra ou venda de ativos nem recomendar investimentos. Posso ajudar a entender o método Raio X, seu orçamento e seus projetos de vida.";
 
     private const int MaxQuestionLength = 1000;
-    private const int MaxQuestionsPerHour = 20;
 
     private const string SystemInstruction =
         "Você é o assistente do Conora, que aplica o método Raio X da Vida Financeira (diagnosticar, organizar, planejar, registrar, acompanhar, corrigir e construir). " +
@@ -71,8 +70,8 @@ public sealed partial class GeminiService
 
         var cutoff = DateTime.UtcNow.AddHours(-1);
         var used = await _repo.CountAsync<AuditEvent>(e => e.EntityName == "Gemini" && e.TimestampUtc > cutoff, ct);
-        if (used >= MaxQuestionsPerHour)
-            return new AskAiResponse(true, "Você atingiu o limite de perguntas por hora. Tente novamente mais tarde.");
+        if (used >= GeminiQuota.MaxCallsPerHour)
+            return new AskAiResponse(true, GeminiQuota.HourlyLimitMessage);
 
         var prompt = await BuildPromptAsync(question, request.CompetenceYm, ct);
         var raw = await _gemini.GenerateJsonAsync(SystemInstruction, prompt, ct);

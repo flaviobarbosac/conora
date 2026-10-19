@@ -9,7 +9,7 @@ namespace Conora.Infrastructure.Ai;
 /// <summary>Server-side Gemini REST client. Without <c>Gemini:ApiKey</c> it reports itself as not configured.</summary>
 public sealed class GeminiClient : IGeminiClient
 {
-    private const string DefaultModel = "gemini-2.0-flash";
+    private const string DefaultModel = "gemini-2.5-flash";
 
     private readonly HttpClient _http;
     private readonly string? _apiKey;

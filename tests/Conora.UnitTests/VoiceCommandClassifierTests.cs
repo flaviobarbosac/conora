@@ -104,6 +104,20 @@ public class VoiceCommandClassifierTests
     }
 
     [Fact]
+    public void Greeting_isNotACommand()
+    {
+        var result = VoiceCommandClassifier.Classify("bom dia");
+        Assert.Equal(VoiceCommandClassifier.Ask, result.Intent);
+        Assert.True(VoiceCommandClassifier.LooksLikeGreeting("bom dia"));
+        Assert.True(VoiceCommandClassifier.LooksLikeOpen("como estamos hoje?"));
+        Assert.Equal("Bom dia! Em que posso ajudar?", VoiceCommandClassifier.OpenFallback(new DateTime(2026, 10, 19, 9, 0, 0)));
+        Assert.Equal("Boa tarde! Em que posso ajudar?", VoiceCommandClassifier.OpenFallback(new DateTime(2026, 10, 19, 15, 0, 0)));
+        Assert.Equal("Boa noite! Em que posso ajudar?", VoiceCommandClassifier.OpenFallback(new DateTime(2026, 10, 19, 20, 0, 0)));
+        Assert.Equal("", result.Reply);
+        Assert.Null(result.Action);
+    }
+
+    [Fact]
     public void HelpQuestion_listsWhatIanCanDo()
     {
         var result = VoiceCommandClassifier.Classify("em que você pode me ajudar?");
