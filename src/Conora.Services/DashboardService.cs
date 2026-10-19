@@ -210,8 +210,10 @@ public sealed class DashboardService
                 ct)).Sum(e => e.Amount);
             cardPurchases = (await _repo.ListForUsuariosAsync<CardPurchase>(
                 userIds,
-                p => p.CompetenceYm == ym && familyCategoryIds.Contains(p.CategoryId),
-                ct)).Sum(p => p.Amount);
+                p => p.FirstInvoiceYm.CompareTo(CardPurchase.InvoiceWindowStart(ym)) >= 0
+                     && p.FirstInvoiceYm.CompareTo(ym) <= 0
+                     && familyCategoryIds.Contains(p.CategoryId),
+                ct)).Sum(p => p.AmountInCompetence(ym));
             projects = (await _repo.ListForUsuariosAsync<Entry>(
                 userIds,
                 e => e.CompetenceYm == ym
@@ -234,9 +236,11 @@ public sealed class DashboardService
                      && e.CategoryId != null
                      && familyCategoryIds.Contains(e.CategoryId.Value),
                 e => e.Amount, ct);
-            cardPurchases = await _repo.SumAsync<CardPurchase>(
-                p => p.CompetenceYm == ym && familyCategoryIds.Contains(p.CategoryId),
-                p => p.Amount, ct);
+            cardPurchases = (await _repo.ListAsync<CardPurchase>(
+                p => p.FirstInvoiceYm.CompareTo(CardPurchase.InvoiceWindowStart(ym)) >= 0
+                     && p.FirstInvoiceYm.CompareTo(ym) <= 0
+                     && familyCategoryIds.Contains(p.CategoryId),
+                ct)).Sum(p => p.AmountInCompetence(ym));
             projects = await _repo.SumAsync<Entry>(
                 e => e.CompetenceYm == ym
                      && e.Type == EntryType.ProjectContribution

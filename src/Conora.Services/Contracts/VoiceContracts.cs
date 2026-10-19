@@ -4,6 +4,10 @@ public sealed record SpeakRequest(string Text, string? Voice);
 
 public sealed record VoiceTurn(string Role, string Text);
 
+public sealed record SuggestCategoriesRequest(string Term, string? Type);
+
+public sealed record SuggestCategoriesResponse(IReadOnlyList<string> Names);
+
 public sealed record VoiceCommandRequest(
     string Transcript,
     string? CompetenceYm = null,

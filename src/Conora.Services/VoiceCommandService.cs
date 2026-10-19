@@ -1,6 +1,7 @@
 using System.Globalization;
 using System.Text.Json;
 using Conora.Domain.Entities;
+using Conora.Domain.Enums;
 using Conora.Domain.Exceptions;
 using Conora.Domain.Ports;
 using Conora.Domain.Services;
@@ -62,6 +63,154 @@ public sealed class VoiceCommandService
     {
         var name = string.Equals(voice, "clara", StringComparison.OrdinalIgnoreCase) ? "Aoede" : "Charon";
         return _gemini.SpeakAsync(text, name, ct);
+    }
+
+    public const int MaxCategorySuggestions = 4;
+
+    private static readonly CategorySection[] ExpenseSections =
+    [
+        CategorySection.Discount,
+        CategorySection.LifeProject,
+        CategorySection.Essential,
+        CategorySection.Social,
+    ];
+
+    public async Task<SuggestCategoriesResponse> SuggestCategoriesAsync(SuggestCategoriesRequest request, CancellationToken ct)
+    {
+        var term = request.Term?.Trim() ?? string.Empty;
+        if (term.Length == 0)
+            return new SuggestCategoriesResponse([]);
+
+        var income = string.Equals(request.Type, "Income", StringComparison.OrdinalIgnoreCase);
+        var sections = income ? [CategorySection.Income] : ExpenseSections;
+        var categories = await _repo.ListAsync<Category>(
+            c => c.Level == CategoryLevel.Analytical && c.IsActive && !c.IsPendingReview && sections.Contains(c.Section),
+            ct);
+        var names = categories
+            .Select(c => c.Name)
+            .Where(name => !string.IsNullOrWhiteSpace(name))
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .ToList();
+        if (names.Count == 0)
+            return new SuggestCategoriesResponse([]);
+
+        var ranked = names
+            .Select(name => (name, score: CategoryScore(term, name)))
+            .Where(item => item.score > 0 && item.score < 1000)
+            .OrderByDescending(item => item.score)
+            .ThenBy(item => item.name, StringComparer.OrdinalIgnoreCase)
+            .Select(item => item.name)
+            .Take(MaxCategorySuggestions)
+            .ToList();
+
+        if (ranked.Count < MaxCategorySuggestions && _gemini.IsConfigured && !await OverHourlyLimitAsync(ct))
+        {
+            foreach (var extra in await SemanticNamesAsync(term, names, ct))
+            {
+                if (ranked.Count >= MaxCategorySuggestions)
+                    break;
+                if (ranked.Any(name => string.Equals(name, extra, StringComparison.OrdinalIgnoreCase)))
+                    continue;
+                if (string.Equals(Fold(extra), Fold(term), StringComparison.Ordinal))
+                    continue;
+                ranked.Add(extra);
+            }
+        }
+
+        return new SuggestCategoriesResponse(ranked);
+    }
+
+    private async Task<IReadOnlyList<string>> SemanticNamesAsync(string term, List<string> names, CancellationToken ct)
+    {
+        var list = string.Join('\n', names.Select(name => "- " + name));
+        var raw = await _gemini.GenerateJsonAsync(
+            "Você escolhe categorias já cadastradas. Responda só JSON {\"names\":[]}. " +
+            "No máximo 4 nomes, copiados exatamente da lista. Não invente. " +
+            "Escolha os mais próximos do termo falado pelo sentido.",
+            "Termo: " + term + "\nLista:\n" + list,
+            ct);
+        AuditRecorder.Record(_audits, _correlation, "Gemini", Guid.NewGuid(), "GeminiUsed", new { Length = term.Length, Kind = "voice-categories", Ok = raw is not null });
+        await _uow.SaveChangesAsync(ct);
+        if (string.IsNullOrWhiteSpace(raw))
+            return [];
+        try
+        {
+            using var doc = JsonDocument.Parse(raw);
+            if (!doc.RootElement.TryGetProperty("names", out var node))
+                return [];
+            var allowed = new Dictionary<string, string>(StringComparer.Ordinal);
+            foreach (var name in names)
+            {
+                var key = Fold(name);
+                if (!allowed.ContainsKey(key))
+                    allowed[key] = name;
+            }
+            var picked = new List<string>();
+            foreach (var item in node.EnumerateArray())
+            {
+                if (picked.Count >= MaxCategorySuggestions)
+                    break;
+                var text = item.GetString();
+                if (string.IsNullOrWhiteSpace(text))
+                    continue;
+                if (allowed.TryGetValue(Fold(text), out var canonical) && !picked.Contains(canonical, StringComparer.OrdinalIgnoreCase))
+                    picked.Add(canonical);
+            }
+            return picked;
+        }
+        catch (JsonException)
+        {
+            return [];
+        }
+    }
+
+    private static int CategoryScore(string spoken, string name)
+    {
+        var needle = Fold(spoken);
+        var hay = Fold(name);
+        if (needle.Length == 0 || hay.Length == 0)
+            return 0;
+        if (needle == hay)
+            return 1000;
+        if (hay.Contains(needle, StringComparison.Ordinal) || needle.Contains(hay, StringComparison.Ordinal))
+            return 800 - Math.Abs(needle.Length - hay.Length);
+        var prefix = 0;
+        var limit = Math.Min(needle.Length, hay.Length);
+        while (prefix < limit && needle[prefix] == hay[prefix])
+            prefix++;
+        if (prefix >= 4)
+            return 500 + prefix;
+        var distance = EditDistance(needle, hay);
+        var ratio = 1d - (distance / (double)Math.Max(needle.Length, hay.Length));
+        return ratio >= 0.55 ? (int)(ratio * 400) : 0;
+    }
+
+    private static int EditDistance(string left, string right)
+    {
+        var rows = left.Length + 1;
+        var cols = right.Length + 1;
+        var grid = new int[rows, cols];
+        for (var i = 0; i < rows; i++)
+            grid[i, 0] = i;
+        for (var j = 0; j < cols; j++)
+            grid[0, j] = j;
+        for (var i = 1; i < rows; i++)
+        {
+            for (var j = 1; j < cols; j++)
+            {
+                var cost = left[i - 1] == right[j - 1] ? 0 : 1;
+                grid[i, j] = Math.Min(Math.Min(grid[i - 1, j] + 1, grid[i, j - 1] + 1), grid[i - 1, j - 1] + cost);
+            }
+        }
+        return grid[left.Length, right.Length];
+    }
+
+    private static string Fold(string value)
+    {
+        var chars = value.Normalize(System.Text.NormalizationForm.FormD)
+            .Where(c => System.Globalization.CharUnicodeInfo.GetUnicodeCategory(c) != System.Globalization.UnicodeCategory.NonSpacingMark)
+            .ToArray();
+        return new string(chars).ToLowerInvariant().Trim();
     }
 
     public async Task<VoiceCommandResponse> ClassifyAsync(VoiceCommandRequest request, CancellationToken ct)

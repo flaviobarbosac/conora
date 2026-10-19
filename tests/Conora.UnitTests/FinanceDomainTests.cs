@@ -209,14 +209,43 @@ public class FinanceDomainTests
     }
 
     [Fact]
-    public void Life_project_contribution_never_goes_below_zero()
+    public void Life_project_contribution_rejects_a_reversal_past_zero()
     {
         var due = new DateTime(2027, 6, 1, 0, 0, 0, DateTimeKind.Utc);
         var project = LifeProject.Create("Reserva", 1200m, due, "2026-10", Guid.NewGuid());
         project.ApplyContribution(100m);
-        project.ApplyContribution(-250m);
+        Assert.Throws<ValidationException>(() => project.ApplyContribution(-250m));
+        Assert.Equal(100m, project.AccumulatedAmount);
+        project.ApplyContribution(-100m);
         Assert.Equal(0m, project.AccumulatedAmount);
-        project.ApplyContribution(80m);
-        Assert.Equal(80m, project.AccumulatedAmount);
+    }
+
+    [Fact]
+    public void Month_result_uses_received_income_including_uncategorized()
+    {
+        var result = MonthBalance.FromReceived(
+            receivedIncome: 10_500m,
+            discount: 1_500m,
+            life: 1_000m,
+            essential: 4_000m,
+            social: 500m);
+
+        Assert.Equal(3_500m, result);
+    }
+
+    [Fact]
+    public void Card_purchase_books_each_installment_on_its_invoice_month()
+    {
+        var card = CreditCard.Create("Visa", 1000m, 10, 17, null);
+        var purchase = CardPurchase.Create(card, 100m, new DateTime(2026, 10, 15, 0, 0, 0, DateTimeKind.Utc), 3, Guid.NewGuid(), "Mercado");
+
+        Assert.Equal(0m, purchase.AmountInCompetence("2026-10"));
+        Assert.Equal(33.33m, purchase.AmountInCompetence("2026-11"));
+        Assert.Equal(33.33m, purchase.AmountInCompetence("2026-12"));
+        Assert.Equal(33.34m, purchase.AmountInCompetence("2027-01"));
+        Assert.Equal(100m,
+            purchase.AmountInCompetence("2026-11")
+            + purchase.AmountInCompetence("2026-12")
+            + purchase.AmountInCompetence("2027-01"));
     }
 }

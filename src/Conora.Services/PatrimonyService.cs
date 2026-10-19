@@ -127,8 +127,11 @@ public sealed class PatrimonyService
                      && (e.Type == EntryType.Expense || e.Type == EntryType.Contribution)
                      && e.CategoryId != null && essentialIds.Contains(e.CategoryId.Value),
                 e => e.Amount, ct);
-            spent += await _repo.SumAsync<CardPurchase>(
-                p => p.CompetenceYm == ym && essentialIds.Contains(p.CategoryId), p => p.Amount, ct);
+            spent += (await _repo.ListAsync<CardPurchase>(
+                p => p.FirstInvoiceYm.CompareTo(CardPurchase.InvoiceWindowStart(ym)) >= 0
+                     && p.FirstInvoiceYm.CompareTo(ym) <= 0
+                     && essentialIds.Contains(p.CategoryId),
+                ct)).Sum(p => p.AmountInCompetence(ym));
 
             if (spent > 0)
                 monthly.Add(spent);

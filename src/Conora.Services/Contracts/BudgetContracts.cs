@@ -48,7 +48,12 @@ public sealed record BudgetResponse(
     bool CanEdit = true,
     Guid? BudgetOwnerUsuarioId = null);
 
-public sealed record BudgetYearMonthCell(string CompetenceYm, decimal PlannedAmount, decimal ActualAmount);
+public sealed record BudgetYearMonthCell(
+    string CompetenceYm,
+    decimal PlannedAmount,
+    decimal ActualAmount,
+    decimal ReceivedIncome = 0,
+    decimal MonthResult = 0);
 
 public sealed record BudgetYearLineResponse(
     Guid? CategoryId,
