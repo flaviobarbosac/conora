@@ -12,8 +12,8 @@ public static partial class VoiceCommandClassifier
     public const string Navigate = "navigate";
     public const string Action = "action";
     public const string Ask = "ask";
-    public const string Report = "report";
     public const string CreateEntry = "create-entry";
+    public const string CreateBudget = "create-budget";
 
     public sealed record Result(
         string Intent,
@@ -69,7 +69,13 @@ public static partial class VoiceCommandClassifier
         if (opens && screen is not null && !acts)
             return new Result(Navigate, screen, null, null, $"Abrindo {Label(screen)}.");
 
-        if (acts || (amount is not null && (text.Contains("despesa") || text.Contains("receita") || text.Contains("reais") || text.Contains("quinhentos"))))
+        if (AsksForBudget(text, amount))
+        {
+            var budget = ReadEntry(raw, text, amount);
+            return new Result(Action, null, CreateBudget, budget, "Entendi o orçamento.");
+        }
+
+        if (acts || text.Contains("aporte") || (amount is not null && (text.Contains("despesa") || text.Contains("receita") || text.Contains("reais") || text.Contains("quinhentos"))))
         {
             var entry = ReadEntry(raw, text, amount);
             return new Result(Action, null, CreateEntry, entry, "Entendi o lançamento.");
@@ -78,11 +84,44 @@ public static partial class VoiceCommandClassifier
         if (opens && screen is not null)
             return new Result(Navigate, screen, null, null, $"Abrindo {Label(screen)}.");
 
+        if (IanInsight.LooksLike(text))
+            return new Result(Ask, null, null, null, "");
+
+        if (LooksLikeHelp(text))
+            return new Result(Ask, null, null, null, HelpReply);
+
         if (AsksForReport(text))
-            return new Result(Report, null, null, null, "Vou montar o relatório.");
+            return new Result(Ask, null, null, null, ReportPausedReply);
 
         return new Result(Ask, null, null, null, string.Empty);
     }
+
+    public const string ScopeReply = "Posso abrir uma tela, lançar uma despesa, uma receita ou um aporte, ou registrar um orçamento.";
+
+    public const string HelpReply =
+        "Posso abrir uma tela, lançar uma despesa, uma receita ou um aporte, registrar um orçamento e dizer para onde a sua receita está indo, neste mês ou nos últimos meses, inclusive em essencial, social, descontos ou projetos.";
+
+    public static bool LooksLikeHelp(string? transcript)
+    {
+        var text = IanSubjectMatcher.Normalize(transcript);
+        if (text.Length == 0 || AsksToPost(text) || OpensScreen(text))
+            return false;
+
+        return text.Contains("pode ajudar")
+            || text.Contains("me ajudar")
+            || text.Contains("voce ajuda")
+            || text.Contains("em que voce")
+            || text.Contains("no que voce")
+            || text.Contains("o que voce pode")
+            || text.Contains("o que voce faz")
+            || text.Contains("o que voce sabe")
+            || text.Contains("como voce pode")
+            || text.Contains("como pode ajudar")
+            || text.Contains("suas funcoes")
+            || text.Contains("que voce faz");
+    }
+
+    public const string ReportPausedReply = ScopeReply;
 
     public static bool LooksLikeReport(string? transcript)
         => AsksForReport(IanSubjectMatcher.Normalize(transcript));
@@ -112,6 +151,11 @@ public static partial class VoiceCommandClassifier
            || text.Contains("onde gastei")
            || text.Contains("composic")
            || (text.Contains("mes") && (text.Contains("despesa") || text.Contains("gasto")) && !AsksToPost(text));
+
+    private static bool AsksForBudget(string text, decimal? amount)
+        => text.Contains("orcamento")
+           && !text.Contains("como esta")
+           && (AsksToPost(text) || text.Contains("registro") || text.Contains("categoria") || amount is not null);
 
     private static bool AsksToPost(string text)
         => HasWord(text, "lanca") || HasWord(text, "lancar") || HasWord(text, "lancamento")
@@ -145,7 +189,9 @@ public static partial class VoiceCommandClassifier
 
     private static Entry ReadEntry(string raw, string text, decimal? digits)
     {
-        var type = text.Contains("receita") || text.Contains("renda") || text.Contains("a receber")
+        var type = text.Contains("aporte")
+            ? "ProjectContribution"
+            : text.Contains("receita") || text.Contains("renda") || text.Contains("a receber")
             ? "Income"
             : text.Contains("despesa") || text.Contains("a pagar") || text.Contains("paguei") || text.Contains("paga")
                 || text.Contains("conta de")

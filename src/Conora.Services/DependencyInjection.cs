@@ -29,7 +29,6 @@ public static class DependencyInjection
         services.AddScoped<DashboardService>();
         services.AddScoped<GamificationService>();
         services.AddScoped<GeminiService>();
-        services.AddScoped<IanReportService>();
         services.AddScoped<VoiceCommandService>();
         services.AddScoped<WhatsAppService>();
         services.AddScoped<ReceiptIntakeService>();

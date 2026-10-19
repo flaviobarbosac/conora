@@ -281,11 +281,12 @@ public sealed class HelpService
             ]),
 
         new("ia", "Ian",
-            "Pergunte sobre os seus dados; o Ian monta um relatório com números e gráfico em outra página.",
+            "Agente de voz na tela inicial. Abre telas, lança despesa ou receita e registra orçamento.",
             [
-                new("Pergunta", "Texto livre, por exemplo o resumo do mês ou a evolução de um gasto."),
-                new("Relatório", "Página estática com valores em cima e o gráfico escolhido embaixo."),
-                new("PDF", "Na página do relatório, exporta valores e gráfico no mesmo arquivo.")
+                new("Navegação", "Peça a tela, por exemplo orçamento ou lançamentos."),
+                new("Lançamento", "Diga se é despesa ou receita, o valor, a data, a descrição, a categoria e a conta."),
+                new("Orçamento", "Diga que é um orçamento, o valor e a categoria. Se a categoria não existir, o Ian mostra as opções."),
+                new("Raio-X", "Pergunte para onde a renda foi, ou peça o detalhe de uma seção. Usa os valores que o Raio-X já mostra, inclusive dos últimos meses."),
             ]),
 
         new("menu", "Menu e preferências",
