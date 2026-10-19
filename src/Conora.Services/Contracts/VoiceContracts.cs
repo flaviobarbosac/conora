@@ -2,7 +2,12 @@ namespace Conora.Services.Contracts;
 
 public sealed record SpeakRequest(string Text, string? Voice);
 
-public sealed record VoiceCommandRequest(string Transcript, string? CompetenceYm = null);
+public sealed record VoiceTurn(string Role, string Text);
+
+public sealed record VoiceCommandRequest(
+    string Transcript,
+    string? CompetenceYm = null,
+    IReadOnlyList<VoiceTurn>? History = null);
 
 /// <summary>
 /// Classified spoken command. The client navigates and saves; this response never does either.
