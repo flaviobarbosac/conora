@@ -758,14 +758,16 @@ public sealed class CategoryService
             return await _repo.AnyAsync<Entry>(e => e.CategoryId != null && categoryIds.Contains(e.CategoryId.Value), ct)
                    || await _repo.AnyAsync<CardPurchase>(p => categoryIds.Contains(p.CategoryId), ct)
                    || await _repo.AnyAsync<BudgetLine>(l => categoryIds.Contains(l.CategoryId), ct)
-                   || await _repo.AnyAsync<PatrimonyItem>(p => categoryIds.Contains(p.CategoryId), ct);
+                   || await _repo.AnyAsync<PatrimonyItem>(p => categoryIds.Contains(p.CategoryId), ct)
+                   || await _repo.AnyAsync<LifeProject>(p => p.CategoryId != null && categoryIds.Contains(p.CategoryId.Value), ct);
         }
 
         return await _repo.AnyForUsuariosAsync<Entry>(
                    memberIds, e => e.CategoryId != null && categoryIds.Contains(e.CategoryId.Value), ct)
                || await _repo.AnyForUsuariosAsync<CardPurchase>(memberIds, p => categoryIds.Contains(p.CategoryId), ct)
                || await _repo.AnyForUsuariosAsync<BudgetLine>(memberIds, l => categoryIds.Contains(l.CategoryId), ct)
-               || await _repo.AnyForUsuariosAsync<PatrimonyItem>(memberIds, p => categoryIds.Contains(p.CategoryId), ct);
+               || await _repo.AnyForUsuariosAsync<PatrimonyItem>(memberIds, p => categoryIds.Contains(p.CategoryId), ct)
+               || await _repo.AnyForUsuariosAsync<LifeProject>(memberIds, p => p.CategoryId != null && categoryIds.Contains(p.CategoryId.Value), ct);
     }
 
     private async Task<List<Guid>> ReplicaIdsAsync(Category account, IReadOnlyList<Guid> memberIds, CancellationToken ct)

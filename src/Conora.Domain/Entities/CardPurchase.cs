@@ -13,7 +13,7 @@ public class CardPurchase : ModelBase, ITenantOwned
     public Guid CategoryId { get; private set; }
     public string Description { get; private set; } = default!;
 
-    /// <summary>Budget competence = purchase month (spec v1.1 §2).</summary>
+    /// <summary>Month of the purchase. Category actuals use <see cref="AmountInCompetence"/> (invoice months).</summary>
     public string CompetenceYm { get; private set; } = default!;
 
     /// <summary>Invoice competence of the first installment (depends on the card closing day).</summary>
@@ -69,5 +69,20 @@ public class CardPurchase : ModelBase, ITenantOwned
         }
 
         return plan;
+    }
+
+    /// <summary>First invoice month that can still place a slice in <paramref name="ym"/> (max 60 installments).</summary>
+    public static string InvoiceWindowStart(string ym) => Competence.AddMonths(ym, -59);
+
+    /// <summary>Installment slice booked on the category in <paramref name="ym"/>. Zero when this bill does not fall in that month.</summary>
+    public decimal AmountInCompetence(string ym)
+    {
+        foreach (var (invoiceYm, amount) in InstallmentPlan())
+        {
+            if (invoiceYm == ym)
+                return amount;
+        }
+
+        return 0m;
     }
 }

@@ -18,6 +18,9 @@ public static class AiEndpoints
         group.MapPost("/voice", async (VoiceCommandRequest request, VoiceCommandService service, CancellationToken ct) =>
             Results.Ok(await service.ClassifyAsync(request, ct)));
 
+        group.MapPost("/voice/categories", async (SuggestCategoriesRequest request, VoiceCommandService service, CancellationToken ct) =>
+            Results.Ok(await service.SuggestCategoriesAsync(request, ct)));
+
         group.MapPost("/speak", async (SpeakRequest request, VoiceCommandService service, CancellationToken ct) =>
         {
             var wav = await service.SpeakAsync(request.Text ?? string.Empty, request.Voice, ct);

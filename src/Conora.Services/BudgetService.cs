@@ -110,21 +110,46 @@ public sealed class BudgetService
                 .GroupBy(e => e.CategoryId!.Value)
                 .Select(g => new AccountSum(g.Key, g.Sum(x => x.Amount))), ct);
 
-        var purchases = multi
-            ? await _repo.QueryForUsuariosAsync<CardPurchase, AccountSum>(userIds, q => q
-                .Where(p => p.CompetenceYm == ym && p.PurchasedAt <= until && allowedCategoryIds.Contains(p.CategoryId))
-                .GroupBy(p => p.CategoryId)
-                .Select(g => new AccountSum(g.Key, g.Sum(x => x.Amount))), ct)
-            : await _repo.QueryAsync<CardPurchase, AccountSum>(q => q
-                .Where(p => p.CompetenceYm == ym && p.PurchasedAt <= until && allowedCategoryIds.Contains(p.CategoryId))
-                .GroupBy(p => p.CategoryId)
-                .Select(g => new AccountSum(g.Key, g.Sum(x => x.Amount))), ct);
+        var purchases = await ListPurchasesTouchingAsync(ym, until, allowedCategoryIds, userIds, multi, ct);
 
         var totals = new Dictionary<Guid, decimal>();
-        foreach (var row in entries.Concat(purchases))
+        foreach (var row in entries)
             totals[row.CategoryId] = totals.GetValueOrDefault(row.CategoryId) + row.Amount;
+        foreach (var purchase in purchases)
+        {
+            var slice = purchase.AmountInCompetence(ym);
+            if (slice == 0)
+                continue;
+            totals[purchase.CategoryId] = totals.GetValueOrDefault(purchase.CategoryId) + slice;
+        }
 
         return totals;
+    }
+
+    /// <summary>Purchases whose invoice plan can place a slice in the competence. The caller sums <see cref="CardPurchase.AmountInCompetence"/>.</summary>
+    private async Task<IReadOnlyList<CardPurchase>> ListPurchasesTouchingAsync(
+        string ym,
+        DateTime until,
+        HashSet<Guid> categoryIds,
+        IReadOnlyList<Guid> userIds,
+        bool multi,
+        CancellationToken ct)
+    {
+        var windowStart = CardPurchase.InvoiceWindowStart(ym);
+        return multi
+            ? await _repo.ListForUsuariosAsync<CardPurchase>(
+                userIds,
+                p => p.FirstInvoiceYm.CompareTo(windowStart) >= 0
+                     && p.FirstInvoiceYm.CompareTo(ym) <= 0
+                     && p.PurchasedAt <= until
+                     && categoryIds.Contains(p.CategoryId),
+                ct)
+            : await _repo.ListAsync<CardPurchase>(
+                p => p.FirstInvoiceYm.CompareTo(windowStart) >= 0
+                     && p.FirstInvoiceYm.CompareTo(ym) <= 0
+                     && p.PurchasedAt <= until
+                     && categoryIds.Contains(p.CategoryId),
+                ct);
     }
 
     public async Task<BudgetResponse> GetAsync(string competenceYm, CancellationToken ct, SharingScope? sharingScope = null)
@@ -232,6 +257,12 @@ public sealed class BudgetService
         var totalPlanned = displayLines.Sum(l => l.PlannedAmount);
         var totalActual = actuals.Values.Sum();
         var receivedIncome = await GetReceivedIncomeAsync(ym, userIds, multi, scope, ct);
+        var monthResult = MonthBalance.FromReceived(
+            receivedIncome,
+            sections.First(s => s.Section == CategorySection.Discount).ActualAmount,
+            sections.First(s => s.Section == CategorySection.LifeProject).ActualAmount,
+            sections.First(s => s.Section == CategorySection.Essential).ActualAmount,
+            sections.First(s => s.Section == CategorySection.Social).ActualAmount);
         return new BudgetResponse(
             ym,
             mode,
@@ -240,7 +271,7 @@ public sealed class BudgetService
             Project(ym, totalActual),
             spendable,
             receivedIncome,
-            spendable - totalActual,
+            monthResult,
             sources,
             sections,
             displayLines,
@@ -342,10 +373,35 @@ public sealed class BudgetService
             .ThenBy(l => l.CategoryName)
             .ToList();
 
-        var totals = months.Select(ym => new BudgetYearMonthCell(
-            ym,
-            plannedByMonth[ym].Values.Sum(),
-            actualByMonth[ym].Values.Sum())).ToList();
+        var receivedByMonth = await GetReceivedIncomeByMonthAsync(months, userIds, multi, ct);
+        var totals = months.Select(ym =>
+        {
+            var received = receivedByMonth.GetValueOrDefault(ym);
+            var monthResult = MonthBalance.FromReceived(
+                received,
+                ActualOf(ym, CategorySection.Discount),
+                ActualOf(ym, CategorySection.LifeProject),
+                ActualOf(ym, CategorySection.Essential),
+                ActualOf(ym, CategorySection.Social));
+            return new BudgetYearMonthCell(
+                ym,
+                plannedByMonth[ym].Values.Sum(),
+                actualByMonth[ym].Values.Sum(),
+                received,
+                monthResult);
+        }).ToList();
+
+        decimal ActualOf(string monthYm, CategorySection section)
+        {
+            decimal sum = 0;
+            foreach (var (id, amount) in actualByMonth[monthYm])
+            {
+                if (accounts.TryGetValue(id, out var account) && account.Section == section)
+                    sum += amount;
+            }
+
+            return sum;
+        }
 
         return new BudgetYearResponse(year, months, yearLines, totals);
     }
@@ -435,16 +491,13 @@ public sealed class BudgetService
                      || e.Type == EntryType.Contribution
                      || e.Type == EntryType.ProjectContribution),
             ct);
-        var purchases = await _repo.ListForUsuariosAsync<CardPurchase>(
-            userIds,
-            p => p.CompetenceYm == ym && p.PurchasedAt <= until && categoryIds.Contains(p.CategoryId),
-            ct);
+        var purchases = await ListPurchasesTouchingAsync(ym, until, categoryIds, userIds, userIds.Count > 1, ct);
 
         var byUser = userIds.ToDictionary(id => id, _ => 0m);
         foreach (var entry in entries)
             byUser[entry.UsuarioId] = byUser.GetValueOrDefault(entry.UsuarioId) + entry.Amount;
         foreach (var purchase in purchases)
-            byUser[purchase.UsuarioId] = byUser.GetValueOrDefault(purchase.UsuarioId) + purchase.Amount;
+            byUser[purchase.UsuarioId] = byUser.GetValueOrDefault(purchase.UsuarioId) + purchase.AmountInCompetence(ym);
 
         var names = userIds.ToDictionary(id => id, id => id == _family.RequireUserId() ? "Você" : "Membro");
         var group = await _family.GetGroupAsync(ct);
@@ -554,25 +607,33 @@ public sealed class BudgetService
         await EnsureManualPlanAllowedAsync(request.CategoryId, account, ct);
 
         var total = decimal.Round(request.TotalAmount, 2);
-        var each = decimal.Round(total / request.InstallmentCount, 2);
-        var allocated = 0m;
         var startBudget = await _repo.FirstOrDefaultAsync<Budget>(b => b.CompetenceYm == startYm, ct, track: false);
         var expenseDay = startBudget is null
             ? null
             : (await _repo.FirstOrDefaultAsync<BudgetLine>(
                 l => l.BudgetId == startBudget.Id && l.CategoryId == request.CategoryId, ct, track: false))?.ExpenseDay;
 
+        var slots = new List<Budget>();
         for (var i = 0; i < request.InstallmentCount; i++)
         {
             var ym = Competence.AddMonths(startYm, i);
             await _months.EnsureOpenAsync(ym, ct);
-            var value = i == request.InstallmentCount - 1 ? total - allocated : each;
-            allocated += value;
-
             var budget = await GetOrCreateBudgetAsync(ym, BudgetMode.Detailed, ct);
             if (!request.Overwrite && await GetPlannedAsync(budget.Id, request.CategoryId, ct) > 0)
                 continue;
-            await SetLineAsync(budget, request.CategoryId, value, ct, expenseDay, updateDay: true);
+            slots.Add(budget);
+        }
+
+        if (slots.Count == 0)
+            throw new ValidationException("installmentCount", "Todos os meses já têm previsto. Substitua para parcelar de novo.");
+
+        var each = decimal.Round(total / slots.Count, 2);
+        var allocated = 0m;
+        for (var i = 0; i < slots.Count; i++)
+        {
+            var value = i == slots.Count - 1 ? total - allocated : each;
+            allocated += value;
+            await SetLineAsync(slots[i], request.CategoryId, value, ct, expenseDay, updateDay: true);
         }
 
         await _uow.SaveChangesAsync(ct);
@@ -785,6 +846,47 @@ public sealed class BudgetService
                      (e.CategoryId != null && allowedCategoryIds.Contains(e.CategoryId.Value))
                      || e.CategoryId == null),
             e => e.Amount, ct);
+    }
+
+    private async Task<Dictionary<string, decimal>> GetReceivedIncomeByMonthAsync(
+        IReadOnlyList<string> months,
+        IReadOnlyList<Guid> userIds,
+        bool multi,
+        CancellationToken ct)
+    {
+        var monthSet = months.ToHashSet(StringComparer.Ordinal);
+        var selfId = _family.RequireUserId();
+        var allowedCategoryIds = (await _repo.ListForUsuariosAsync<Category>(
+                userIds, c => !c.IsPendingReview && c.Level == CategoryLevel.Analytical, ct))
+            .Select(c => c.Id)
+            .ToHashSet();
+
+        var entries = multi
+            ? await _repo.ListForUsuariosAsync<Entry>(
+                userIds,
+                e => monthSet.Contains(e.CompetenceYm)
+                     && e.Type == EntryType.Income
+                     && (
+                         (e.CategoryId != null && allowedCategoryIds.Contains(e.CategoryId.Value))
+                         || (e.UsuarioId == selfId && e.CategoryId == null)),
+                ct)
+            : await _repo.ListAsync<Entry>(
+                e => monthSet.Contains(e.CompetenceYm)
+                     && e.Type == EntryType.Income
+                     && (
+                         (e.CategoryId != null && allowedCategoryIds.Contains(e.CategoryId.Value))
+                         || e.CategoryId == null),
+                ct);
+
+        var totals = new Dictionary<string, decimal>(StringComparer.Ordinal);
+        foreach (var entry in entries)
+        {
+            if (entry.OccurredAt > ActualUntilUtc(entry.CompetenceYm))
+                continue;
+            totals[entry.CompetenceYm] = totals.GetValueOrDefault(entry.CompetenceYm) + entry.Amount;
+        }
+
+        return totals;
     }
 
     private Task<bool> HasLifeProjectAsync(Guid categoryId, CancellationToken ct)

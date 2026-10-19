@@ -70,5 +70,12 @@ public class LifeProject : ModelBase, ITenantOwned
     public void SetScope(LifeProjectScope scope) => Scope = scope;
 
     /// <summary>Adds (or removes, when negative) a contribution. No yield is modeled (spec C10).</summary>
-    public void ApplyContribution(decimal delta) => AccumulatedAmount = Math.Max(0, AccumulatedAmount + delta);
+    public void ApplyContribution(decimal delta)
+    {
+        var next = AccumulatedAmount + delta;
+        if (next < 0)
+            throw new ValidationException("amount", "O estorno deixaria o acumulado do projeto negativo.");
+
+        AccumulatedAmount = next;
+    }
 }
