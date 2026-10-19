@@ -14,7 +14,6 @@ namespace Conora.Services;
 public sealed class VoiceCommandService
 {
     private const int MaxLength = 1000;
-    private const int MaxQuestionsPerHour = 20;
 
     private const string SystemInstruction =
         "Você classifica um comando de voz do app Conora. Responda só JSON. " +
@@ -239,8 +238,10 @@ public sealed class VoiceCommandService
 
         var local = VoiceCommandClassifier.Classify(transcript);
         var speaker = await SpeakerAsync(ct);
-        if (!_gemini.IsConfigured || await OverHourlyLimitAsync(ct))
+        if (!_gemini.IsConfigured)
             return await WithSpokenAnswerAsync(local, transcript, request.CompetenceYm, speaker, ct);
+        if (await OverHourlyLimitAsync(ct))
+            return ToResponse(local with { Reply = Address(speaker, GeminiQuota.HourlyLimitMessage) });
 
         var raw = await _gemini.GenerateJsonAsync(SystemInstruction, PromptFor(request, transcript, speaker), ct);
         AuditRecorder.Record(_audits, _correlation, "Gemini", Guid.NewGuid(), "GeminiUsed", new { Length = transcript.Length, Kind = "voice", Ok = raw is not null });
@@ -291,7 +292,7 @@ public sealed class VoiceCommandService
     {
         var cutoff = DateTime.UtcNow.AddHours(-1);
         var used = await _repo.CountAsync<AuditEvent>(e => e.EntityName == "Gemini" && e.TimestampUtc > cutoff, ct);
-        return used >= MaxQuestionsPerHour;
+        return used >= GeminiQuota.MaxCallsPerHour;
     }
 
     private static string PromptFor(VoiceCommandRequest request, string transcript, (string Full, string First)? speaker)
@@ -449,6 +450,17 @@ public sealed class VoiceCommandService
     {
         if (result.Intent != VoiceCommandClassifier.Ask)
             return ToResponse(result with { Reply = Address(speaker, result.Reply) });
+        if (VoiceCommandClassifier.LooksLikeOpen(transcript))
+        {
+            if (IsModelReply(result.Reply))
+                return ToResponse(result with { Reply = Address(speaker, result.Reply) });
+
+            var line = await ComposeGreetingAsync(transcript, speaker, ct);
+            if (!string.IsNullOrWhiteSpace(line))
+                return ToResponse(result with { Reply = line });
+
+            return ToResponse(result with { Reply = Address(speaker, VoiceCommandClassifier.OpenFallback(BrazilNow())) });
+        }
         if (IanInsight.LooksLike(transcript))
         {
             var insight = await ComposeInsightAsync(transcript, competenceYm, ct);
@@ -461,6 +473,61 @@ public sealed class VoiceCommandService
             ? VoiceCommandClassifier.HelpReply
             : VoiceCommandClassifier.ScopeReply;
         return ToResponse(result with { Reply = Address(speaker, fallback) });
+    }
+
+    private static bool IsModelReply(string? reply)
+    {
+        var text = reply?.Trim() ?? "";
+        return text.Length > 0
+            && text != VoiceCommandClassifier.ScopeReply
+            && text != VoiceCommandClassifier.HelpReply;
+    }
+
+    private static DateTime BrazilNow()
+    {
+        try
+        {
+            var zone = TimeZoneInfo.FindSystemTimeZoneById("America/Sao_Paulo");
+            return TimeZoneInfo.ConvertTimeFromUtc(DateTime.UtcNow, zone);
+        }
+        catch (TimeZoneNotFoundException)
+        {
+            return DateTime.Now;
+        }
+    }
+
+    private async Task<string?> ComposeGreetingAsync(
+        string transcript,
+        (string Full, string First)? speaker,
+        CancellationToken ct)
+    {
+        if (!_gemini.IsConfigured)
+            return null;
+        if (await OverHourlyLimitAsync(ct))
+            return Address(speaker, GeminiQuota.HourlyLimitMessage);
+
+        var who = speaker is null ? "" : $"Trate por {speaker.Value.First}. ";
+        var raw = await _gemini.GenerateJsonAsync(
+            "Você é o Ian. Responda só JSON {\"reply\":\"...\"}. " +
+            "A pessoa cumprimentou. Escreva uma frase falada, natural e curta. " +
+            who +
+            "Não liste funções do app e não use menu.",
+            transcript,
+            ct);
+        AuditRecorder.Record(_audits, _correlation, "Gemini", Guid.NewGuid(), "GeminiUsed", new { Length = transcript.Length, Kind = "voice-greeting", Ok = raw is not null });
+        await _uow.SaveChangesAsync(ct);
+        if (string.IsNullOrWhiteSpace(raw))
+            return null;
+        try
+        {
+            using var doc = JsonDocument.Parse(raw);
+            var reply = ReadString(doc.RootElement, "reply");
+            return string.IsNullOrWhiteSpace(reply) ? null : Address(speaker, reply);
+        }
+        catch (JsonException)
+        {
+            return null;
+        }
     }
 
     private async Task<string> ComposeInsightAsync(string transcript, string? competenceYm, CancellationToken ct)

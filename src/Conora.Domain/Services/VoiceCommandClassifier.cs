@@ -90,6 +90,9 @@ public static partial class VoiceCommandClassifier
         if (LooksLikeHelp(text))
             return new Result(Ask, null, null, null, HelpReply);
 
+        if (LooksLikeOpen(text))
+            return new Result(Ask, null, null, null, "");
+
         if (AsksForReport(text))
             return new Result(Ask, null, null, null, ReportPausedReply);
 
@@ -100,6 +103,43 @@ public static partial class VoiceCommandClassifier
 
     public const string HelpReply =
         "Posso abrir uma tela, lançar uma despesa, uma receita ou um aporte, registrar um orçamento e dizer para onde a sua receita está indo, neste mês ou nos últimos meses, inclusive em essencial, social, descontos ou projetos.";
+
+    public static bool LooksLikeOpen(string? transcript)
+    {
+        if (LooksLikeGreeting(transcript))
+            return true;
+
+        var text = IanSubjectMatcher.Normalize(transcript);
+        if (text.Length == 0 || AsksToPost(text) || OpensScreen(text) || ReadAmount(text) is not null)
+            return false;
+        if (text.Contains("vaz") || text.Contains("detalh") || text.Contains("aprofund") || text.Contains("ultim"))
+            return false;
+
+        return text.Contains("como estamos")
+            || text.Contains("como esta hoje")
+            || text.Contains("como vamos");
+    }
+
+    public static string OpenFallback(DateTime local)
+    {
+        var hello = local.Hour < 12 ? "Bom dia" : local.Hour < 18 ? "Boa tarde" : "Boa noite";
+        return $"{hello}! Em que posso ajudar?";
+    }
+
+    public static bool LooksLikeGreeting(string? transcript)
+    {
+        var text = IanSubjectMatcher.Normalize(transcript);
+        if (text.Length == 0 || AsksToPost(text) || OpensScreen(text) || ReadAmount(text) is not null)
+            return false;
+
+        return text is "oi" or "ola" or "bom dia" or "boa tarde" or "boa noite" or "boa madrugada"
+                or "e ai" or "tudo bem" or "como vai"
+            || text.StartsWith("bom dia ", StringComparison.Ordinal)
+            || text.StartsWith("boa tarde ", StringComparison.Ordinal)
+            || text.StartsWith("boa noite ", StringComparison.Ordinal)
+            || text.StartsWith("oi ", StringComparison.Ordinal)
+            || text.StartsWith("ola ", StringComparison.Ordinal);
+    }
 
     public static bool LooksLikeHelp(string? transcript)
     {
