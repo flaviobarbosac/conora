@@ -32,6 +32,7 @@ public sealed class VoiceCommandService
         "reply é uma frase curta em português. Em ask, reply é a resposta direta, sem falar de relatório de despesa. " +
         "Se for action, reply só resume o que foi entendido, sem pedir confirmação e sem perguntar campo que já veio na frase. " +
         "Nunca diga que já gravou ou que já abriu a tela. " +
+        "Se a mensagem trouxer uma conversa anterior, continue essa mesma conversa. Use o que já foi dito e não recomece do zero. " +
         "Formato: {\"intent\":\"navigate|action|ask\",\"route\":null,\"action\":null,\"entry\":null,\"reply\":\"...\"}.";
 
     private readonly IGeminiClient _gemini;
@@ -75,7 +76,7 @@ public sealed class VoiceCommandService
         if (!_gemini.IsConfigured || await OverHourlyLimitAsync(ct))
             return await WithSpokenAnswerAsync(local, transcript, request.CompetenceYm, ct);
 
-        var raw = await _gemini.GenerateJsonAsync(SystemInstruction, transcript, ct);
+        var raw = await _gemini.GenerateJsonAsync(SystemInstruction, PromptFor(request, transcript), ct);
         AuditRecorder.Record(_audits, _correlation, "Gemini", Guid.NewGuid(), "GeminiUsed", new { Length = transcript.Length, Kind = "voice", Ok = raw is not null });
         await _uow.SaveChangesAsync(ct);
 
@@ -96,6 +97,29 @@ public sealed class VoiceCommandService
         var cutoff = DateTime.UtcNow.AddHours(-1);
         var used = await _repo.CountAsync<AuditEvent>(e => e.EntityName == "Gemini" && e.TimestampUtc > cutoff, ct);
         return used >= MaxQuestionsPerHour;
+    }
+
+    private static string PromptFor(VoiceCommandRequest request, string transcript)
+    {
+        var history = request.History;
+        if (history is null || history.Count == 0)
+            return transcript;
+
+        var lines = new System.Text.StringBuilder();
+        lines.AppendLine("Conversa anterior. Continue a mesma conversa e use o que já foi dito:");
+        foreach (var turn in history.TakeLast(12))
+        {
+            var text = turn.Text?.Trim();
+            if (string.IsNullOrWhiteSpace(text))
+                continue;
+            if (text.Length > 400)
+                text = text[..400];
+            var who = string.Equals(turn.Role, "assistant", StringComparison.OrdinalIgnoreCase) ? "Assistente" : "Usuário";
+            lines.Append(who).Append(": ").AppendLine(text);
+        }
+
+        lines.Append("Nova fala: ").Append(transcript);
+        return lines.ToString();
     }
 
     private static VoiceCommandClassifier.Result MergeEntry(
