@@ -26,6 +26,7 @@ public class UserConfiguration : IEntityTypeConfiguration<User>
         builder.Property(u => u.ReserveTargetMonths).IsRequired();
         builder.Property(u => u.MonthCloseDay).IsRequired();
         builder.Property(u => u.IncludeAbsoluteValuesInRetrospective).IsRequired();
+        builder.Property(u => u.VoiceEntryConfirm).IsRequired().HasDefaultValue(true);
         builder.Property(u => u.Version).IsRequired();
         builder.Property(u => u.CreatedAt).IsRequired();
         builder.Property(u => u.UpdatedAt).IsRequired();

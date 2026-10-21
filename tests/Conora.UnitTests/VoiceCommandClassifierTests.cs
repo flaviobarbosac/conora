@@ -94,12 +94,12 @@ public class VoiceCommandClassifierTests
     }
 
     [Fact]
-    public void Aporte_isAProjectContribution()
+    public void SpokenPayment_isIncome()
     {
         var result = VoiceCommandClassifier.Classify("lança um aporte de 200 reais no projeto viagem");
         Assert.Equal(VoiceCommandClassifier.Action, result.Intent);
         Assert.Equal(VoiceCommandClassifier.CreateEntry, result.Action);
-        Assert.Equal("ProjectContribution", result.Entry?.Type);
+        Assert.Equal("Income", result.Entry?.Type);
         Assert.Equal(200m, result.Entry?.Amount);
     }
 

@@ -82,7 +82,12 @@ public sealed class BudgetService
         var until = ActualUntilUtc(ym);
 
         var allowedCategoryIds = (await _repo.ListForUsuariosAsync<Category>(
-                userIds, c => !c.IsPendingReview && c.Level == CategoryLevel.Analytical, ct))
+                userIds,
+                c => !c.IsPendingReview
+                     && c.Level == CategoryLevel.Analytical
+                     && c.Section != CategorySection.Asset
+                     && c.Section != CategorySection.Liability,
+                ct))
             .Select(c => c.Id)
             .ToHashSet();
 
@@ -821,7 +826,9 @@ public sealed class BudgetService
         var until = ActualUntilUtc(ym);
         var selfId = _family.RequireUserId();
         var allowedCategoryIds = (await _repo.ListForUsuariosAsync<Category>(
-                userIds, c => !c.IsPendingReview && c.Level == CategoryLevel.Analytical, ct))
+                userIds,
+                c => !c.IsPendingReview && c.Level == CategoryLevel.Analytical && c.Section == CategorySection.Income,
+                ct))
             .Select(c => c.Id)
             .ToHashSet();
 
@@ -857,7 +864,9 @@ public sealed class BudgetService
         var monthSet = months.ToHashSet(StringComparer.Ordinal);
         var selfId = _family.RequireUserId();
         var allowedCategoryIds = (await _repo.ListForUsuariosAsync<Category>(
-                userIds, c => !c.IsPendingReview && c.Level == CategoryLevel.Analytical, ct))
+                userIds,
+                c => !c.IsPendingReview && c.Level == CategoryLevel.Analytical && c.Section == CategorySection.Income,
+                ct))
             .Select(c => c.Id)
             .ToHashSet();
 

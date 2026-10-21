@@ -20,7 +20,7 @@ public sealed class HelpService
         new(6, "corrigir", "Corrigir",
             "Ajuste o orçamento do mês aberto quando a realidade mudar e feche o mês para travar o histórico."),
         new(7, "construir", "Construir",
-            "Crie projetos com prazo e início do aporte. O Conora gera a parcela sugerida no orçamento até o prazo.")
+            "Crie projetos com prazo e início do rateio. O Conora gera a parcela sugerida no orçamento até o prazo.")
     ];
 
     private static readonly IReadOnlyList<HelpTermResponse> Glossary =
@@ -33,10 +33,10 @@ public sealed class HelpService
             "Visão do mês: previsto, realizado e % do previsto. Na raiz mostra Renda, Despesa e Patrimônio; o clique desce a cadeia até o item lançado."),
         new("orcamento-cadastro", "Orçamento (cadastro)",
             "Tela para informar o valor planejado de cada conta, salvar, copiar o mês anterior e ver o ano."),
-        new("inicio-aporte", "Início do aporte",
+        new("inicio-rateio", "Início do rateio",
             "Primeira competência em que o projeto entra no orçamento. Padrão: mês seguinte. Pode ser qualquer mês entre o atual e o prazo."),
         new("parcela-sugerida", "Parcela sugerida",
-            "Meta dividida pelos meses do início do aporte até o prazo (inclusive). Esse valor vira uma linha de orçamento em cada mês."),
+            "Meta dividida pelos meses do início do rateio até o prazo (inclusive). Esse valor vira uma linha de orçamento em cada mês."),
         new("horizonte", "Horizonte",
             "Curto, médio ou longo prazo. Vem da categoria (grupo pai), não de um campo no projeto."),
         new("planejado", "Planejado",
@@ -50,7 +50,7 @@ public sealed class HelpService
         new("investimento", "Investimento (bloco)",
             "Linhas de curto, médio e longo prazo no orçamento (reserva, consórcio, previdência)."),
         new("projeto-de-vida", "Projeto de vida",
-            "Objetivo com meta, prazo, início do aporte e conta do plano. Vários projetos podem usar a mesma conta. Progresso = acumulado / meta (só leitura)."),
+            "Objetivo com valor original, valor atualizado, prazo e início do rateio. O valor atualizado é o original menos os lançamentos de receita na categoria. Vários projetos podem usar a mesma conta."),
         new("tenant", "Sua conta (isolamento)",
             "Cada pessoa tem login e dados próprios. Contas bancárias, cartões e lançamentos são individuais. No grupo familiar, só algumas telas mostram a soma dos dois — sem misturar o dinheiro de cada um."),
         new("grupo-familiar", "Grupo familiar",
@@ -109,7 +109,7 @@ public sealed class HelpService
         new("lancamentos", "Lançamentos",
             "Registra o movimento do dia a dia. É a fonte do realizado no Raio-X.",
             [
-                new("Tipo", "Despesa, renda, transferência, contribuição ou aporte em projeto."),
+                new("Tipo", "Despesa, renda, transferência ou contribuição. Projeto de vida só entra em receita."),
                 new("Valor", "Valor do lançamento, sempre com duas casas decimais."),
                 new("Data", "Dia em que a movimentação ocorreu."),
                 new("Descrição", "Texto livre que identifica o lançamento."),
@@ -199,22 +199,23 @@ public sealed class HelpService
             ]),
 
         new("projetos", "Projetos de vida",
-            "Metas com prazo, início do aporte e conta do plano. Pessoal ou do grupo familiar.",
+            "Metas com prazo, início do rateio e conta do plano. Pessoal ou do grupo familiar. O pagamento entra como receita na categoria do projeto.",
             [
                 new("Dashboard", "Barras por horizonte: verde curto, amarelo médio, azul longo. Acima da meta fica vermelho, com o texto Acima da meta. Clique no card abre o detalhe."),
                 new("Nome", "Nome do objetivo."),
                 new("Descrição detalhada", "Texto livre do projeto (opcional). Aparece no detalhe e em preview no dashboard."),
                 new("Conta do plano", "Define o horizonte (curto/médio/longo). Contas de Projetos de vida; vários projetos podem usar a mesma conta."),
                 new("Meta", "Valor que você quer atingir."),
-                new("Prazo", "Competência alvo. Obrigatório e não pode ser antes do início do aporte."),
-                new("Início do aporte", "Primeiro mês no orçamento. Padrão: mês seguinte. Faixa: mês atual até o prazo."),
+                new("Prazo", "Competência alvo. Obrigatório e não pode ser antes do início do rateio."),
+                new("Início do rateio", "Primeiro mês no orçamento. Padrão: mês seguinte. Faixa: mês atual até o prazo."),
                 new("Parcela sugerida", "Preview só leitura: meta ÷ meses (início até o prazo, inclusive)."),
                 new("Orçamento gerado", "Ao criar ou alterar, o Conora grava essa parcela em cada mês do intervalo. Excluir o projeto remove essas linhas."),
-                new("Progresso", "Acumulado / meta. Só leitura."),
+                new("Valor original", "Meta usada no rateio do orçamento. Não muda com os lançamentos."),
+                new("Valor atualizado", "Valor original menos os lançamentos de receita na categoria do projeto."),
                 new("Filtro da lista", "Na própria tela: Todos, Curto, Médio e Longo. Na Home, as barras abrem o filtro correspondente."),
                 new("Escopo pessoal", "Só você vê e edita."),
                 new("Escopo do grupo", "Aparece para os dois; só o dono edita ou apaga. Exige grupo ativo."),
-                new("Aporte", "Lançamento que sai da sua conta e aumenta o acumulado. Feito no detalhe do projeto.")
+                new("Lançamento", "Receita na categoria do projeto reduz o valor atualizado. Não existe cadastro separado.")
             ]),
 
         new("patrimonio", "Patrimônio",
@@ -222,7 +223,7 @@ public sealed class HelpService
             [
                 new("Nome", "Identificação do item."),
                 new("Tipo", "Ativo (bem) ou passivo (dívida)."),
-                new("Valor", "Valor atual do bem ou da dívida."),
+                new("Valor", "Valor atual do bem ou da dívida. Receita na categoria aumenta; despesa diminui."),
                 new("Patrimônio líquido", "Ativos menos passivos.")
             ]),
 

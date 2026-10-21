@@ -170,7 +170,8 @@ public sealed class FamilyGroupService
             request.EmailsEnabled,
             request.ReserveTargetMonths,
             request.MonthCloseDay,
-            request.IncludeAbsoluteValuesInRetrospective);
+            request.IncludeAbsoluteValuesInRetrospective,
+            request.VoiceEntryConfirm);
         await _uow.SaveChangesAsync(ct);
 
         if (request.EmailsEnabled)
@@ -846,7 +847,8 @@ public sealed class FamilyGroupService
             user.EmailsEnabled,
             user.ReserveTargetMonths,
             user.MonthCloseDay,
-            user.IncludeAbsoluteValuesInRetrospective);
+            user.IncludeAbsoluteValuesInRetrospective,
+            user.VoiceEntryConfirm);
 
     private static FamilyInviteResponse ToInvite(FamilyInvite i)
         => new(i.Id, i.Email, i.ExpiresAt, i.AcceptedAt, i.CancelledAt, i.IsOpen);

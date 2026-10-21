@@ -63,7 +63,8 @@ public sealed record UpdatePreferencesRequest(
     bool EmailsEnabled,
     int ReserveTargetMonths,
     int MonthCloseDay,
-    bool IncludeAbsoluteValuesInRetrospective);
+    bool IncludeAbsoluteValuesInRetrospective,
+    bool VoiceEntryConfirm = true);
 
 public sealed record ProfileResponse(
     Guid UsuarioId,
@@ -75,7 +76,8 @@ public sealed record ProfileResponse(
     bool EmailsEnabled,
     int ReserveTargetMonths,
     int MonthCloseDay,
-    bool IncludeAbsoluteValuesInRetrospective);
+    bool IncludeAbsoluteValuesInRetrospective,
+    bool VoiceEntryConfirm = true);
 
 public sealed record CategoryMemberBreakdownRow(
     Guid UsuarioId,
