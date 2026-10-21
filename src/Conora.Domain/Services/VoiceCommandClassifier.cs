@@ -99,10 +99,10 @@ public static partial class VoiceCommandClassifier
         return new Result(Ask, null, null, null, string.Empty);
     }
 
-    public const string ScopeReply = "Posso abrir uma tela, lançar uma despesa, uma receita ou um aporte, ou registrar um orçamento.";
+    public const string ScopeReply = "Posso abrir uma tela, lançar uma despesa ou uma receita, ou registrar um orçamento.";
 
     public const string HelpReply =
-        "Posso abrir uma tela, lançar uma despesa, uma receita ou um aporte, registrar um orçamento e dizer para onde a sua receita está indo, neste mês ou nos últimos meses, inclusive em essencial, social, descontos ou projetos.";
+        "Posso abrir uma tela, lançar uma despesa ou uma receita, registrar um orçamento e dizer para onde a sua receita está indo, neste mês ou nos últimos meses, inclusive em essencial, social, descontos ou projetos.";
 
     public static bool LooksLikeOpen(string? transcript)
     {
@@ -229,9 +229,7 @@ public static partial class VoiceCommandClassifier
 
     private static Entry ReadEntry(string raw, string text, decimal? digits)
     {
-        var type = text.Contains("aporte")
-            ? "ProjectContribution"
-            : text.Contains("receita") || text.Contains("renda") || text.Contains("a receber")
+        var type = text.Contains("aporte") || text.Contains("receita") || text.Contains("renda") || text.Contains("a receber")
             ? "Income"
             : text.Contains("despesa") || text.Contains("a pagar") || text.Contains("paguei") || text.Contains("paga")
                 || text.Contains("conta de")

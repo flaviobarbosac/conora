@@ -31,7 +31,7 @@ public static class Competence
         var current = Require(fromYm, fromField);
         var end = Require(toYm, toField);
         if (Compare(current, end) > 0)
-            throw new ValidationException(fromField, "O início do aporte não pode ser depois do prazo.");
+            throw new ValidationException(fromField, "O início do rateio não pode ser depois do prazo.");
 
         var months = new List<string>();
         while (true)

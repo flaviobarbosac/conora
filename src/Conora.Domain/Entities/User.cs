@@ -24,6 +24,8 @@ public class User : ModelBase
     public int ReserveTargetMonths { get; private set; } = 6;
     public int MonthCloseDay { get; private set; } = 1;
     public bool IncludeAbsoluteValuesInRetrospective { get; private set; }
+    /// <summary>When true, Ian shows the spoken launch and waits for approval before saving.</summary>
+    public bool VoiceEntryConfirm { get; private set; } = true;
 
     private User()
     {
@@ -117,7 +119,8 @@ public class User : ModelBase
         bool emailsEnabled,
         int reserveTargetMonths,
         int monthCloseDay,
-        bool includeAbsoluteValuesInRetrospective)
+        bool includeAbsoluteValuesInRetrospective,
+        bool voiceEntryConfirm = true)
     {
         var errors = new Dictionary<string, string[]>();
         var theme = ThemeCatalog.Normalize(themeId);
@@ -136,6 +139,7 @@ public class User : ModelBase
         ReserveTargetMonths = reserveTargetMonths;
         MonthCloseDay = monthCloseDay;
         IncludeAbsoluteValuesInRetrospective = includeAbsoluteValuesInRetrospective;
+        VoiceEntryConfirm = voiceEntryConfirm;
     }
 
     public void RequestDeletion()

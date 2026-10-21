@@ -21,8 +21,8 @@ public sealed class VoiceCommandService
         "navigate: o usuário quer abrir ou mudar de tela, inclusive 'ir pra', 'ir para', 'mover pra tela' e 'vai pra'. route é um destes caminhos: " +
         "/ /orcamento /raio-x /lancamentos /categorias /contas /cartoes /projetos /patrimonio /membros /marcos /relatorios /diagnostico /importar /mes /perfil /configuracoes /ajuda /plano /whatsapp. " +
         "action create-budget: o usuário quer registrar um valor de orçamento numa categoria, não abrir a tela. entry.type fica null. entry.categoryName é a categoria. entry.amount é o valor previsto. " +
-        "action create-entry: o usuário quer gravar um lançamento de despesa, de receita ou de aporte em projeto de vida. entry.type é Expense, Income ou ProjectContribution. " +
-        "Aporte ou aportar é ProjectContribution. Receita, renda ou a receber é Income. Despesa, a pagar ou conta de é Expense. " +
+        "action create-entry: o usuário quer gravar um lançamento de despesa ou de receita. entry.type é Expense ou Income. " +
+        "Receita, renda ou a receber é Income. Despesa, a pagar ou conta de é Expense. " +
         "entry.amount é número ou null. entry.date é hoje, ontem ou yyyy-MM-dd, ou null. " +
         "entry.description é o referente. entry.categoryName é a categoria. entry.accountName é a conta bancária. " +
         "Preencha todo campo que a frase trouxe, de uma vez. Não peça campo a campo. " +
@@ -31,7 +31,7 @@ public sealed class VoiceCommandService
         "ask: conversa. Você é o Ian. Fale pelo primeiro nome de quem está logado, de um jeito natural, como pessoa. " +
         "Se a pessoa cumprimentar, se apresentar ou perguntar quem você é e o que você pode fazer, responda no diálogo, sem frase pronta. " +
         "Se ela disser outro nome, reconheça, e continue tratando pelo primeiro nome da conta. " +
-        "O que você faz de fato: abrir uma tela do Conora, lançar despesa, receita ou aporte, registrar orçamento e comentar a receita só com números que já foram informados. " +
+        "O que você faz de fato: abrir uma tela do Conora, lançar despesa ou receita, registrar orçamento e comentar a receita só com números que já foram informados. " +
         "Não invente valor, saldo, categoria nem dado que não veio. Se não souber, diga e pergunte. " +
         "reply de ask é a fala curta para áudio, com o primeiro nome. " +
         "Se for action, reply só resume o que foi entendido, sem pedir confirmação e sem perguntar campo que já veio na frase. " +
@@ -79,9 +79,10 @@ public sealed class VoiceCommandService
     private static readonly CategorySection[] ExpenseSections =
     [
         CategorySection.Discount,
-        CategorySection.LifeProject,
         CategorySection.Essential,
         CategorySection.Social,
+        CategorySection.Asset,
+        CategorySection.Liability,
     ];
 
     public async Task<SuggestCategoriesResponse> SuggestCategoriesAsync(SuggestCategoriesRequest request, CancellationToken ct)
@@ -97,7 +98,9 @@ public sealed class VoiceCommandService
             ? new[] { CategorySection.LifeProject }
             : budget
             ? ExpenseSections.Append(CategorySection.Income).ToArray()
-            : income ? [CategorySection.Income] : ExpenseSections;
+            : income
+                ? [CategorySection.Income, CategorySection.LifeProject, CategorySection.Asset, CategorySection.Liability]
+                : ExpenseSections;
         var categories = await _repo.ListAsync<Category>(
             c => c.Level == CategoryLevel.Analytical && c.IsActive && !c.IsPendingReview && sections.Contains(c.Section),
             ct);
@@ -388,7 +391,9 @@ public sealed class VoiceCommandService
                 var type = ReadString(entry, "type");
                 if (action == VoiceCommandClassifier.CreateBudget)
                     type = "";
-                else if (type is not ("Expense" or "Income" or "ProjectContribution"))
+                else if (type == "ProjectContribution")
+                    type = "Income";
+                else if (type is not ("Expense" or "Income"))
                     type = "Expense";
                 return new VoiceCommandClassifier.Result(
                     VoiceCommandClassifier.Action,

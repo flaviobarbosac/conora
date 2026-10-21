@@ -1543,6 +1543,11 @@ namespace Conora.Infrastructure.Persistence.Migrations
                     b.Property<long>("Version")
                         .HasColumnType("bigint");
 
+                    b.Property<bool>("VoiceEntryConfirm")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("boolean")
+                        .HasDefaultValue(true);
+
                     b.HasKey("Id");
 
                     b.HasIndex("AppleId")

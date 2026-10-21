@@ -110,7 +110,7 @@ public sealed class LifeProjectService
         {
             throw new ValidationException(
                 "goalAmount",
-                "Meta, prazo, início do aporte e conta não podem mudar depois da criação. O previsto vem do rateio no orçamento.");
+                "Meta, prazo, início do rateio e conta não podem mudar depois da criação. O previsto vem do rateio no orçamento.");
         }
 
         if (request.Scope == LifeProjectScope.Group)
@@ -141,7 +141,7 @@ public sealed class LifeProjectService
         if (project.UsuarioId != self)
             throw new ForbiddenException("Só o dono pode excluir o projeto.");
         if (await _repo.AnyAsync<Entry>(e => e.LifeProjectId == id, ct))
-            throw new ValidationException("id", "Projeto com aportes não pode ser excluído.");
+            throw new ValidationException("id", "Projeto com lançamentos não pode ser excluído.");
 
         var accountId = project.CategoryId;
         var months = MonthsOf(project);
@@ -255,7 +255,7 @@ public sealed class LifeProjectService
         var startYm = Competence.Require(contributionStartYm, "contributionStartYm");
         var currentYm = Competence.From(DateTime.UtcNow);
         if (Competence.Compare(startYm, currentYm) < 0 && startYm != previousStartYm)
-            throw new ValidationException("contributionStartYm", "O início do aporte não pode ser antes do mês atual.");
+            throw new ValidationException("contributionStartYm", "O início do rateio não pode ser antes do mês atual.");
 
         Competence.RangeInclusive(startYm, Competence.From(dueDate));
     }

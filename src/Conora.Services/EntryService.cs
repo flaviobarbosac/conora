@@ -241,6 +241,7 @@ public sealed class EntryService
         {
             await EntryLedger.ApplyAsync(_repo, entry, 1, ct);
             await ApplyProjectAsync(entry, 1, ct);
+            await ApplyPatrimonyAsync(entry, 1, ct);
         }
 
         AuditRecorder.Record(_audits, _correlation, "Entry", created[0].Id, "EntryCreated",
@@ -268,10 +269,12 @@ public sealed class EntryService
 
         await EntryLedger.ApplyAsync(_repo, entry, -1, ct);
         await ApplyProjectAsync(entry, -1, ct);
+        await ApplyPatrimonyAsync(entry, -1, ct);
         entry.Update(request.Amount, newDate, newYm, request.AccountId, request.ContraAccountId,
             categoryId, request.IncomeSourceId, request.MemberId, request.Description);
         await EntryLedger.ApplyAsync(_repo, entry, 1, ct);
         await ApplyProjectAsync(entry, 1, ct);
+        await ApplyPatrimonyAsync(entry, 1, ct);
 
         AuditRecorder.Record(_audits, _correlation, "Entry", entry.Id, "EntryUpdated", new { entry.Type, entry.Amount, entry.CompetenceYm });
         await _uow.SaveChangesAsync(ct);
@@ -287,6 +290,7 @@ public sealed class EntryService
 
         await EntryLedger.ApplyAsync(_repo, entry, -1, ct);
         await ApplyProjectAsync(entry, -1, ct);
+        await ApplyPatrimonyAsync(entry, -1, ct);
         _repo.SoftDelete(entry);
 
         AuditRecorder.Record(_audits, _correlation, "Entry", entry.Id, "EntryDeleted", new { entry.Type, entry.Amount, entry.CompetenceYm });
@@ -372,9 +376,18 @@ public sealed class EntryService
             var category = await _categories.RequireAnalyticalAsync(cid, ct);
             var ok = type switch
             {
-                EntryType.Income => category.Section == CategorySection.Income,
-                EntryType.Expense or EntryType.Contribution => category.Section is CategorySection.Discount
-                    or CategorySection.LifeProject or CategorySection.Essential or CategorySection.Social,
+                EntryType.Income => category.Section is CategorySection.Income
+                    or CategorySection.LifeProject
+                    or CategorySection.Asset
+                    or CategorySection.Liability,
+                EntryType.Expense => category.Section is CategorySection.Discount
+                    or CategorySection.Essential
+                    or CategorySection.Social
+                    or CategorySection.Asset
+                    or CategorySection.Liability,
+                EntryType.Contribution => category.Section is CategorySection.Discount
+                    or CategorySection.Essential
+                    or CategorySection.Social,
                 EntryType.ProjectContribution => category.Section == CategorySection.LifeProject,
                 _ => true
             };
@@ -430,11 +443,47 @@ public sealed class EntryService
 
     private async Task ApplyProjectAsync(Entry entry, int sign, CancellationToken ct)
     {
-        if (entry.Type != EntryType.ProjectContribution || entry.LifeProjectId is not Guid pid)
+        if (entry.Type == EntryType.ProjectContribution && entry.LifeProjectId is Guid pid)
+        {
+            var linked = await RequireVisibleProjectAsync(pid, ct, track: true);
+            linked.ApplyContribution(entry.Amount * sign);
+            return;
+        }
+
+        if (entry.Type != EntryType.Income || entry.CategoryId is not Guid categoryId)
             return;
 
-        var project = await RequireVisibleProjectAsync(pid, ct, track: true);
-        project.ApplyContribution(entry.Amount * sign);
+        var category = await _repo.FirstOrDefaultAsync<Category>(c => c.Id == categoryId, ct, track: false);
+        if (category?.Section != CategorySection.LifeProject)
+            return;
+
+        var peers = await _family.GetReadableUsuarioIdsAsync(ct);
+        var matches = await _repo.ListForUsuariosAsync<LifeProject>(peers, p => p.CategoryId == categoryId, ct, track: true);
+        var project = entry.LifeProjectId is Guid linkedId
+            ? matches.FirstOrDefault(p => p.Id == linkedId)
+            : matches.Count == 1 ? matches[0] : null;
+        project?.ApplyContribution(entry.Amount * sign);
+    }
+
+    /// <summary>Income raises the patrimony item; expense lowers it. One item in the category, or the one named in the description.</summary>
+    private async Task ApplyPatrimonyAsync(Entry entry, int sign, CancellationToken ct)
+    {
+        if (entry.Type is not (EntryType.Income or EntryType.Expense) || entry.CategoryId is not Guid categoryId)
+            return;
+
+        var category = await _repo.FirstOrDefaultAsync<Category>(c => c.Id == categoryId, ct, track: false);
+        if (category is null || category.Section is not (CategorySection.Asset or CategorySection.Liability))
+            return;
+
+        var items = await _repo.ListAsync<PatrimonyItem>(p => p.CategoryId == categoryId, ct, track: true);
+        var item = items.Count == 1
+            ? items[0]
+            : items.FirstOrDefault(p => string.Equals(p.Name, entry.Description, StringComparison.OrdinalIgnoreCase));
+        if (item is null)
+            return;
+
+        var direction = entry.Type == EntryType.Expense ? -1 : 1;
+        item.SetAmount(item.Amount + entry.Amount * sign * direction);
     }
 
     private async Task<LifeProject> RequireVisibleProjectAsync(Guid projectId, CancellationToken ct, bool track = false)
