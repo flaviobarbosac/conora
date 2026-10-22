@@ -77,7 +77,8 @@ public sealed record ProfileResponse(
     int ReserveTargetMonths,
     int MonthCloseDay,
     bool IncludeAbsoluteValuesInRetrospective,
-    bool VoiceEntryConfirm = true);
+    bool VoiceEntryConfirm = true,
+    bool HasAppleLogin = false);
 
 public sealed record CategoryMemberBreakdownRow(
     Guid UsuarioId,
