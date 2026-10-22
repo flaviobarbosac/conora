@@ -32,6 +32,8 @@ public static class DependencyInjection
         services.AddSingleton<IGoogleTokenValidator, GoogleTokenValidator>();
         services.AddHttpClient(nameof(Security.AppleTokenValidator), client => client.Timeout = TimeSpan.FromSeconds(15));
         services.AddSingleton<IAppleTokenValidator, Security.AppleTokenValidator>();
+        services.AddHttpClient(nameof(Security.AppleTokenRevoker), client => client.Timeout = TimeSpan.FromSeconds(15));
+        services.AddSingleton<IAppleTokenRevoker, Security.AppleTokenRevoker>();
         services.AddScoped<IEmailSuppressionStore, EfEmailSuppressionStore>();
         services.AddScoped<ISupplierStore, Persistence.EfSupplierStore>();
         services.AddScoped<IReceiptOcrQueue, Persistence.EfReceiptOcrQueue>();

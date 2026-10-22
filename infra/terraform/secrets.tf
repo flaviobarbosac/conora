@@ -28,6 +28,9 @@ locals {
     apple = {
       clientId   = var.apple_client_id
       servicesId = var.apple_services_id
+      teamId     = var.apple_team_id
+      keyId      = var.apple_key_id
+      privateKey = var.apple_private_key
     }
     gemini = {
       apiKey = var.gemini_api_key

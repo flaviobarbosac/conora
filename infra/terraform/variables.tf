@@ -76,6 +76,24 @@ variable "apple_services_id" {
   default = "br.com.conora.web"
 }
 
+variable "apple_team_id" {
+  type    = string
+  default = "N2JF8644LJ"
+}
+
+variable "apple_key_id" {
+  type        = string
+  default     = ""
+  description = "Key ID of the Sign in with Apple .p8 key (token revocation on account deletion)."
+}
+
+variable "apple_private_key" {
+  type        = string
+  default     = ""
+  sensitive   = true
+  description = "Contents of the Sign in with Apple .p8 key. Set via TF_VAR_apple_private_key, never in a committed tfvars."
+}
+
 variable "ses_from" {
   type    = string
   default = "noreply@conora.com.br"

@@ -848,7 +848,8 @@ public sealed class FamilyGroupService
             user.ReserveTargetMonths,
             user.MonthCloseDay,
             user.IncludeAbsoluteValuesInRetrospective,
-            user.VoiceEntryConfirm);
+            user.VoiceEntryConfirm,
+            !string.IsNullOrEmpty(user.AppleId));
 
     private static FamilyInviteResponse ToInvite(FamilyInvite i)
         => new(i.Id, i.Email, i.ExpiresAt, i.AcceptedAt, i.CancelledAt, i.IsOpen);

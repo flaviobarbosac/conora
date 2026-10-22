@@ -18,6 +18,7 @@ public sealed class LgpdService
     private readonly ICorrelationContext _correlation;
     private readonly IEmailSender _email;
     private readonly FamilyGroupService _family;
+    private readonly IAppleTokenRevoker _appleRevoker;
 
     public LgpdService(
         IUserRepository users,
@@ -28,7 +29,8 @@ public sealed class LgpdService
         ITenantContext tenant,
         ICorrelationContext correlation,
         IEmailSender email,
-        FamilyGroupService family)
+        FamilyGroupService family,
+        IAppleTokenRevoker appleRevoker)
     {
         _users = users;
         _audits = audits;
@@ -39,6 +41,7 @@ public sealed class LgpdService
         _correlation = correlation;
         _email = email;
         _family = family;
+        _appleRevoker = appleRevoker;
     }
 
     public async Task<LgpdExportResponse> ExportAsync(CancellationToken ct)
@@ -62,7 +65,7 @@ public sealed class LgpdService
         });
     }
 
-    public async Task DeleteAsync(CancellationToken ct)
+    public async Task DeleteAsync(DeleteAccountRequest? body, CancellationToken ct)
     {
         var user = await RequireUserAsync(ct);
         if (await _family.IsBudgetOwnerWithPeersAsync(ct))
@@ -77,6 +80,7 @@ public sealed class LgpdService
         request.Complete();
         AuditRecorder.Record(_audits, _correlation, "User", user.Id, "LgpdDeletion", new { user.Email });
         await _uow.SaveChangesAsync(ct);
+        await RevokeAppleAsync(user, body, ct);
         await _email.SendAsync(
             user.Email,
             "Exclusão de dados",
@@ -85,6 +89,20 @@ public sealed class LgpdService
                 Preheader = "Pedido de exclusão registrado no Conora."
             },
             ct);
+    }
+
+    // Apple requires the Sign in with Apple grant to be revoked when the account is deleted.
+    private async Task RevokeAppleAsync(User user, DeleteAccountRequest? request, CancellationToken ct)
+    {
+        if (string.IsNullOrEmpty(user.AppleId) || string.IsNullOrWhiteSpace(request?.AppleAuthorizationCode))
+            return;
+
+        var client = string.Equals(request.AppleClient, "ios", StringComparison.OrdinalIgnoreCase)
+            ? AppleClientKind.Ios
+            : AppleClientKind.Web;
+        var revoked = await _appleRevoker.RevokeAsync(request.AppleAuthorizationCode, client, request.AppleRedirectUri, ct);
+        AuditRecorder.Record(_audits, _correlation, "User", user.Id, "AppleTokenRevoked", new { revoked, client = client.ToString() });
+        await _uow.SaveChangesAsync(ct);
     }
 
     public async Task PurgeExpiredAsync(CancellationToken ct)

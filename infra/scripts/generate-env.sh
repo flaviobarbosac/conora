@@ -117,6 +117,14 @@ if [ -n "$APPLE_SERVICES_ID" ]; then
   printf 'Apple__ServicesId=%s\n' "$APPLE_SERVICES_ID" >> "${OUT_DIR}/.env.app"
 fi
 
+APPLE_KEY_ID=$(get_int .apple.keyId)
+APPLE_PRIVATE_KEY=$(get_int .apple.privateKey | tr -d '\r\n')
+if [ -n "$APPLE_KEY_ID" ] && [ -n "$APPLE_PRIVATE_KEY" ]; then
+  printf 'Apple__TeamId=%s\n' "$(get_int .apple.teamId)" >> "${OUT_DIR}/.env.app"
+  printf 'Apple__KeyId=%s\n' "$APPLE_KEY_ID" >> "${OUT_DIR}/.env.app"
+  printf 'Apple__PrivateKey=%s\n' "$APPLE_PRIVATE_KEY" >> "${OUT_DIR}/.env.app"
+fi
+
 # Allow provisional access via the instance public IP (same-origin front+API on :80).
 if PUBLIC_IP=$(curl -fsS --connect-timeout 2 -H "X-aws-ec2-metadata-token: $(curl -fsS -X PUT --connect-timeout 2 -H 'X-aws-ec2-metadata-token-ttl-seconds: 60' http://169.254.169.254/latest/api/token)" http://169.254.169.254/latest/meta-data/public-ipv4 2>/dev/null); then
   if [ -n "$PUBLIC_IP" ]; then
