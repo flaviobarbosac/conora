@@ -126,6 +126,13 @@ public sealed class FamilyGroupRepository : IFamilyGroupRepository
         => _db.WorkspaceSubscriptions.IgnoreQueryFilters().AsNoTracking()
             .FirstOrDefaultAsync(s => s.UsuarioId == usuarioId && s.DeletedAt == null, ct);
 
+    public Task<WorkspaceSubscription?> FindSubscriptionByStoreIdAsync(
+        string store, string storeSubscriptionId, CancellationToken ct = default)
+        => _db.WorkspaceSubscriptions.IgnoreQueryFilters().AsNoTracking()
+            .FirstOrDefaultAsync(s => s.Store == store
+                && s.StoreSubscriptionId == storeSubscriptionId
+                && s.DeletedAt == null, ct);
+
     public Task<User?> FindUserByIdAsync(Guid id, CancellationToken ct = default, bool track = false)
     {
         IQueryable<User> query = _db.Users.IgnoreQueryFilters();

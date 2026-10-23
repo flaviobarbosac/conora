@@ -41,7 +41,8 @@ public static class DependencyInjection
         services.AddSingleton<IReceiptImageStore, Storage.LocalReceiptImageStore>();
         services.AddScoped<IEmailSender, SmtpEmailSender>();
         services.Configure<StoreBillingOptions>(configuration.GetSection(StoreBillingOptions.SectionName));
-        services.AddScoped<IStoreReceiptValidator, TrustingStoreReceiptValidator>();
+        services.AddHttpClient<IStoreReceiptValidator, StoreReceiptValidator>(client => client.Timeout = TimeSpan.FromSeconds(20));
+        services.AddScoped<IStoreNotificationReader, StoreNotificationReader>();
         services.AddScoped<IStoreBillingGateway, LocalStoreBillingGateway>();
         services.AddHttpClient("ses-sns", client => client.Timeout = TimeSpan.FromSeconds(15));
         services.AddHttpClient<IGeminiClient, Ai.GeminiClient>(client => client.Timeout = TimeSpan.FromSeconds(45));

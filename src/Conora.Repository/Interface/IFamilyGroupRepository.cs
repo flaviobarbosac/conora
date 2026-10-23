@@ -35,4 +35,7 @@ public interface IFamilyGroupRepository
 
     /// <summary>Another workspace's subscription (cross-tenant), used when a family plan covers its members.</summary>
     Task<WorkspaceSubscription?> FindSubscriptionAsync(Guid usuarioId, CancellationToken ct = default);
+
+    /// <summary>Subscription linked to a store subscription id (cross-tenant), used by store notifications.</summary>
+    Task<WorkspaceSubscription?> FindSubscriptionByStoreIdAsync(string store, string storeSubscriptionId, CancellationToken ct = default);
 }

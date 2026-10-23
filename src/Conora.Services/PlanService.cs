@@ -143,16 +143,64 @@ public sealed class PlanService
         return await ApplyStorePlanAsync(request.Plan, request.StorePurchaseToken.Trim(), "client", ct);
     }
 
-    /// <summary>Called by store webhooks after Play / App Store notifies a purchase or renewal.</summary>
-    public async Task ApplyStoreConfirmationAsync(StorePurchaseConfirmation confirmation, CancellationToken ct)
+    /// <summary>
+    /// Mirrors a store-validated subscription state (app confirmation or store notification) on the
+    /// user's workspace subscription. Entitled extends access to the store expiry; not entitled ends
+    /// the plan only when it is the same store subscription that is currently linked.
+    /// </summary>
+    public async Task<PlanResponse> ApplyStoreConfirmationAsync(StorePurchaseConfirmation confirmation, CancellationToken ct)
     {
         if (!PlanCatalog.IsSellable(confirmation.Plan))
             throw new ValidationException("plan", "Plano inválido.");
-        if (string.IsNullOrWhiteSpace(confirmation.PurchaseToken))
+        if (string.IsNullOrWhiteSpace(confirmation.StoreSubscriptionId))
             throw new ValidationException("store", "Token da loja obrigatório.");
 
         _tenant.Set(confirmation.UsuarioId);
-        await ApplyStorePlanAsync(confirmation.Plan, confirmation.PurchaseToken.Trim(), confirmation.Store, ct);
+        var now = DateTime.UtcNow;
+        var storeId = confirmation.StoreSubscriptionId.Trim();
+        var sub = await _repo.FirstOrDefaultAsync<WorkspaceSubscription>(_ => true, ct);
+        string action;
+        if (confirmation.Entitled)
+        {
+            // Without a store expiry (should not happen with live validation) grant one billing period.
+            var expiresAt = confirmation.ExpiresAt
+                ?? (PlanCatalog.IsYearly(confirmation.Plan) ? now.AddYears(1) : now.AddMonths(1));
+            if (sub is null)
+            {
+                sub = WorkspaceSubscription.FromStore(confirmation.Plan, expiresAt, confirmation.Store, confirmation.ProductId, storeId);
+                _repo.Add(sub);
+            }
+            else
+            {
+                sub.ApplyStorePeriod(confirmation.Plan, expiresAt, confirmation.Store, confirmation.ProductId, storeId);
+            }
+            action = "PlanSubscribedFromStore";
+        }
+        else
+        {
+            if (sub is null
+                || !string.Equals(sub.Store, confirmation.Store, StringComparison.Ordinal)
+                || !string.Equals(sub.StoreSubscriptionId, storeId, StringComparison.Ordinal))
+            {
+                // A late notice about a store subscription this account no longer uses must not touch the plan.
+                _snapshot = null;
+                return await GetAsync(ct);
+            }
+            sub.EndFromStore(confirmation.ExpiresAt is DateTime ended && ended < now ? ended : now);
+            action = "PlanEndedFromStore";
+        }
+
+        AuditRecorder.Record(
+            _audits,
+            _correlation,
+            "WorkspaceSubscription",
+            sub.Id,
+            action,
+            new { confirmation.Plan, confirmation.Store, confirmation.ProductId, storeSubscriptionId = storeId, sub.ExpiresAt });
+        await _uow.SaveChangesAsync(ct);
+
+        _snapshot = null;
+        return await GetAsync(ct);
     }
 
     private async Task<PlanResponse> ApplyStorePlanAsync(PlanKind plan, string purchaseToken, string store, CancellationToken ct)

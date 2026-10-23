@@ -3,16 +3,26 @@ using Conora.Domain.Enums;
 namespace Conora.Services.Contracts;
 
 /// <summary>
-/// StorePurchaseToken is required: the plan only activates after Google Play / App Store confirmation
-/// (or a local stub token in development).
+/// Development / Testing only: activates a plan with a local stub token. Production plans come
+/// from <see cref="StoreConfirmRequest"/> (validated with the store) and store notifications.
 /// </summary>
 public sealed record SubscribeRequest(PlanKind Plan, string? StorePurchaseToken = null);
 
+/// <summary>
+/// Sent by the app after the native purchase sheet. Channel: 1 = Google Play, 2 = App Store.
+/// TransactionId is the Apple transaction id (or Google order id); PurchaseToken is the Google token.
+/// </summary>
+public sealed record StoreConfirmRequest(int Channel, string ProductId, string TransactionId, string? PurchaseToken);
+
+/// <summary>Store-confirmed subscription state to mirror on the user's workspace subscription.</summary>
 public sealed record StorePurchaseConfirmation(
     Guid UsuarioId,
     PlanKind Plan,
-    string PurchaseToken,
-    string Store);
+    string Store,
+    string ProductId,
+    string StoreSubscriptionId,
+    DateTime? ExpiresAt,
+    bool Entitled);
 
 public sealed record PlanOfferResponse(
     PlanKind Kind,

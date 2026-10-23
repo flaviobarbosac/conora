@@ -34,6 +34,47 @@ public class WorkspaceSubscription : ModelBase, ITenantOwned
         ExpiresAt = ExpiryFrom(plan, baseDate);
     }
 
+    /// <summary>"google-play" or "app-store" when the plan is billed by a store; null for legacy / dev plans.</summary>
+    public string? Store { get; private set; }
+    public string? StoreProductId { get; private set; }
+
+    /// <summary>Stable store key across renewals: Apple originalTransactionId or Google purchase token.</summary>
+    public string? StoreSubscriptionId { get; private set; }
+
+    public static WorkspaceSubscription FromStore(
+        PlanKind plan, DateTime expiresAt, string store, string productId, string storeSubscriptionId)
+    {
+        var sub = new WorkspaceSubscription();
+        sub.ApplyStorePeriod(plan, expiresAt, store, productId, storeSubscriptionId);
+        return sub;
+    }
+
+    /// <summary>
+    /// Mirrors a store-confirmed active period. The store expiry is authoritative; a stale (older)
+    /// notification for the same store subscription never shortens a later expiry.
+    /// </summary>
+    public void ApplyStorePeriod(PlanKind plan, DateTime expiresAt, string store, string productId, string storeSubscriptionId)
+    {
+        var sameSubscription = string.Equals(StoreSubscriptionId, storeSubscriptionId, StringComparison.Ordinal);
+        if (sameSubscription && Status == SubscriptionStatus.Active && expiresAt < ExpiresAt)
+            return;
+
+        Plan = plan;
+        Status = SubscriptionStatus.Active;
+        ExpiresAt = expiresAt;
+        Store = store;
+        StoreProductId = productId;
+        StoreSubscriptionId = storeSubscriptionId;
+    }
+
+    /// <summary>The store ended the subscription (expired, refunded or revoked).</summary>
+    public void EndFromStore(DateTime endedAt)
+    {
+        Status = SubscriptionStatus.Expired;
+        if (endedAt < ExpiresAt)
+            ExpiresAt = endedAt;
+    }
+
     public void MarkReadOnly() => Status = SubscriptionStatus.ReadOnly;
 
     /// <summary>Effective status: an Active subscription past its expiry is Expired.</summary>
