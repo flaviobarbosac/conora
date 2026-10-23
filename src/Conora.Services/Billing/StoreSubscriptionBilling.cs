@@ -4,7 +4,6 @@ using Conora.Domain.Catalog;
 using Conora.Domain.Enums;
 using Conora.Domain.Exceptions;
 using Conora.Domain.Ports;
-using Conora.Domain.Services;
 using Conora.Infrastructure.Billing;
 using Conora.Repository.Interface;
 using Conora.Services.Contracts;
@@ -14,8 +13,8 @@ using Microsoft.Extensions.Options;
 namespace Conora.Services.Billing;
 
 /// <summary>
-/// Conora adaptation of Clampfy StoreAssinaturaService: validates receipt, maps product→PlanKind,
-/// activates via PlanService, applies store notices.
+/// Conora adaptation of Clampfy StoreAssinaturaService: validates the purchase with the store,
+/// maps product → PlanKind and mirrors the store state (expiry, refund, expiration) on the plan.
 /// Free-trial length (90 student / 30 others) is NOT a store SKU — AccessPolicy uses IsTrainingStudent.
 /// </summary>
 public sealed class StoreSubscriptionBilling : IStoreSubscriptionBilling
@@ -46,108 +45,89 @@ public sealed class StoreSubscriptionBilling : IStoreSubscriptionBilling
     {
         if (command.Channel is not (StoreBillingChannel.Google or StoreBillingChannel.Apple))
             throw new ValidationException("store", "Canal de loja inválido.");
-
-        if (string.IsNullOrWhiteSpace(command.PurchaseToken))
+        if (string.IsNullOrWhiteSpace(command.ProductId) || string.IsNullOrWhiteSpace(command.TransactionId))
+            throw new ValidationException("store", "Recibo da loja incompleto.");
+        if (command.Channel == StoreBillingChannel.Google && string.IsNullOrWhiteSpace(command.PurchaseToken))
             throw new ValidationException("store", "Token da loja obrigatório.");
 
-        var receipt = await _receipts.ValidateAsync(
-            command.Channel,
-            command.ProductId,
-            command.TransactionId,
-            command.PurchaseToken,
-            ct);
+        StoreReceipt receipt;
+        try
+        {
+            receipt = await _receipts.ValidateAsync(
+                command.Channel,
+                command.ProductId.Trim(),
+                command.TransactionId.Trim(),
+                command.PurchaseToken?.Trim() ?? "",
+                ct);
+        }
+        catch (InvalidOperationException ex)
+        {
+            _logger.LogWarning(ex, "Store validation failed user={UserId} product={ProductId}", command.UsuarioId, command.ProductId);
+            throw new ValidationException("store", ex.Message);
+        }
 
         if (!string.Equals(receipt.ProductId, command.ProductId.Trim(), StringComparison.Ordinal))
             throw new ValidationException("productId", "O produto confirmado pela loja não confere.");
-
         if (receipt.AccountId.HasValue && receipt.AccountId.Value != command.UsuarioId)
             throw new ValidationException("store", "Esta compra está presa a outro login.");
-
         if (!TryMapProduct(receipt.ProductId, out var plan))
             throw new ValidationException("productId", "Produto da loja não reconhecido.");
+        if (!receipt.Entitled)
+            throw new ValidationException("store", "A loja ainda não confirmou o pagamento desta assinatura.");
 
-        var user = await _users.FindUserByIdAsync(command.UsuarioId, ct);
-        var trialDays = AccessPolicy.TrialDaysFor(user?.IsTrainingStudent ?? true);
+        var storeLabel = StoreLabel(command.Channel);
+        var linked = await _users.FindSubscriptionByStoreIdAsync(storeLabel, receipt.SubscriptionId, ct);
+        if (linked is not null && linked.UsuarioId != command.UsuarioId)
+            throw new ValidationException("store", "Esta compra está presa a outro login.");
+
+        await _plans.ApplyStoreConfirmationAsync(ToConfirmation(command.UsuarioId, plan, storeLabel, receipt), ct);
         _logger.LogInformation(
-            "Store confirm user={UserId} product={ProductId} plan={Plan} trialProfileDays={TrialDays} student={Student}",
-            command.UsuarioId,
-            receipt.ProductId,
-            plan,
-            trialDays,
-            user?.IsTrainingStudent ?? true);
-
-        if (receipt.InTrial || !receipt.Paid)
-        {
-            _logger.LogInformation(
-                "Store intro/trial receipt for user={UserId}; paid plan not activated yet.",
-                command.UsuarioId);
-            return;
-        }
-
-        var storeLabel = command.Channel == StoreBillingChannel.Google ? "google-play" : "app-store";
-        await _plans.ApplyStoreConfirmationAsync(
-            new StorePurchaseConfirmation(command.UsuarioId, plan, command.PurchaseToken.Trim(), storeLabel),
-            ct);
-
-        _logger.LogInformation(
-            "Store purchase confirmed user={UserId} product={ProductId} plan={Plan} channel={Channel} ref={Ref}",
+            "Store purchase confirmed user={UserId} product={ProductId} plan={Plan} channel={Channel} ref={Ref} expires={ExpiresAt}",
             command.UsuarioId,
             receipt.ProductId,
             plan,
             command.Channel,
-            ExternalReference(command.Channel, receipt.TransactionId));
+            ExternalReference(command.Channel, receipt.TransactionId),
+            receipt.ExpiresAt);
     }
 
     public async Task ApplyNoticeAsync(StoreNoticeCommand command, CancellationToken ct = default)
     {
-        if (command.UsuarioId is null)
+        var receipt = command.Receipt;
+        var storeLabel = StoreLabel(command.Channel);
+        if (!TryMapProduct(receipt.ProductId, out var plan))
         {
-            _logger.LogWarning("Store notice ignored: missing usuarioId event={Event}", command.Evento);
+            _logger.LogWarning("Store notice {Event} ignored: unknown product {ProductId}", command.Evento, receipt.ProductId);
             return;
         }
 
-        var evento = command.Evento.Trim().ToLowerInvariant();
-        if (evento is "pago" or "renovado" or "purchased" or "renewed" or "didrenew")
+        // The store subscription id wins over the account token: renewals keep the original owner.
+        var linked = await _users.FindSubscriptionByStoreIdAsync(storeLabel, receipt.SubscriptionId, ct);
+        var usuarioId = linked?.UsuarioId ?? receipt.AccountId;
+        if (usuarioId is null)
         {
-            if (!TryMapProduct(command.ProductId, out var plan))
-            {
-                _logger.LogWarning("Store notice product unknown: {ProductId}", command.ProductId);
-                return;
-            }
-
-            var user = await _users.FindUserByIdAsync(command.UsuarioId.Value, ct);
-            _logger.LogInformation(
-                "Store notice {Event} user={UserId} product={ProductId} trialProfileDays={Days} student={Student}",
-                evento,
-                command.UsuarioId,
-                command.ProductId,
-                AccessPolicy.TrialDaysFor(user?.IsTrainingStudent ?? true),
-                user?.IsTrainingStudent ?? true);
-
-            if (command.EmTrial)
-            {
-                _logger.LogInformation(
-                    "Store trial notice for user={UserId} product={ProductId}; plan not activated until paid.",
-                    command.UsuarioId, command.ProductId);
-                return;
-            }
-
-            var token = string.IsNullOrWhiteSpace(command.SubscriptionId)
-                ? command.TransactionId
-                : command.SubscriptionId!;
-            var storeLabel = command.Channel == StoreBillingChannel.Google ? "google-play" : "app-store";
-            await _plans.ApplyStoreConfirmationAsync(
-                new StorePurchaseConfirmation(command.UsuarioId.Value, plan, token, storeLabel),
-                ct);
+            _logger.LogWarning(
+                "Store notice {Event} ignored: no Conora login for {Store} subscription (product {ProductId})",
+                command.Evento, storeLabel, receipt.ProductId);
+            return;
+        }
+        if (linked is null && !receipt.Entitled)
+        {
+            _logger.LogInformation("Store notice {Event} for an unlinked inactive subscription; nothing to end.", command.Evento);
             return;
         }
 
-        if (evento is "expirado" or "expired" or "reembolso" or "refund" or "revoke" or "didfailtorenew")
+        var user = await _users.FindUserByIdAsync(usuarioId.Value, ct);
+        if (user is null || user.DeletedAt is not null)
         {
-            _logger.LogInformation(
-                "Store notice {Event} user={UserId} product={ProductId} — acknowledged (cancel API stub).",
-                evento, command.UsuarioId, command.ProductId);
+            _logger.LogWarning("Store notice {Event} ignored: user {UserId} not found", command.Evento, usuarioId);
+            return;
         }
+
+        await _plans.ApplyStoreConfirmationAsync(ToConfirmation(usuarioId.Value, plan, storeLabel, receipt), ct);
+        _logger.LogInformation(
+            "Store notice {Event} applied user={UserId} product={ProductId} entitled={Entitled} expires={ExpiresAt}",
+            command.Evento, usuarioId, receipt.ProductId, receipt.Entitled, receipt.ExpiresAt);
     }
 
     public bool TryMapProduct(string productId, out PlanKind plan)
@@ -169,6 +149,9 @@ public sealed class StoreSubscriptionBilling : IStoreSubscriptionBilling
     public decimal? PriceOfProduct(string productId) =>
         TryMapProduct(productId, out var plan) ? PlanCatalog.PriceOf(plan) : null;
 
+    public static string StoreLabel(StoreBillingChannel channel) =>
+        channel == StoreBillingChannel.Google ? "google-play" : "app-store";
+
     public static string ExternalReference(StoreBillingChannel channel, string transactionId)
     {
         var reference = $"loja:{(int)channel}:{transactionId}";
@@ -177,6 +160,9 @@ public sealed class StoreSubscriptionBilling : IStoreSubscriptionBilling
         var hash = Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(transactionId)));
         return $"loja:{(int)channel}:sha256:{hash}";
     }
+
+    private static StorePurchaseConfirmation ToConfirmation(Guid usuarioId, PlanKind plan, string store, StoreReceipt receipt) =>
+        new(usuarioId, plan, store, receipt.ProductId, receipt.SubscriptionId, receipt.ExpiresAt, receipt.Entitled);
 
     private static bool IdsEqual(string a, string b) =>
         string.Equals(a, b, StringComparison.Ordinal);

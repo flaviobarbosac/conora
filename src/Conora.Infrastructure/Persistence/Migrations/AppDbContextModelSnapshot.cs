@@ -1855,6 +1855,18 @@ namespace Conora.Infrastructure.Persistence.Migrations
                         .HasMaxLength(20)
                         .HasColumnType("character varying(20)");
 
+                    b.Property<string>("Store")
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)");
+
+                    b.Property<string>("StoreProductId")
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)");
+
+                    b.Property<string>("StoreSubscriptionId")
+                        .HasMaxLength(512)
+                        .HasColumnType("character varying(512)");
+
                     b.Property<DateTime>("UpdatedAt")
                         .HasColumnType("timestamp with time zone");
 
@@ -1870,6 +1882,11 @@ namespace Conora.Infrastructure.Persistence.Migrations
                         .IsUnique()
                         .HasDatabaseName("IX_workspace_subscriptions_UsuarioId")
                         .HasFilter("\"DeletedAt\" IS NULL");
+
+                    b.HasIndex("Store", "StoreSubscriptionId")
+                        .IsUnique()
+                        .HasDatabaseName("IX_workspace_subscriptions_StoreSubscriptionId")
+                        .HasFilter("\"StoreSubscriptionId\" IS NOT NULL AND \"DeletedAt\" IS NULL");
 
                     b.ToTable("workspace_subscriptions", (string)null);
                 });

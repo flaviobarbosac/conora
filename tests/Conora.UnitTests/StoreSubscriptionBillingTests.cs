@@ -59,10 +59,20 @@ public class StoreSubscriptionBillingTests
     private static StoreSubscriptionBilling CreateSut() =>
         new(
             null!,
-            new TrustingStoreReceiptValidator(
-                Options.Create(new StoreBillingOptions()),
-                NullLogger<TrustingStoreReceiptValidator>.Instance),
+            new FakeStoreReceiptValidator(),
             null!,
             Options.Create(new StoreBillingOptions()),
             NullLogger<StoreSubscriptionBilling>.Instance);
+}
+
+internal sealed class FakeStoreReceiptValidator : IStoreReceiptValidator
+{
+    public StoreReceipt? Receipt { get; set; }
+
+    public Task<StoreReceipt> ValidateAsync(
+        StoreBillingChannel channel, string productId, string transactionId, string purchaseToken, CancellationToken ct = default)
+        => Task.FromResult(Receipt ?? throw new InvalidOperationException("A loja não confirmou esta compra."));
+
+    public Task<StoreReceipt> FetchGoogleSubscriptionAsync(string purchaseToken, CancellationToken ct = default)
+        => Task.FromResult(Receipt ?? throw new InvalidOperationException("A Google Play não confirmou esta compra."));
 }
