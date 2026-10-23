@@ -7,6 +7,7 @@ using Conora.Repository.Interface;
 using Conora.Services.Common;
 using Conora.Services.Contracts;
 using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 
 namespace Conora.Services;
@@ -27,6 +28,7 @@ public sealed class AuthService
     private readonly IAppleTokenValidator _apple;
     private readonly IEmailSender _email;
     private readonly IConfiguration _config;
+    private readonly IHostEnvironment _env;
     private readonly CategoryService _categories;
     private readonly ILogger<AuthService> _logger;
 
@@ -43,6 +45,7 @@ public sealed class AuthService
         IAppleTokenValidator apple,
         IEmailSender email,
         IConfiguration config,
+        IHostEnvironment env,
         CategoryService categories,
         ILogger<AuthService> logger)
     {
@@ -58,6 +61,7 @@ public sealed class AuthService
         _apple = apple;
         _email = email;
         _config = config;
+        _env = env;
         _categories = categories;
         _logger = logger;
     }
@@ -263,6 +267,13 @@ public sealed class AuthService
         _tenant.Set(user.Id);
         _categories.AddDefaults();
         await SaveUserCreatingAsync(user, action, ct);
+        // Integration tests run without a real inbox; auto-verify only in Testing.
+        if (_env.IsEnvironment("Testing"))
+        {
+            user.MarkEmailVerified();
+            return await PersistSessionAsync(user, action, notifyWelcome: false, ct);
+        }
+
         // Always throws ValidationException after sending (or reusing) the Conora validation e-mail.
         await SendVerificationAndBlockAsync(user, firstSend: true, ct);
         return default!;
