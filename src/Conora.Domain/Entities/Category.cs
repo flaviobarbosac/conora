@@ -82,7 +82,6 @@ public class Category : ModelBase, ITenantOwned
 
     public void SetActive(bool active)
     {
-        EnsureNotSystem();
         if (Level != CategoryLevel.Analytical)
             throw new ValidationException("isActive", "Só contas analíticas podem ser ativadas ou desativadas.");
 
