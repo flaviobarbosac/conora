@@ -173,10 +173,15 @@ public sealed class CategoryService
         if (account.IsPendingReview)
             throw new ValidationException("id", "Aceite ou recuse a categoria antes de editá-la.");
 
-        account.Rename(request.Name);
+        // System analytical accounts may only toggle IsActive (name stays fixed).
+        if (!account.IsSystem)
+        {
+            account.Rename(request.Name);
+            account.MarkFamily();
+            await EnsureUniqueNameAsync(account.Name, account.ParentId ?? Guid.Empty, account.Id, ct);
+        }
+
         account.SetActive(request.IsActive);
-        account.MarkFamily();
-        await EnsureUniqueNameAsync(account.Name, account.ParentId ?? Guid.Empty, account.Id, ct);
 
         await _uow.SaveChangesAsync(ct);
         await PropagateAcceptedAsync(account.Id, ct);
