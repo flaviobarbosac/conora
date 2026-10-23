@@ -44,6 +44,7 @@ public class AppDbContext : DbContext
     public DbSet<FamilyNotice> FamilyNotices => Set<FamilyNotice>();
     public DbSet<WorkspaceSubscription> WorkspaceSubscriptions => Set<WorkspaceSubscription>();
     public DbSet<UserMilestone> UserMilestones => Set<UserMilestone>();
+    public DbSet<AlertSeen> AlertSeen => Set<AlertSeen>();
     public DbSet<ImportBatch> ImportBatches => Set<ImportBatch>();
     public DbSet<ImportPreviewRow> ImportPreviewRows => Set<ImportPreviewRow>();
     public DbSet<WhatsAppLink> WhatsAppLinks => Set<WhatsAppLink>();

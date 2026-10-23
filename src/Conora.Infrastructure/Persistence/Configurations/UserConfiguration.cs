@@ -13,6 +13,8 @@ public class UserConfiguration : IEntityTypeConfiguration<User>
 
         builder.Property(u => u.Name).IsRequired().HasMaxLength(200);
         builder.Property(u => u.Email).IsRequired().HasMaxLength(320);
+        builder.Property(u => u.Phone).HasMaxLength(32);
+        builder.Property(u => u.Cep).HasMaxLength(9);
         builder.Property(u => u.Cpf).HasMaxLength(11);
         builder.Property(u => u.PasswordHash).HasMaxLength(500);
         builder.Property(u => u.PasswordResetTokenHash).HasMaxLength(64);
@@ -21,6 +23,7 @@ public class UserConfiguration : IEntityTypeConfiguration<User>
         builder.Property(u => u.AppleId).HasMaxLength(100);
         builder.Property(u => u.EmailVerified).IsRequired();
         builder.Property(u => u.OnboardingCompleted).IsRequired();
+        builder.Property(u => u.IsTrainingStudent).IsRequired().HasDefaultValue(true);
         builder.Property(u => u.ThemeId).IsRequired().HasMaxLength(40);
         builder.Property(u => u.QuietMode).IsRequired();
         builder.Property(u => u.EmailsEnabled).IsRequired().HasDefaultValue(true);

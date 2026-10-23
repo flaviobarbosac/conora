@@ -17,19 +17,34 @@ public class PlanAccessTests
     [InlineData(99, AccessPhase.Grace)]
     [InlineData(100, AccessPhase.Blocked)]
     [InlineData(150, AccessPhase.Blocked)]
-    public void Trial_lifecycle_without_plan(int days, AccessPhase expected)
+    public void Student_trial_lifecycle_without_plan(int days, AccessPhase expected)
     {
-        var state = AccessPolicy.Evaluate(Created, null, Created.AddDays(days));
+        var state = AccessPolicy.Evaluate(Created, null, Created.AddDays(days), isTrainingStudent: true);
 
         Assert.Equal(expected, state.Phase);
         Assert.Equal(expected == AccessPhase.Trial, state.IsWritable);
+    }
+
+    [Theory]
+    [InlineData(0, AccessPhase.Trial)]
+    [InlineData(29, AccessPhase.Trial)]
+    [InlineData(30, AccessPhase.Grace)]
+    [InlineData(39, AccessPhase.Grace)]
+    [InlineData(40, AccessPhase.Blocked)]
+    public void Standard_trial_is_30_days_then_10_grace(int days, AccessPhase expected)
+    {
+        var state = AccessPolicy.Evaluate(Created, null, Created.AddDays(days), isTrainingStudent: false);
+
+        Assert.Equal(expected, state.Phase);
+        Assert.Equal(Created.AddDays(30), state.TrialEndsAt);
+        Assert.Equal(Created.AddDays(40), state.BlockAt);
     }
 
     [Fact]
     public void Accounts_older_than_launch_start_trial_on_launch_floor()
     {
         var old = new DateTime(2026, 1, 1, 0, 0, 0, DateTimeKind.Utc);
-        var state = AccessPolicy.Evaluate(old, null, AccessPolicy.TrialFloorUtc.AddDays(10));
+        var state = AccessPolicy.Evaluate(old, null, AccessPolicy.TrialFloorUtc.AddDays(10), isTrainingStudent: true);
 
         Assert.Equal(AccessPhase.Trial, state.Phase);
         Assert.Equal(AccessPolicy.TrialFloorUtc.AddDays(90), state.TrialEndsAt);
@@ -49,10 +64,10 @@ public class PlanAccessTests
     [Theory]
     [InlineData(PlanKind.IndividualMonthly, 49.90, PlanTier.Individual)]
     [InlineData(PlanKind.IndividualYearly, 499.00, PlanTier.Individual)]
-    [InlineData(PlanKind.FamilyMonthly, 69.90, PlanTier.Family)]
-    [InlineData(PlanKind.FamilyYearly, 699.00, PlanTier.Family)]
-    [InlineData(PlanKind.FamilyPlusMonthly, 99.90, PlanTier.FamilyPlus)]
-    [InlineData(PlanKind.FamilyPlusYearly, 999.00, PlanTier.FamilyPlus)]
+    [InlineData(PlanKind.FamilyMonthly, 59.90, PlanTier.Family)]
+    [InlineData(PlanKind.FamilyYearly, 599.00, PlanTier.Family)]
+    [InlineData(PlanKind.FamilyPlusMonthly, 79.00, PlanTier.FamilyPlus)]
+    [InlineData(PlanKind.FamilyPlusYearly, 790.00, PlanTier.FamilyPlus)]
     public void Catalog_prices_yearly_with_two_free_months(PlanKind kind, double price, PlanTier tier)
     {
         Assert.Equal((decimal)price, PlanCatalog.PriceOf(kind));
@@ -70,6 +85,6 @@ public class PlanAccessTests
         Assert.False(PlanCatalog.IsSellable(PlanKind.Yearly14990));
         Assert.Equal(0, PlanCatalog.MaxExtraMembers(PlanTier.Individual));
         Assert.Equal(1, PlanCatalog.MaxExtraMembers(PlanTier.Family));
-        Assert.Null(PlanCatalog.MaxExtraMembers(PlanTier.FamilyPlus));
+        Assert.Equal(4, PlanCatalog.MaxExtraMembers(PlanTier.FamilyPlus));
     }
 }

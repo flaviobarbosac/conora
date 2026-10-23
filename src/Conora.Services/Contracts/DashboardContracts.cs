@@ -1,7 +1,17 @@
 ﻿namespace Conora.Services.Contracts;
 
-/// <summary>Severity: Ok | Attention (>=70%) | Limit (=100%) | Exceeded (>100%) | Info.</summary>
-public sealed record AlertResponse(string Code, string Severity, string Message, Guid? CategoryId = null, decimal? Percent = null);
+/// <summary>Severity: Ok | Attention (>=70%) | Limit (=100%) | Exceeded (>100%) | Info. Seen is per user/competence.</summary>
+public sealed record AlertResponse(
+    string Code,
+    string Severity,
+    string Message,
+    Guid? CategoryId = null,
+    decimal? Percent = null,
+    bool Seen = false);
+
+public sealed record MarkAlertsSeenRequest(string CompetenceYm, IReadOnlyList<MarkAlertSeenItem> Items);
+
+public sealed record MarkAlertSeenItem(string Code, Guid? CategoryId = null);
 
 public sealed record DashboardResponse(
     string CompetenceYm,

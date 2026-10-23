@@ -1,4 +1,5 @@
 using Conora.Services;
+using Conora.Services.Contracts;
 
 namespace Conora.Api.Endpoints;
 
@@ -13,6 +14,12 @@ public static class DashboardEndpoints
 
         dashboard.MapGet("/{competenceYm}/alerts", async (string competenceYm, DashboardService service, CancellationToken ct) =>
             Results.Ok(await service.GetAlertsAsync(competenceYm, ct)));
+
+        dashboard.MapPost("/alerts/seen", async (MarkAlertsSeenRequest request, DashboardService service, CancellationToken ct) =>
+        {
+            await service.MarkAlertsSeenAsync(request, ct);
+            return Results.NoContent();
+        });
 
         app.MapGet("/reports/monthly/{competenceYm}", async (string competenceYm, DashboardService service, CancellationToken ct) =>
             Results.Ok(await service.GetReportAsync(competenceYm, ct)))

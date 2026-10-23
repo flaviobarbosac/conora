@@ -83,6 +83,53 @@ namespace Conora.Infrastructure.Persistence.Migrations
                     b.ToTable("accounts", (string)null);
                 });
 
+            modelBuilder.Entity("Conora.Domain.Entities.AlertSeen", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid?>("CategoryId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("Code")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)");
+
+                    b.Property<string>("CompetenceYm")
+                        .IsRequired()
+                        .HasMaxLength(7)
+                        .HasColumnType("character varying(7)");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<DateTime?>("DeletedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<DateTime>("SeenAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<DateTime>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid>("UsuarioId")
+                        .HasColumnType("uuid");
+
+                    b.Property<long>("Version")
+                        .HasColumnType("bigint");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("UsuarioId", "CompetenceYm", "Code", "CategoryId")
+                        .IsUnique()
+                        .HasDatabaseName("IX_alert_seen_Usuario_Ym_Code_Category")
+                        .HasFilter("\"DeletedAt\" IS NULL");
+
+                    b.ToTable("alert_seen", (string)null);
+                });
+
             modelBuilder.Entity("Conora.Domain.Entities.AuditEvent", b =>
                 {
                     b.Property<Guid>("Id")
@@ -1521,6 +1568,10 @@ namespace Conora.Infrastructure.Persistence.Migrations
                         .HasColumnType("integer")
                         .HasDefaultValue(70);
 
+                    b.Property<string>("Cep")
+                        .HasMaxLength(9)
+                        .HasColumnType("character varying(9)");
+
                     b.Property<string>("Cpf")
                         .HasMaxLength(11)
                         .HasColumnType("character varying(11)");
@@ -1558,6 +1609,11 @@ namespace Conora.Infrastructure.Persistence.Migrations
                     b.Property<bool>("IncludeAbsoluteValuesInRetrospective")
                         .HasColumnType("boolean");
 
+                    b.Property<bool>("IsTrainingStudent")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("boolean")
+                        .HasDefaultValue(true);
+
                     b.Property<int>("MonthCloseDay")
                         .HasColumnType("integer");
 
@@ -1579,6 +1635,10 @@ namespace Conora.Infrastructure.Persistence.Migrations
                     b.Property<string>("PasswordResetTokenHash")
                         .HasMaxLength(64)
                         .HasColumnType("character varying(64)");
+
+                    b.Property<string>("Phone")
+                        .HasMaxLength(32)
+                        .HasColumnType("character varying(32)");
 
                     b.Property<bool>("PhotoEvolutionEnabled")
                         .ValueGeneratedOnAdd()

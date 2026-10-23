@@ -2,6 +2,7 @@
 using System.Text;
 using Conora.Domain.Entities;
 using Conora.Domain.Enums;
+using Conora.Domain.Ports;
 using Conora.Domain.Services;
 using Conora.Repository.Interface;
 using Conora.Services.Contracts;
@@ -18,19 +19,25 @@ public sealed class DashboardService
     private readonly BudgetService _budgets;
     private readonly CategoryService _categories;
     private readonly FamilyGroupService _family;
+    private readonly IUnitOfWork _uow;
+    private readonly IWhatsAppMessenger _whatsApp;
 
     public DashboardService(
         IFinanceRepository repo,
         MonthService months,
         BudgetService budgets,
         CategoryService categories,
-        FamilyGroupService family)
+        FamilyGroupService family,
+        IUnitOfWork uow,
+        IWhatsAppMessenger whatsApp)
     {
         _repo = repo;
         _months = months;
         _budgets = budgets;
         _categories = categories;
         _family = family;
+        _uow = uow;
+        _whatsApp = whatsApp;
     }
 
     public async Task<DashboardResponse> GetAsync(string competenceYm, CancellationToken ct)
@@ -57,6 +64,30 @@ public sealed class DashboardService
 
     public Task<IReadOnlyList<AlertResponse>> GetAlertsAsync(string competenceYm, CancellationToken ct)
         => GetAlertsCoreAsync(Competence.Require(competenceYm), ct);
+
+    public async Task MarkAlertsSeenAsync(MarkAlertsSeenRequest request, CancellationToken ct)
+    {
+        var ym = Competence.Require(request.CompetenceYm);
+        if (request.Items.Count == 0)
+            return;
+
+        var existing = await _repo.ListAsync<AlertSeen>(
+            s => s.CompetenceYm == ym, ct, track: true);
+        var now = DateTime.UtcNow;
+        foreach (var item in request.Items)
+        {
+            if (string.IsNullOrWhiteSpace(item.Code))
+                continue;
+            var code = item.Code.Trim();
+            if (existing.Any(s => s.Code == code && s.CategoryId == item.CategoryId))
+                continue;
+            var row = AlertSeen.Mark(ym, code, item.CategoryId, now);
+            _repo.Add(row);
+            existing.Add(row);
+        }
+
+        await _uow.SaveChangesAsync(ct);
+    }
 
     public async Task<MonthlyReportResponse> GetReportAsync(string competenceYm, CancellationToken ct)
     {
@@ -255,21 +286,29 @@ public sealed class DashboardService
     private async Task<IReadOnlyList<AlertResponse>> BuildAlertsAsync(string ym, Totals totals, CancellationToken ct)
     {
         var alerts = new List<AlertResponse>();
+        var seen = await _repo.ListAsync<AlertSeen>(s => s.CompetenceYm == ym, ct, track: false);
+        bool IsSeen(string code, Guid? categoryId) =>
+            seen.Any(s => s.Code == code && s.CategoryId == categoryId);
 
         var ownerId = await _family.GetBudgetOwnerUsuarioIdAsync(ct);
-        if (ownerId == _family.RequireUserId())
+        var selfId = _family.RequireUserId();
+        if (ownerId == selfId)
         {
             var pendingCount = await _repo.CountAsync<Category>(
                 c => c.IsPendingReview && !c.IsSystem && c.Level == CategoryLevel.Analytical, ct);
             if (pendingCount > 0)
             {
+                const string code = "CATEGORY_PENDING_REVIEW";
                 alerts.Add(new AlertResponse(
-                    "CATEGORY_PENDING_REVIEW",
+                    code,
                     "Exceeded",
                     pendingCount == 1
                         ? "Urgente: revise 1 categoria sob análise para lançar corretamente."
-                        : $"Urgente: revise {pendingCount} categorias sob análise para lançar corretamente."));
+                        : $"Urgente: revise {pendingCount} categorias sob análise para lançar corretamente.",
+                    Seen: IsSeen(code, null)));
             }
+
+            await TryAddMonthCloseAlertAsync(ym, alerts, IsSeen, ct);
         }
 
         var budget = await _budgets.GetAsync(ym, ct);
@@ -279,12 +318,14 @@ public sealed class DashboardService
             if (line.Section == CategorySection.Income && line.Status == "Exceeded")
                 continue;
 
+            var code = $"BUDGET_{line.Status.ToUpperInvariant()}";
             alerts.Add(new AlertResponse(
-                $"BUDGET_{line.Status.ToUpperInvariant()}",
+                code,
                 line.Status,
                 MessageFor(line.Status, $"conta {line.CategoryName}", line.Percent),
                 line.CategoryId,
-                line.Percent));
+                line.Percent,
+                IsSeen(code, line.CategoryId)));
         }
 
         var cards = await _repo.ListAsync<CreditCard>(null, ct);
@@ -294,13 +335,81 @@ public sealed class DashboardService
             var used = unpaid.Where(i => i.CreditCardId == card.Id).Sum(i => i.Total);
             var (percent, status) = BudgetService.Evaluate(card.LimitTotal, used);
             if (status != "Ok")
-                alerts.Add(new AlertResponse("CARD_LIMIT", status, MessageFor(status, $"Limite do cartão {card.Name}", percent), null, percent));
+            {
+                const string code = "CARD_LIMIT";
+                alerts.Add(new AlertResponse(
+                    code,
+                    status,
+                    MessageFor(status, $"Limite do cartão {card.Name}", percent),
+                    null,
+                    percent,
+                    IsSeen(code, null)));
+            }
         }
 
         if (totals.Income - totals.Expense < 0)
-            alerts.Add(new AlertResponse("NEGATIVE_RESULT", "Attention", "As despesas do mês superam a receita."));
+        {
+            const string code = "NEGATIVE_RESULT";
+            alerts.Add(new AlertResponse(
+                code,
+                "Attention",
+                "As despesas do mês superam a receita.",
+                Seen: IsSeen(code, null)));
+        }
 
         return alerts;
+    }
+
+    private async Task TryAddMonthCloseAlertAsync(
+        string currentYm,
+        List<AlertResponse> alerts,
+        Func<string, Guid?, bool> isSeen,
+        CancellationToken ct)
+    {
+        if (!MonthCloseReminder.IsActive(DateTime.UtcNow))
+            return;
+
+        var previousYm = Competence.AddMonths(currentYm, -1);
+        var previous = await _months.GetAsync(previousYm, ct);
+        if (previous.IsClosed)
+            return;
+
+        const string code = "MONTH_CLOSE_PENDING";
+        var message =
+            $"Feche o mês {previousYm} até o dia 5. O fechamento fica em Orçamento / Fechar mês.";
+        alerts.Add(new AlertResponse(code, "Attention", message, Seen: isSeen(code, null)));
+
+        await TryNotifyMonthCloseWhatsAppAsync(previousYm, isSeen(code, null), ct);
+    }
+
+    private async Task TryNotifyMonthCloseWhatsAppAsync(string previousYm, bool alreadySeen, CancellationToken ct)
+    {
+        if (alreadySeen || !_whatsApp.IsConfigured)
+            return;
+
+        const string waCode = "MONTH_CLOSE_WA";
+        var waSeen = await _repo.AnyAsync<AlertSeen>(
+            s => s.CompetenceYm == previousYm && s.Code == waCode, ct);
+        if (waSeen)
+            return;
+
+        var link = await _repo.FirstOrDefaultAsync<WhatsAppLink>(_ => true, ct, track: false);
+        if (link is null || string.IsNullOrWhiteSpace(link.PhoneE164))
+            return;
+
+        try
+        {
+            await _whatsApp.SendTextAsync(
+                link.PhoneE164,
+                $"Conora: feche o mês {previousYm} até o dia 5. Abra Orçamento → Fechar mês.",
+                ct);
+            _repo.Add(AlertSeen.Mark(previousYm, waCode, null, DateTime.UtcNow));
+            await _uow.SaveChangesAsync(ct);
+        }
+        catch
+        {
+            // Bell alert remains even if WhatsApp fails.
+        }
     }
 
     private static string MessageFor(string status, string subject, decimal? percent) => status switch

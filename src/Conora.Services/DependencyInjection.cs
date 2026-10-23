@@ -1,4 +1,6 @@
-﻿using Microsoft.Extensions.DependencyInjection;
+﻿using Conora.Domain.Ports;
+using Conora.Services.Billing;
+using Microsoft.Extensions.DependencyInjection;
 
 namespace Conora.Services;
 
@@ -14,6 +16,7 @@ public static class DependencyInjection
 
         // Finance domain
         services.AddScoped<PlanService>();
+        services.AddScoped<IStoreSubscriptionBilling, StoreSubscriptionBilling>();
         services.AddScoped<MonthService>();
         services.AddScoped<CategoryService>();
         services.AddScoped<MemberService>();
