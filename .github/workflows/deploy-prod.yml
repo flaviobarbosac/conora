@@ -1,9 +1,12 @@
 name: Deploy Production API
 
+# Production deploys only when a PR into main is merged (develop → main).
+# Not on push alone — so the merge of the PR is the deploy trigger.
 on:
   pull_request:
     types: [closed]
     branches: [main]
+  workflow_dispatch:
 
 permissions:
   id-token: write
@@ -15,13 +18,13 @@ env:
 
 jobs:
   test-build-deploy:
-    if: github.event.pull_request.merged == true
+    if: github.event_name == 'workflow_dispatch' || github.event.pull_request.merged == true
     runs-on: ubuntu-latest
     environment: production
     steps:
       - uses: actions/checkout@v4
         with:
-          ref: ${{ github.event.pull_request.merge_commit_sha }}
+          ref: ${{ github.event.pull_request.merge_commit_sha || github.sha }}
 
       - name: Setup .NET
         uses: actions/setup-dotnet@v4
