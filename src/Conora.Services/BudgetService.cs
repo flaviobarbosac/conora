@@ -53,18 +53,20 @@ public sealed class BudgetService
         _family = family;
     }
 
-    public static (decimal? Percent, string Status) Evaluate(decimal planned, decimal actual)
+    /// <param name="attentionPercent">Start of the yellow Attention band (1–99). Limit at 100% and Exceeded above stay fixed.</param>
+    public static (decimal? Percent, string Status) Evaluate(decimal planned, decimal actual, int attentionPercent = 70)
     {
         if (planned <= 0)
             return (null, actual > 0 ? "Exceeded" : "Ok");
 
+        var threshold = Math.Clamp(attentionPercent, 1, 99) / 100m;
         var ratio = actual / planned;
         var percent = decimal.Round(ratio * 100, 1);
         var status = ratio switch
         {
             > 1m => "Exceeded",
             1m => "Limit",
-            >= 0.7m => "Attention",
+            var r when r >= threshold => "Attention",
             _ => "Ok"
         };
         return (percent, status);
@@ -245,7 +247,9 @@ public sealed class BudgetService
                 false, true, 0, true, SharingScope.Family, IsPendingReview: false);
         }
 
-        var detailLines = BuildDetailLines(plannedPairs, actuals, accounts);
+        var self = await _family.FindUserByIdAsync(selfId, ct);
+        var attentionPercent = self?.BudgetAlertPercent ?? 70;
+        var detailLines = BuildDetailLines(plannedPairs, actuals, accounts, attentionPercent);
         var mode = BudgetMode.Detailed;
         var displayLines = detailLines;
 
@@ -683,7 +687,8 @@ public sealed class BudgetService
     private static List<BudgetLineResponse> BuildDetailLines(
         IReadOnlyList<(Guid CategoryId, decimal Planned, int? ExpenseDay)> lines,
         Dictionary<Guid, decimal> actuals,
-        Dictionary<Guid, CategoryResponse> accounts)
+        Dictionary<Guid, CategoryResponse> accounts,
+        int attentionPercent = 70)
     {
         var planned = new Dictionary<Guid, decimal>();
         var days = new Dictionary<Guid, int?>();
@@ -710,7 +715,7 @@ public sealed class BudgetService
                 ? parent.Name
                 : account?.Name ?? "—";
             var name = account?.Name ?? "—";
-            var (percent, status) = Evaluate(plan, actual);
+            var (percent, status) = Evaluate(plan, actual, attentionPercent);
             responses.Add(new BudgetLineResponse(
                 id, name, account?.ParentId, group, section, CategoryLevel.Analytical,
                 plan, actual, plan - actual, percent, status, IsGroup: false, expenseDay));
@@ -736,6 +741,28 @@ public sealed class BudgetService
         }
 
         await _uow.SaveChangesAsync(ct);
+    }
+
+    /// <summary>
+    /// Adds a payable amount to the planned line for the due-date competence (boleto scan).
+    /// Does not create an Entry — only BudgetLine planned.
+    /// </summary>
+    public async Task<(string CompetenceYm, decimal PlannedAmount, int? ExpenseDay)> AddPayableFromBoletoAsync(
+        Guid categoryId,
+        decimal amount,
+        DateTime dueDate,
+        CancellationToken ct)
+    {
+        await _plan.EnsureWritableAsync(ct);
+        var ym = Competence.From(dueDate);
+        await _months.EnsureOpenAsync(ym, ct);
+        var expenseDay = Math.Clamp(dueDate.Day, 1, 31);
+        var budget = await GetOrCreateBudgetAsync(ym, BudgetMode.Detailed, ct);
+        var previous = await GetPlannedAsync(budget.Id, categoryId, ct);
+        var planned = decimal.Round(previous + amount, 2);
+        await SetLineAsync(budget, categoryId, planned, ct, expenseDay, updateDay: true);
+        await _uow.SaveChangesAsync(ct);
+        return (ym, planned, expenseDay);
     }
 
     public async Task ClearPlannedForAccountAsync(Guid categoryId, IReadOnlyList<string> months, CancellationToken ct)

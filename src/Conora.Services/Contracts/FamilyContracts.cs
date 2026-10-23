@@ -64,7 +64,9 @@ public sealed record UpdatePreferencesRequest(
     int ReserveTargetMonths,
     int MonthCloseDay,
     bool IncludeAbsoluteValuesInRetrospective,
-    bool VoiceEntryConfirm = true);
+    bool VoiceEntryConfirm = true,
+    int BudgetAlertPercent = 70,
+    bool PhotoEvolutionEnabled = true);
 
 public sealed record ProfileResponse(
     Guid UsuarioId,
@@ -78,7 +80,9 @@ public sealed record ProfileResponse(
     int MonthCloseDay,
     bool IncludeAbsoluteValuesInRetrospective,
     bool VoiceEntryConfirm = true,
-    bool HasAppleLogin = false);
+    bool HasAppleLogin = false,
+    int BudgetAlertPercent = 70,
+    bool PhotoEvolutionEnabled = true);
 
 public sealed record CategoryMemberBreakdownRow(
     Guid UsuarioId,

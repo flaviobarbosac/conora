@@ -116,15 +116,14 @@ public class FinanceDomainTests
     }
 
     [Fact]
-    public void Reopen_requires_reason_and_owner()
+    public void Reopen_requires_reason()
     {
         var owner = Guid.NewGuid();
         var lockRow = MonthLock.Close("2026-09", owner);
 
         Assert.Throws<ValidationException>(() => lockRow.Reopen("", owner));
-        Assert.Throws<ForbiddenException>(() => lockRow.Reopen("Ajuste de lançamento", Guid.NewGuid()));
 
-        lockRow.Reopen("Ajuste de lançamento", owner);
+        lockRow.Reopen("Ajuste de lançamento", Guid.NewGuid());
         Assert.False(lockRow.IsClosed);
         Assert.Equal("Ajuste de lançamento", lockRow.ReopenReason);
     }

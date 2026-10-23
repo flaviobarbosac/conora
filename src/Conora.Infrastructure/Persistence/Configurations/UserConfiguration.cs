@@ -16,6 +16,7 @@ public class UserConfiguration : IEntityTypeConfiguration<User>
         builder.Property(u => u.Cpf).HasMaxLength(11);
         builder.Property(u => u.PasswordHash).HasMaxLength(500);
         builder.Property(u => u.PasswordResetTokenHash).HasMaxLength(64);
+        builder.Property(u => u.EmailVerificationTokenHash).HasMaxLength(64);
         builder.Property(u => u.GoogleId).HasMaxLength(100);
         builder.Property(u => u.AppleId).HasMaxLength(100);
         builder.Property(u => u.EmailVerified).IsRequired();
@@ -27,6 +28,8 @@ public class UserConfiguration : IEntityTypeConfiguration<User>
         builder.Property(u => u.MonthCloseDay).IsRequired();
         builder.Property(u => u.IncludeAbsoluteValuesInRetrospective).IsRequired();
         builder.Property(u => u.VoiceEntryConfirm).IsRequired().HasDefaultValue(true);
+        builder.Property(u => u.BudgetAlertPercent).IsRequired().HasDefaultValue(70);
+        builder.Property(u => u.PhotoEvolutionEnabled).IsRequired().HasDefaultValue(true);
         builder.Property(u => u.Version).IsRequired();
         builder.Property(u => u.CreatedAt).IsRequired();
         builder.Property(u => u.UpdatedAt).IsRequired();
@@ -56,5 +59,10 @@ public class UserConfiguration : IEntityTypeConfiguration<User>
             .IsUnique()
             .HasFilter("\"PasswordResetTokenHash\" IS NOT NULL")
             .HasDatabaseName("IX_Users_PasswordResetTokenHash");
+
+        builder.HasIndex(u => u.EmailVerificationTokenHash)
+            .IsUnique()
+            .HasFilter("\"EmailVerificationTokenHash\" IS NOT NULL")
+            .HasDatabaseName("IX_Users_EmailVerificationTokenHash");
     }
 }

@@ -196,6 +196,10 @@ public sealed partial class WhatsAppService
             if (intake.Status == ReceiptIntakeStatus.Failed)
                 return new WhatsAppReply(phone, intake.FailureReason ?? "Não consegui ler o cupom.");
 
+            if (intake.Status == ReceiptIntakeStatus.Confirmed)
+                return new WhatsAppReply(phone,
+                    $"Lançamento gravado: R$ {(intake.ExtractedAmount ?? 0).ToString("N2", new CultureInfo("pt-BR"))} ({intake.ExtractedName ?? "recibo"}).");
+
             if (intake.NeedsClassification || intake.Status == ReceiptIntakeStatus.NeedsClassification)
                 return new WhatsAppReply(phone, await BuildClassificationListAsync(intake.ExtractedName, ct));
 
@@ -293,6 +297,8 @@ public sealed partial class WhatsAppService
                 return new WhatsAppReply(phone, "Essa conta não tem código de sistema. Escolha outra.");
 
             var updated = await _receipts.ClassifyAsync(intake.Id, new ClassifyReceiptRequest(chosen.Code), ct);
+            if (updated.Status == ReceiptIntakeStatus.Confirmed)
+                return new WhatsAppReply(phone, "Lançamento confirmado.");
             return new WhatsAppReply(phone, BuildConfirmPrompt(updated));
         }
 

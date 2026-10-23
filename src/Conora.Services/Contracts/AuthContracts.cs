@@ -7,4 +7,5 @@ public sealed record AppleLoginRequest(string IdentityToken, string? Name = null
 public sealed record RefreshRequest(string RefreshToken);
 public sealed record ForgotPasswordRequest(string Usuario);
 public sealed record ResetPasswordRequest(string Token, string Password);
+public sealed record VerifyEmailRequest(string Token);
 public sealed record AuthResponse(Guid UserId, string Email, string AccessToken, string RefreshToken, DateTime AccessExpiresAtUtc);

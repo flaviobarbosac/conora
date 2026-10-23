@@ -36,9 +36,6 @@ public class MonthLock : ModelBase, ITenantOwned
         if (string.IsNullOrWhiteSpace(reason) || reason.Trim().Length < 5)
             throw new ValidationException("reason", "Informe o motivo da reabertura (mínimo 5 caracteres).");
 
-        if (ClosedByUsuarioId != usuarioId)
-            throw new ForbiddenException("Somente o titular pode reabrir o mês.");
-
         IsClosed = false;
         ReopenReason = reason.Trim();
     }

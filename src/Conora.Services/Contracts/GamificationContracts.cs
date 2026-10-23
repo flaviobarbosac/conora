@@ -17,7 +17,9 @@ public sealed record AchievementResponse(
     string Title,
     string Description,
     bool Earned,
-    DateTime? EarnedAt);
+    DateTime? EarnedAt,
+    int Points = 0,
+    int? Age = null);
 
 public sealed record AchievementsResponse(
     bool QuietMode,

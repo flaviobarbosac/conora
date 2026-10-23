@@ -12,6 +12,7 @@ public class ReceiptIntakeConfiguration : IEntityTypeConfiguration<ReceiptIntake
         builder.HasKey(e => e.Id);
         builder.Property(e => e.UsuarioId).IsRequired();
         builder.Property(e => e.Channel).HasConversion<string>().HasMaxLength(20);
+        builder.Property(e => e.Purpose).HasConversion<string>().HasMaxLength(20);
         builder.Property(e => e.ImageObjectKey).IsRequired().HasMaxLength(260);
         builder.Property(e => e.Status).HasConversion<string>().HasMaxLength(30);
         builder.Property(e => e.ExtractedCnpj).HasMaxLength(14);

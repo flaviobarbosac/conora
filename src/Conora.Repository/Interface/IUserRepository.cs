@@ -10,6 +10,8 @@ public interface IUserRepository : IBaseRepository<User>
     Task<User?> FindByGoogleIdAsync(string googleId, CancellationToken ct = default);
     Task<User?> FindByAppleIdAsync(string appleId, CancellationToken ct = default);
     Task<User?> FindByPasswordResetHashAsync(string tokenHash, CancellationToken ct = default);
+    Task<User?> FindByEmailVerificationHashAsync(string tokenHash, CancellationToken ct = default);
+    Task<IReadOnlyList<Guid>> ListActiveUserIdsAsync(CancellationToken ct = default);
     Task<IReadOnlyList<User>> ListExpiredDeletionsAsync(DateTime cutoffUtc, CancellationToken ct = default);
     void Remove(User user);
 }

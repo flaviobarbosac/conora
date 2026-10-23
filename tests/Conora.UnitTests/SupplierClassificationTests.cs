@@ -28,4 +28,16 @@ public class SupplierClassificationTests
         Assert.Null(supplier.Cnpj);
         Assert.True(supplier.NeedsReview);
     }
+
+    [Fact]
+    public void User_override_stores_code_per_person()
+    {
+        var supplier = Supplier.Create("Padaria X", "04.252.011/0001-10");
+        supplier.TrySetClassification("ESS_MARKET", Guid.CreateVersion7());
+        var user = Guid.CreateVersion7();
+        var overrideRow = SupplierUserCategory.Create(supplier.Id, user, "ESS_FOOD");
+        Assert.Equal("ESS_FOOD", overrideRow.CategoryCode);
+        overrideRow.SetCategoryCode("ess_transport");
+        Assert.Equal("ESS_TRANSPORT", overrideRow.CategoryCode);
+    }
 }

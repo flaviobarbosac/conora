@@ -23,6 +23,7 @@ public sealed class LocalReceiptImageStore : IReceiptImageStore
     {
         var ext = contentType.Contains("png", StringComparison.OrdinalIgnoreCase) ? ".png"
             : contentType.Contains("webp", StringComparison.OrdinalIgnoreCase) ? ".webp"
+            : contentType.Contains("pdf", StringComparison.OrdinalIgnoreCase) ? ".pdf"
             : ".jpg";
         var key = $"{DateTime.UtcNow:yyyy/MM/dd}/{Guid.CreateVersion7():N}{ext}";
         var path = Path.Combine(_root, key.Replace('/', Path.DirectorySeparatorChar));

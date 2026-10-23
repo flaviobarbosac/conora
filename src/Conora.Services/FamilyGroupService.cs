@@ -29,6 +29,7 @@ public sealed class FamilyGroupService
     private readonly ILogger<FamilyGroupService> _logger;
     private readonly CategoryService _categories;
     private readonly PlanService _plan;
+    private readonly IStoreBillingGateway _storeBilling;
 
     public FamilyGroupService(
         IFamilyGroupRepository family,
@@ -42,9 +43,11 @@ public sealed class FamilyGroupService
         ICorrelationContext correlation,
         ILogger<FamilyGroupService> logger,
         CategoryService categories,
-        PlanService plan)
+        PlanService plan,
+        IStoreBillingGateway storeBilling)
     {
         _plan = plan;
+        _storeBilling = storeBilling;
         _family = family;
         _repo = repo;
         _uow = uow;
@@ -59,6 +62,9 @@ public sealed class FamilyGroupService
     }
 
     public Guid RequireUserId() => _tenant.UsuarioId ?? throw new ForbiddenException("Usuário não autenticado.");
+
+    public Task<User?> FindUserByIdAsync(Guid id, CancellationToken ct = default, bool track = false)
+        => _family.FindUserByIdAsync(id, ct, track);
 
     /// <summary>
     /// Users whose Family-scoped data is readable. Personal scope always returns only self.
@@ -171,7 +177,9 @@ public sealed class FamilyGroupService
             request.ReserveTargetMonths,
             request.MonthCloseDay,
             request.IncludeAbsoluteValuesInRetrospective,
-            request.VoiceEntryConfirm);
+            request.VoiceEntryConfirm,
+            request.BudgetAlertPercent,
+            request.PhotoEvolutionEnabled);
         await _uow.SaveChangesAsync(ct);
 
         if (request.EmailsEnabled)
@@ -296,7 +304,8 @@ public sealed class FamilyGroupService
         var invite = FamilyInvite.Create(self, email, membership?.FamilyGroupId, InviteTtl);
         _family.AddInvite(invite);
 
-        var link = $"{PublicWebBase()}/app/grupo/convite/{invite.Token}";
+        // Invite opens the store/plans first; the token is kept so accept can cancel Individual.
+        var link = $"{PublicWebBase()}/app/planos?convite={Uri.EscapeDataString(invite.Token)}";
         try
         {
             await _email.SendAsync(
@@ -306,11 +315,12 @@ public sealed class FamilyGroupService
                     $"{me.Name} convidou você",
                     [
                         $"{me.Name} convidou você para compartilhar o orçamento familiar no Conora.",
-                        "Abra o link, entre se já tiver conta ou crie com este mesmo e-mail."
+                        "Abra o link na loja do app (Google Play ou App Store), assine o plano do grupo se ainda não tiver, e depois aceite o convite com este mesmo e-mail.",
+                        "Se você já paga o Individual sozinho, o aceite cancela essa cobrança para não pagar em dobro."
                     ])
                 {
-                    Preheader = "Convite para o grupo familiar no Conora.",
-                    ActionLabel = "Aceitar convite",
+                    Preheader = "Convite para o grupo familiar no Conora — abre a loja.",
+                    ActionLabel = "Abrir loja e aceitar",
                     ActionUrl = link,
                     Note = $"O convite vale até {invite.ExpiresAt:dd/MM/yyyy HH:mm} UTC."
                 },
@@ -491,6 +501,8 @@ public sealed class FamilyGroupService
 
         AuditRecorder.Record(_audits, _correlation, "FamilyInvite", invite.Id, "FamilyInviteAccepted", new { invite.Email, self });
         await _uow.SaveChangesAsync(ct);
+        // Avoid double billing: cancel the invitee's own Individual (local stub; store API TODO).
+        await _storeBilling.CancelMemberIndividualAsync(self, ct);
         await _categories.EnsureDefaultsAsync(ct);
         await _categories.MergeOnJoinAsync(group.BudgetOwnerUsuarioId, self, ct);
         return await GetGroupAsync(ct);
@@ -510,7 +522,10 @@ public sealed class FamilyGroupService
                 "group",
                 "Responsável pelo orçamento não pode sair sem transferir o orçamento para outro membro.");
 
+        var wasOwner = group.IsBudgetOwner(self);
         await RemoveMemberCoreAsync(membership.FamilyGroupId, self, self, markPersonal: true, ct);
+        if (wasOwner)
+            await _storeBilling.CancelOwnerSubscriptionAsync(self, ct);
     }
 
     public async Task RemoveMemberAsync(Guid usuarioId, CancellationToken ct)
@@ -849,7 +864,9 @@ public sealed class FamilyGroupService
             user.MonthCloseDay,
             user.IncludeAbsoluteValuesInRetrospective,
             user.VoiceEntryConfirm,
-            !string.IsNullOrEmpty(user.AppleId));
+            !string.IsNullOrEmpty(user.AppleId),
+            user.BudgetAlertPercent,
+            user.PhotoEvolutionEnabled);
 
     private static FamilyInviteResponse ToInvite(FamilyInvite i)
         => new(i.Id, i.Email, i.ExpiresAt, i.AcceptedAt, i.CancelledAt, i.IsOpen);

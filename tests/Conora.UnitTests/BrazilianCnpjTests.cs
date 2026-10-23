@@ -31,4 +31,12 @@ public class BrazilianCnpjTests
         Assert.True(BrazilianCnpj.TryExtract(text, out var normalized));
         Assert.Equal("04252011000110", normalized);
     }
+
+    [Fact]
+    public void LooksLikeInvalid_detects_bad_check_digits()
+    {
+        Assert.True(BrazilianCnpj.LooksLikeInvalid("04252011000111", out var digits));
+        Assert.Equal("04252011000111", digits);
+        Assert.False(BrazilianCnpj.LooksLikeInvalid("04.252.011/0001-10", out _));
+    }
 }

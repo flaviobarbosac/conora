@@ -12,6 +12,8 @@ public class User : ModelBase
     public string? PasswordHash { get; private set; }
     public string? PasswordResetTokenHash { get; private set; }
     public DateTime? PasswordResetExpiresAtUtc { get; private set; }
+    public string? EmailVerificationTokenHash { get; private set; }
+    public DateTime? EmailVerificationExpiresAtUtc { get; private set; }
     public string? GoogleId { get; private set; }
     public string? AppleId { get; private set; }
     public bool EmailVerified { get; private set; }
@@ -26,6 +28,10 @@ public class User : ModelBase
     public bool IncludeAbsoluteValuesInRetrospective { get; private set; }
     /// <summary>When true, Ian shows the spoken launch and waits for approval before saving.</summary>
     public bool VoiceEntryConfirm { get; private set; } = true;
+    /// <summary>Percent at which a budget account enters Attention (yellow). Limit at 100% and Exceeded above stay fixed.</summary>
+    public int BudgetAlertPercent { get; private set; } = 70;
+    /// <summary>When true, Ian and Clara portraits and voice bands follow milestone age. When false, both stay at age 30 / adult.</summary>
+    public bool PhotoEvolutionEnabled { get; private set; } = true;
 
     private User()
     {
@@ -87,22 +93,34 @@ public class User : ModelBase
         PasswordHash = passwordHash;
         PasswordResetTokenHash = null;
         PasswordResetExpiresAtUtc = null;
-        EmailVerified = true;
     }
 
-    public void SetGoogleId(string googleId)
+    public void SetGoogleId(string googleId) => GoogleId = googleId;
+
+    public void SetAppleId(string appleId) => AppleId = appleId;
+
+    public void IssueEmailVerification(string tokenHash, DateTime expiresAtUtc)
     {
-        GoogleId = googleId;
-        EmailVerified = true;
+        if (string.IsNullOrWhiteSpace(tokenHash))
+            throw new ArgumentException("Token inválido.", nameof(tokenHash));
+        if (expiresAtUtc <= DateTime.UtcNow)
+            throw new ArgumentException("Prazo inválido.", nameof(expiresAtUtc));
+
+        EmailVerificationTokenHash = tokenHash;
+        EmailVerificationExpiresAtUtc = expiresAtUtc;
     }
 
-    public void SetAppleId(string appleId)
+    public bool EmailVerificationIsActive(string tokenHash)
+        => !string.IsNullOrEmpty(EmailVerificationTokenHash)
+           && string.Equals(EmailVerificationTokenHash, tokenHash, StringComparison.Ordinal)
+           && EmailVerificationExpiresAtUtc > DateTime.UtcNow;
+
+    public void MarkEmailVerified()
     {
-        AppleId = appleId;
         EmailVerified = true;
+        EmailVerificationTokenHash = null;
+        EmailVerificationExpiresAtUtc = null;
     }
-
-    public void MarkEmailVerified() => EmailVerified = true;
 
     public void Rename(string name)
     {
@@ -120,7 +138,9 @@ public class User : ModelBase
         int reserveTargetMonths,
         int monthCloseDay,
         bool includeAbsoluteValuesInRetrospective,
-        bool voiceEntryConfirm = true)
+        bool voiceEntryConfirm = true,
+        int budgetAlertPercent = 70,
+        bool photoEvolutionEnabled = true)
     {
         var errors = new Dictionary<string, string[]>();
         var theme = ThemeCatalog.Normalize(themeId);
@@ -130,6 +150,8 @@ public class User : ModelBase
             errors["reserveTargetMonths"] = ["Meta da reserva deve ter entre 1 e 24 meses."];
         if (monthCloseDay is < 1 or > 31)
             errors["monthCloseDay"] = ["Dia de fechamento deve ser entre 1 e 31."];
+        if (budgetAlertPercent is < 1 or > 99)
+            errors["budgetAlertPercent"] = ["Alerta do orçamento deve ser entre 1% e 99%."];
         if (errors.Count > 0)
             throw new ValidationException(errors);
 
@@ -140,6 +162,8 @@ public class User : ModelBase
         MonthCloseDay = monthCloseDay;
         IncludeAbsoluteValuesInRetrospective = includeAbsoluteValuesInRetrospective;
         VoiceEntryConfirm = voiceEntryConfirm;
+        BudgetAlertPercent = budgetAlertPercent;
+        PhotoEvolutionEnabled = photoEvolutionEnabled;
     }
 
     public void RequestDeletion()
