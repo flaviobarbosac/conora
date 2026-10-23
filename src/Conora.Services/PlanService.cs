@@ -53,19 +53,28 @@ public sealed class PlanService
 
         WorkspaceSubscription? covering = own is not null && own.IsWritable(now) ? own : null;
         var coveredByFamily = false;
+        var familyMemberWithoutCover = false;
         if (covering is null)
         {
-            var familyPlan = await FindFamilyOwnerPlanAsync(self, now, ct);
+            var (familyPlan, inGroupAsNonOwner) = await TryFamilyOwnerPlanAsync(self, now, ct);
             if (familyPlan is not null)
             {
                 covering = familyPlan;
                 coveredByFamily = true;
+            }
+            else if (inGroupAsNonOwner)
+            {
+                // Owner stopped paying (or has no covering plan): whole group falls to free / read-only.
+                familyMemberWithoutCover = true;
             }
         }
         covering ??= own;
 
         var user = await _family.FindUserByIdAsync(self, ct);
         var state = AccessPolicy.Evaluate(user?.CreatedAt ?? now, covering, now);
+        if (familyMemberWithoutCover && state.IsWritable)
+            state = new AccessState(AccessPhase.Grace, state.TrialEndsAt, state.BlockAt);
+
         _snapshot = new AccessSnapshot(state, covering, coveredByFamily);
         return _snapshot;
     }
@@ -82,7 +91,7 @@ public sealed class PlanService
                 throw new PlanBlockedException();
             case AccessPhase.Grace:
                 throw new PlanReadOnlyException(
-                    "Seu acesso gratuito de 90 dias terminou: o Conora está em modo somente leitura. " +
+                    "O Conora está em modo somente leitura (plano gratuito / consulta). " +
                     "Você ainda pode consultar e exportar seus dados. Assine um plano para voltar a lançar.");
             default:
                 throw new PlanReadOnlyException();
@@ -103,52 +112,83 @@ public sealed class PlanService
         var tier = access.Subscription.Tier;
         if (tier == PlanTier.Individual)
             throw new ForbiddenException(
-                "O plano Individual não inclui grupo familiar. Mude para o plano Família para convidar pessoas.");
+                "O plano Individual não inclui grupo familiar. Mude para o Duo ou Family para convidar pessoas.");
 
         var max = PlanCatalog.MaxExtraMembers(tier);
         if (max is not null && currentExtraMembers >= max)
             throw new ValidationException(
                 "email",
-                $"Seu plano Família permite até {max} pessoas além de você. Mude para o Família+ para adicionar mais.");
+                $"Seu plano Duo permite até {max} pessoa além de você. Mude para o Family para adicionar mais.");
     }
 
-    /// <summary>Activates or renews the plan. Payment gateway integration is not part of this version.</summary>
+    /// <summary>
+    /// Activates or renews only when the store confirmed the purchase (token from Play / App Store webhook or stub).
+    /// </summary>
     public async Task<PlanResponse> SubscribeAsync(SubscribeRequest request, CancellationToken ct)
     {
         if (!PlanCatalog.IsSellable(request.Plan))
             throw new ValidationException("plan", "Plano inválido.");
+        if (string.IsNullOrWhiteSpace(request.StorePurchaseToken))
+            throw new ValidationException(
+                "store",
+                "A assinatura só muda quando a Google Play ou a App Store confirmar a compra.");
 
+        return await ApplyStorePlanAsync(request.Plan, request.StorePurchaseToken.Trim(), "client", ct);
+    }
+
+    /// <summary>Called by store webhooks after Play / App Store notifies a purchase or renewal.</summary>
+    public async Task ApplyStoreConfirmationAsync(StorePurchaseConfirmation confirmation, CancellationToken ct)
+    {
+        if (!PlanCatalog.IsSellable(confirmation.Plan))
+            throw new ValidationException("plan", "Plano inválido.");
+        if (string.IsNullOrWhiteSpace(confirmation.PurchaseToken))
+            throw new ValidationException("store", "Token da loja obrigatório.");
+
+        _tenant.Set(confirmation.UsuarioId);
+        await ApplyStorePlanAsync(confirmation.Plan, confirmation.PurchaseToken.Trim(), confirmation.Store, ct);
+    }
+
+    private async Task<PlanResponse> ApplyStorePlanAsync(PlanKind plan, string purchaseToken, string store, CancellationToken ct)
+    {
         var now = DateTime.UtcNow;
         var sub = await _repo.FirstOrDefaultAsync<WorkspaceSubscription>(_ => true, ct);
         if (sub is null)
         {
-            sub = WorkspaceSubscription.Activate(request.Plan, now);
+            sub = WorkspaceSubscription.Activate(plan, now);
             _repo.Add(sub);
         }
         else
         {
-            sub.Renew(request.Plan, now);
+            sub.Renew(plan, now);
         }
 
-        AuditRecorder.Record(_audits, _correlation, "WorkspaceSubscription", sub.Id, "PlanSubscribed", new { request.Plan, sub.ExpiresAt });
+        AuditRecorder.Record(
+            _audits,
+            _correlation,
+            "WorkspaceSubscription",
+            sub.Id,
+            "PlanSubscribedFromStore",
+            new { plan, store, purchaseToken, sub.ExpiresAt });
         await _uow.SaveChangesAsync(ct);
 
         _snapshot = null;
         return await GetAsync(ct);
     }
 
-    private async Task<WorkspaceSubscription?> FindFamilyOwnerPlanAsync(Guid self, DateTime now, CancellationToken ct)
+    /// <returns>Covering family plan when writable; inGroupAsNonOwner true when the user is a member under another budget owner.</returns>
+    private async Task<(WorkspaceSubscription? Plan, bool InGroupAsNonOwner)> TryFamilyOwnerPlanAsync(
+        Guid self, DateTime now, CancellationToken ct)
     {
         var membership = await _family.FindActiveMembershipAsync(self, ct);
         if (membership is null)
-            return null;
+            return (null, false);
         var group = await _family.GetGroupAsync(membership.FamilyGroupId, ct, track: false);
         if (group is null || group.BudgetOwnerUsuarioId == self)
-            return null;
+            return (null, false);
         var ownerPlan = await _family.FindSubscriptionAsync(group.BudgetOwnerUsuarioId, ct);
-        return ownerPlan is not null && ownerPlan.IsWritable(now) && ownerPlan.Tier != PlanTier.Individual
-            ? ownerPlan
-            : null;
+        if (ownerPlan is not null && ownerPlan.IsWritable(now) && ownerPlan.Tier != PlanTier.Individual)
+            return (ownerPlan, true);
+        return (null, true);
     }
 
     private static PlanResponse ToResponse(AccessSnapshot access, DateTime now)

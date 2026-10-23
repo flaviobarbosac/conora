@@ -71,7 +71,7 @@ public sealed class GeminiClient : IGeminiClient
         return SendAsync(body, ct);
     }
 
-    public async Task<byte[]?> SpeakAsync(string text, string voiceName, CancellationToken ct)
+    public async Task<byte[]?> SpeakAsync(string text, string voiceName, string style, CancellationToken ct)
     {
         if (!IsConfigured)
             return null;
@@ -86,11 +86,11 @@ public sealed class GeminiClient : IGeminiClient
         {
             var wav = await RequestSpeechAsync(
                 "gemini-3.8-flash-tts",
-                SpeechBody(spoken, voiceName, wavModel: true),
+                SpeechBody(spoken, voiceName, style, wavModel: true),
                 ct);
             wav ??= await RequestSpeechAsync(
                 "gemini-2.5-flash-preview-tts",
-                SpeechBody("Fale em português do Brasil, com voz humana e calma: " + spoken, voiceName, wavModel: false),
+                SpeechBody($"Fale com {style}: {spoken}", voiceName, style, wavModel: false),
                 ct);
             return wav;
         }
@@ -102,7 +102,7 @@ public sealed class GeminiClient : IGeminiClient
         }
     }
 
-    private static object SpeechBody(string text, string voiceName, bool wavModel)
+    private static object SpeechBody(string text, string voiceName, string style, bool wavModel)
     {
         if (wavModel)
         {
@@ -118,7 +118,7 @@ public sealed class GeminiClient : IGeminiClient
                             new
                             {
                                 text,
-                                speech_metadata = new { style = "voz humana, calma e natural, português do Brasil" }
+                                speech_metadata = new { style }
                             }
                         }
                     }

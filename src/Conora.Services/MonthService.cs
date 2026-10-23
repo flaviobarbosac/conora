@@ -12,6 +12,7 @@ public sealed class MonthService
 {
     private readonly IFinanceRepository _repo;
     private readonly IFamilyGroupRepository _family;
+    private readonly FamilyGroupService _groups;
     private readonly IAuditEventRepository _audits;
     private readonly IUnitOfWork _uow;
     private readonly ITenantContext _tenant;
@@ -21,6 +22,7 @@ public sealed class MonthService
     public MonthService(
         IFinanceRepository repo,
         IFamilyGroupRepository family,
+        FamilyGroupService groups,
         IAuditEventRepository audits,
         IUnitOfWork uow,
         ITenantContext tenant,
@@ -29,6 +31,7 @@ public sealed class MonthService
     {
         _repo = repo;
         _family = family;
+        _groups = groups;
         _audits = audits;
         _uow = uow;
         _tenant = tenant;
@@ -66,6 +69,7 @@ public sealed class MonthService
     {
         await _plan.EnsureWritableAsync(ct);
         Competence.Require(competenceYm);
+        await EnsureGroupBudgetOwnerAsync(ct);
         await EnsureCanCloseAsync(competenceYm, ct);
 
         var row = await _repo.FirstOrDefaultAsync<MonthLock>(m => m.CompetenceYm == competenceYm, ct);
@@ -93,6 +97,7 @@ public sealed class MonthService
     {
         await _plan.EnsureWritableAsync(ct);
         Competence.Require(competenceYm);
+        await EnsureGroupBudgetOwnerAsync(ct);
 
         var row = await _repo.FirstOrDefaultAsync<MonthLock>(m => m.CompetenceYm == competenceYm, ct);
         if (row is not { IsClosed: true })
@@ -136,6 +141,14 @@ public sealed class MonthService
         var id = _tenant.UsuarioId ?? throw new ForbiddenException("Usuário não autenticado.");
         return await _family.FindUserByIdAsync(id, ct)
                ?? throw new UserNotFoundException(id);
+    }
+
+    private async Task EnsureGroupBudgetOwnerAsync(CancellationToken ct)
+    {
+        var self = _tenant.UsuarioId ?? throw new ForbiddenException("Usuário não autenticado.");
+        var ownerId = await _groups.GetBudgetOwnerUsuarioIdAsync(ct);
+        if (ownerId is Guid oid && oid != self)
+            throw new ForbiddenException("Só o dono do grupo fecha e reabre o mês.");
     }
 
     private Guid RequireOwner()

@@ -18,14 +18,23 @@ public static class ReceiptEndpoints
             var form = await request.ReadFormAsync(ct);
             var file = form.Files.GetFile("file") ?? form.Files.FirstOrDefault();
             if (file is null || file.Length == 0)
-                return Results.BadRequest(new { error = "Arquivo de imagem obrigatório." });
+                return Results.BadRequest(new { error = "Arquivo de imagem ou PDF obrigatório." });
 
             var channel = Enum.TryParse<ReceiptChannel>(form["channel"], ignoreCase: true, out var parsed)
                 ? parsed
                 : ReceiptChannel.App;
 
+            var purpose = Enum.TryParse<ReceiptPurpose>(form["purpose"], ignoreCase: true, out var purposeParsed)
+                ? purposeParsed
+                : ReceiptPurpose.Expense;
+
             await using var stream = file.OpenReadStream();
-            var created = await service.CreateAsync(stream, file.ContentType ?? "image/jpeg", channel, ct);
+            var created = await service.CreateAsync(
+                stream,
+                file.ContentType ?? "image/jpeg",
+                channel,
+                ct,
+                purpose: purpose);
             return Results.Created($"/receipts/{created.Id}", created);
         });
 
@@ -42,12 +51,26 @@ public static class ReceiptEndpoints
             CancellationToken ct) =>
             Results.Ok(await service.ClassifyAsync(id, request, ct)));
 
+        group.MapPost("/{id:guid}/link-supplier", async (
+            Guid id,
+            LinkSupplierRequest request,
+            ReceiptIntakeService service,
+            CancellationToken ct) =>
+            Results.Ok(await service.LinkSupplierAsync(id, request, ct)));
+
         group.MapPost("/{id:guid}/confirm", async (
             Guid id,
             ConfirmReceiptRequest request,
             ReceiptIntakeService service,
             CancellationToken ct) =>
             Results.Ok(await service.ConfirmAsync(id, request, ct)));
+
+        group.MapPost("/{id:guid}/confirm-budget", async (
+            Guid id,
+            ConfirmReceiptRequest request,
+            ReceiptIntakeService service,
+            CancellationToken ct) =>
+            Results.Ok(await service.ConfirmBudgetAsync(id, request, ct)));
 
         return app;
     }

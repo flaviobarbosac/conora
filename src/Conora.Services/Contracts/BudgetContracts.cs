@@ -6,7 +6,7 @@ public sealed record BudgetLineInput(Guid CategoryId, decimal PlannedAmount, int
 
 public sealed record UpsertBudgetRequest(BudgetMode Mode, IReadOnlyList<BudgetLineInput> Lines);
 
-/// <summary>Status follows the fixed rule: under 70% Ok, 70-99% Attention, 100% Limit, above 100% Exceeded.</summary>
+/// <summary>Status: under attention% Ok, attention%–99% Attention, 100% Limit, above 100% Exceeded. Attention% comes from user preference (default 70).</summary>
 public sealed record BudgetLineResponse(
     Guid? CategoryId,
     string CategoryName,

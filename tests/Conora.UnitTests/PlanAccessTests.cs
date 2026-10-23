@@ -51,8 +51,8 @@ public class PlanAccessTests
     [InlineData(PlanKind.IndividualYearly, 499.00, PlanTier.Individual)]
     [InlineData(PlanKind.FamilyMonthly, 69.90, PlanTier.Family)]
     [InlineData(PlanKind.FamilyYearly, 699.00, PlanTier.Family)]
-    [InlineData(PlanKind.FamilyPlusMonthly, 89.90, PlanTier.FamilyPlus)]
-    [InlineData(PlanKind.FamilyPlusYearly, 899.00, PlanTier.FamilyPlus)]
+    [InlineData(PlanKind.FamilyPlusMonthly, 99.90, PlanTier.FamilyPlus)]
+    [InlineData(PlanKind.FamilyPlusYearly, 999.00, PlanTier.FamilyPlus)]
     public void Catalog_prices_yearly_with_two_free_months(PlanKind kind, double price, PlanTier tier)
     {
         Assert.Equal((decimal)price, PlanCatalog.PriceOf(kind));
@@ -69,7 +69,7 @@ public class PlanAccessTests
         Assert.Equal(PlanTier.Individual, PlanCatalog.TierOf(PlanKind.Monthly1490));
         Assert.False(PlanCatalog.IsSellable(PlanKind.Yearly14990));
         Assert.Equal(0, PlanCatalog.MaxExtraMembers(PlanTier.Individual));
-        Assert.Equal(2, PlanCatalog.MaxExtraMembers(PlanTier.Family));
+        Assert.Equal(1, PlanCatalog.MaxExtraMembers(PlanTier.Family));
         Assert.Null(PlanCatalog.MaxExtraMembers(PlanTier.FamilyPlus));
     }
 }

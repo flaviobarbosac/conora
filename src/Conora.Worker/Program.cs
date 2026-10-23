@@ -11,6 +11,8 @@ builder.Services.AddServices();
 builder.Services.AddHostedService<LgpdRetentionWorker>();
 builder.Services.AddHostedService<ReceiptOcrWorker>();
 builder.Services.AddHostedService<ReceiptImagePurgeWorker>();
+builder.Services.AddHostedService<MilestoneNightlyWorker>();
+builder.Services.AddHostedService<MilestoneNightlyWorker>();
 
 var host = builder.Build();
 await host.RunAsync();

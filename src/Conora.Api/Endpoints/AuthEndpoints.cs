@@ -37,6 +37,9 @@ public static class AuthEndpoints
             return Results.NoContent();
         });
 
+        group.MapPost("/verify-email", async (VerifyEmailRequest request, AuthService service, CancellationToken ct) =>
+            Results.Ok(await service.VerifyEmailAsync(request, ct)));
+
         group.MapPost("/refresh", async (RefreshRequest request, AuthService service, CancellationToken ct) =>
             Results.Ok(await service.RefreshAsync(request, ct)));
 

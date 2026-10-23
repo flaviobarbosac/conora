@@ -1,3 +1,4 @@
+using Conora.Domain.Catalog;
 using Conora.Domain.Entities;
 using Conora.Domain.Enums;
 using Conora.Domain.Exceptions;
@@ -180,45 +181,133 @@ public sealed class GamificationService
 
     private async Task<IReadOnlyList<AchievementResponse>> BuildAchievementsAsync(CancellationToken ct)
     {
-        var closedLocks = (await _repo.ListAsync<MonthLock>(m => m.IsClosed, ct))
-            .OrderBy(m => m.CompetenceYm)
-            .ToList();
-        var firstClosed = closedLocks.FirstOrDefault();
-        var firstClosedAt = firstClosed?.ClosedAt;
+        // Persisted grants from the nightly job win; live checks fill the UI before the job runs.
+        var granted = (await _repo.ListAsync<UserMilestone>(null, ct))
+            .ToDictionary(m => m.Key, StringComparer.Ordinal);
 
-        var streak = await LongestWithinBudgetStreakAsync(closedLocks, ct);
-        var threeInARow = streak >= 3;
-        var threeAt = threeInARow
-            ? closedLocks.Select(m => m.ClosedAt).Where(a => a is not null).OrderBy(a => a).Skip(2).FirstOrDefault()
-            : null;
-
-        var anyWithin = false;
-        DateTime? withinAt = null;
-        foreach (var row in closedLocks)
+        var list = new List<AchievementResponse>();
+        foreach (var def in MilestoneCatalog.Ordered)
         {
-            if (!await IsWithinBudgetAsync(row.CompetenceYm, ct))
+            if (granted.TryGetValue(def.Key, out var row))
+            {
+                list.Add(new(def.Key, def.Title, $"{def.Points} pontos · idade {def.Age}.", true, row.GrantedAt, def.Points, def.Age));
                 continue;
-            anyWithin = true;
-            withinAt = row.ClosedAt;
-            break;
+            }
+
+            var (earned, at) = await LiveMilestoneHintAsync(def.Key, ct);
+            list.Add(new(def.Key, def.Title, $"{def.Points} pontos · idade {def.Age}.", earned, at, def.Points, def.Age));
         }
 
-        var reserve = await BuildReserveThermometerAsync(Competence.From(DateTime.UtcNow), (await RequireUserAsync(ct)).ReserveTargetMonths, ct);
-        var reserveComplete = reserve.MonthsCovered >= reserve.TargetMonths;
-        var reserveAt = reserveComplete ? DateTime.UtcNow : (DateTime?)null;
+        return list;
+    }
 
-        var projects = await _repo.ListAsync<LifeProject>(null, ct);
-        var advanced = projects.FirstOrDefault(p => p.AccumulatedAmount > 0);
-        var advancedAt = advanced is null ? (DateTime?)null : advanced.UpdatedAt;
+    private async Task<(bool Earned, DateTime? At)> LiveMilestoneHintAsync(string key, CancellationToken ct)
+    {
+        switch (key)
+        {
+            case "first-month-closed":
+            {
+                var first = (await _repo.ListAsync<MonthLock>(m => m.IsClosed, ct)).OrderBy(m => m.ClosedAt).FirstOrDefault();
+                return (first is not null, first?.ClosedAt);
+            }
+            case "three-months-in-budget":
+            {
+                var closed = (await _repo.ListAsync<MonthLock>(m => m.IsClosed, ct)).OrderBy(m => m.CompetenceYm).ToList();
+                var streak = await LongestWithinBudgetStreakAsync(closed, ct);
+                var at = streak >= 3
+                    ? closed.Select(m => m.ClosedAt).Where(a => a is not null).OrderBy(a => a).Skip(2).FirstOrDefault()
+                    : null;
+                return (streak >= 3, at);
+            }
+            case "reserve-complete":
+            {
+                var reserve = await BuildReserveThermometerAsync(Competence.From(DateTime.UtcNow), (await RequireUserAsync(ct)).ReserveTargetMonths, ct);
+                return (reserve.MonthsCovered >= reserve.TargetMonths && reserve.MonthlyEssentialAverage > 0, null);
+            }
+            case "reserve-started":
+            {
+                var reserve = await BuildReserveThermometerAsync(Competence.From(DateTime.UtcNow), (await RequireUserAsync(ct)).ReserveTargetMonths, ct);
+                return (reserve.ReserveBalance > 0, null);
+            }
+            case "project-progress":
+            {
+                var advanced = (await _repo.ListAsync<LifeProject>(null, ct)).FirstOrDefault(p => p.AccumulatedAmount > 0);
+                return (advanced is not null, advanced?.UpdatedAt);
+            }
+            case "budget-half-filled":
+                return (await IsHalfBudgetFilledAsync(ct), null);
+            case "payment-on-time":
+            {
+                var ym = await FirstPaymentOnTimeYmAsync(ct);
+                return (ym is not null, null);
+            }
+            default:
+                return (false, null);
+        }
+    }
 
-        return
-        [
-            new("first-month-closed", "1º mês fechado", "Você fechou o primeiro mês no Conora.", firstClosed is not null, firstClosedAt),
-            new("three-months-in-budget", "3 meses seguidos", "Três competências fechadas dentro do orçamento.", threeInARow, threeAt),
-            new("budget-in-order", "Orçamento em ordem", "Um mês fechado dentro do previsto.", anyWithin, withinAt),
-            new("reserve-complete", "Reserva completa", "Reserva cobre a meta de meses de essenciais.", reserveComplete, reserveAt),
-            new("project-progress", "Avanço em projeto de vida", "Primeiro aporte que move o acumulado de um projeto.", advanced is not null, advancedAt),
-        ];
+    private async Task<bool> IsHalfBudgetFilledAsync(CancellationToken ct)
+    {
+        var active = await _repo.ListAsync<Category>(
+            c => c.Level == CategoryLevel.Analytical && c.IsActive && !c.IsPendingReview
+                 && (c.Section == CategorySection.Essential
+                     || c.Section == CategorySection.Social
+                     || c.Section == CategorySection.Discount
+                     || c.Section == CategorySection.LifeProject
+                     || c.Section == CategorySection.Income),
+            ct,
+            track: false);
+        if (active.Count == 0)
+            return false;
+        var budgets = await _repo.ListAsync<Budget>(null, ct, track: false);
+        foreach (var budget in budgets)
+        {
+            var lines = await _repo.ListAsync<BudgetLine>(
+                l => l.BudgetId == budget.Id && l.PlannedAmount != 0, ct, track: false);
+            var filledIds = lines.Select(l => l.CategoryId).ToHashSet();
+            if (active.Count(c => filledIds.Contains(c.Id)) * 2 >= active.Count)
+                return true;
+        }
+        return false;
+    }
+
+    private async Task<string?> FirstPaymentOnTimeYmAsync(CancellationToken ct)
+    {
+        var locks = (await _repo.ListAsync<MonthLock>(m => m.IsClosed, ct, track: false))
+            .OrderBy(m => m.CompetenceYm)
+            .ToList();
+        foreach (var month in locks)
+        {
+            var year = int.Parse(month.CompetenceYm.AsSpan(0, 4));
+            var monthNum = int.Parse(month.CompetenceYm.AsSpan(5, 2));
+            var budget = await _repo.FirstOrDefaultAsync<Budget>(b => b.CompetenceYm == month.CompetenceYm, ct, track: false);
+            if (budget is null)
+                continue;
+            var lines = await _repo.ListAsync<BudgetLine>(
+                l => l.BudgetId == budget.Id && l.ExpenseDay != null, ct, track: false);
+            if (lines.Count == 0)
+                continue;
+            var ok = true;
+            foreach (var line in lines)
+            {
+                var day = line.ExpenseDay!.Value;
+                var entries = await _repo.ListAsync<Entry>(
+                    e => e.CategoryId == line.CategoryId
+                         && e.Type == EntryType.Expense
+                         && e.OccurredAt.Year == year
+                         && e.OccurredAt.Month == monthNum,
+                    ct,
+                    track: false);
+                if (entries.Count == 0 || entries.Any(e => e.OccurredAt.Day > day))
+                {
+                    ok = false;
+                    break;
+                }
+            }
+            if (ok)
+                return month.CompetenceYm;
+        }
+        return null;
     }
 
     private async Task<int> LongestWithinBudgetStreakAsync(IReadOnlyList<MonthLock> closed, CancellationToken ct)

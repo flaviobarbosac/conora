@@ -9,8 +9,8 @@ public static class PlanCatalog
 {
     public const int FreeMonthsOnYearly = 2;
 
-    /// <summary>Extra people (besides the owner) allowed in the family group by the Family tier.</summary>
-    public const int FamilyExtraMembers = 2;
+    /// <summary>Extra people on Duo (PlanTier.Family): owner + 1 = 2 people total.</summary>
+    public const int FamilyExtraMembers = 1;
 
     public static readonly IReadOnlyList<PlanOfferDefinition> Offers =
     [
@@ -18,8 +18,8 @@ public static class PlanCatalog
         Offer(PlanKind.IndividualYearly, PlanTier.Individual, 49.90m, yearly: true),
         Offer(PlanKind.FamilyMonthly, PlanTier.Family, 69.90m, yearly: false),
         Offer(PlanKind.FamilyYearly, PlanTier.Family, 69.90m, yearly: true),
-        Offer(PlanKind.FamilyPlusMonthly, PlanTier.FamilyPlus, 89.90m, yearly: false),
-        Offer(PlanKind.FamilyPlusYearly, PlanTier.FamilyPlus, 89.90m, yearly: true)
+        Offer(PlanKind.FamilyPlusMonthly, PlanTier.FamilyPlus, 99.90m, yearly: false),
+        Offer(PlanKind.FamilyPlusYearly, PlanTier.FamilyPlus, 99.90m, yearly: true)
     ];
 
     public static bool IsSellable(PlanKind kind) => Offers.Any(o => o.Kind == kind);

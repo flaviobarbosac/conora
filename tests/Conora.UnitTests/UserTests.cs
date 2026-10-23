@@ -35,7 +35,20 @@ public class UserTests
 
         Assert.Equal("hashed-password", user.PasswordHash);
         Assert.Equal("google-1", user.GoogleId);
-        Assert.True(user.EmailVerified);
+        Assert.False(user.EmailVerified);
         Assert.False(user.PasswordResetIsActive("hash"));
+    }
+
+    [Fact]
+    public void MarkEmailVerified_clears_verification_token()
+    {
+        var user = User.Create("Ana", "ana@example.com");
+        user.IssueEmailVerification("vhash", DateTime.UtcNow.AddHours(24));
+        Assert.True(user.EmailVerificationIsActive("vhash"));
+
+        user.MarkEmailVerified();
+
+        Assert.True(user.EmailVerified);
+        Assert.False(user.EmailVerificationIsActive("vhash"));
     }
 }

@@ -43,6 +43,36 @@ public static partial class BrazilianCnpj
         return false;
     }
 
+    /// <summary>
+    /// True when the value (or the first 14-digit candidate in text) looks like a CNPJ
+    /// but fails the check digits — used to stop OCR and ask for a rescan.
+    /// </summary>
+    public static bool LooksLikeInvalid(string? value, out string digits)
+    {
+        digits = string.Empty;
+        if (string.IsNullOrWhiteSpace(value))
+            return false;
+
+        var only = DigitsOnly(value);
+        if (only.Length == 14)
+        {
+            digits = only;
+            return !TryNormalize(only, out _);
+        }
+
+        foreach (Match match in CnpjPattern().Matches(value))
+        {
+            var candidate = DigitsOnly(match.Value);
+            if (candidate.Length != 14)
+                continue;
+            digits = candidate;
+            if (!TryNormalize(candidate, out _))
+                return true;
+        }
+
+        return false;
+    }
+
     private static bool HasValidCheckDigits(string digits)
     {
         var numbers = digits.Select(c => c - '0').ToArray();

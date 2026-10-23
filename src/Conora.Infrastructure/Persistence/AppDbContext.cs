@@ -22,7 +22,7 @@ public class AppDbContext : DbContext
     public DbSet<LgpdRequest> LgpdRequests => Set<LgpdRequest>();
     public DbSet<EmailSuppression> EmailSuppressions => Set<EmailSuppression>();
     public DbSet<Supplier> Suppliers => Set<Supplier>();
-
+    public DbSet<SupplierUserCategory> SupplierUserCategories => Set<SupplierUserCategory>();
     // Finance domain (all tenant-owned)
     public DbSet<Category> Categories => Set<Category>();
     public DbSet<IncomeSource> IncomeSources => Set<IncomeSource>();
@@ -43,6 +43,7 @@ public class AppDbContext : DbContext
     public DbSet<FamilyOwnerTransfer> FamilyOwnerTransfers => Set<FamilyOwnerTransfer>();
     public DbSet<FamilyNotice> FamilyNotices => Set<FamilyNotice>();
     public DbSet<WorkspaceSubscription> WorkspaceSubscriptions => Set<WorkspaceSubscription>();
+    public DbSet<UserMilestone> UserMilestones => Set<UserMilestone>();
     public DbSet<ImportBatch> ImportBatches => Set<ImportBatch>();
     public DbSet<ImportPreviewRow> ImportPreviewRows => Set<ImportPreviewRow>();
     public DbSet<WhatsAppLink> WhatsAppLinks => Set<WhatsAppLink>();
@@ -73,6 +74,7 @@ public class AppDbContext : DbContext
         TenantFilter<PatrimonyItem>(modelBuilder);
         TenantFilter<FamilyMember>(modelBuilder);
         TenantFilter<WorkspaceSubscription>(modelBuilder);
+        TenantFilter<UserMilestone>(modelBuilder);
         TenantFilter<ImportBatch>(modelBuilder);
         TenantFilter<ImportPreviewRow>(modelBuilder);
         TenantFilter<WhatsAppLink>(modelBuilder);

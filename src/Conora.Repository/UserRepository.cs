@@ -35,6 +35,16 @@ public sealed class UserRepository : BaseRepository<User>, IUserRepository
         => Set.IgnoreQueryFilters()
             .FirstOrDefaultAsync(u => u.PasswordResetTokenHash == tokenHash && u.DeletedAt == null, ct);
 
+    public Task<User?> FindByEmailVerificationHashAsync(string tokenHash, CancellationToken ct = default)
+        => Set.IgnoreQueryFilters()
+            .FirstOrDefaultAsync(u => u.EmailVerificationTokenHash == tokenHash && u.DeletedAt == null, ct);
+
+    public async Task<IReadOnlyList<Guid>> ListActiveUserIdsAsync(CancellationToken ct = default)
+        => await Set.IgnoreQueryFilters().AsNoTracking()
+            .Where(u => u.DeletedAt == null)
+            .Select(u => u.Id)
+            .ToListAsync(ct);
+
     public async Task<IReadOnlyList<User>> ListExpiredDeletionsAsync(DateTime cutoffUtc, CancellationToken ct = default)
         => await Set.IgnoreQueryFilters()
             .Where(u => u.DeletedAt != null && u.DeletedAt < cutoffUtc)

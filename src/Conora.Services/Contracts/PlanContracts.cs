@@ -2,7 +2,17 @@ using Conora.Domain.Enums;
 
 namespace Conora.Services.Contracts;
 
-public sealed record SubscribeRequest(PlanKind Plan);
+/// <summary>
+/// StorePurchaseToken is required: the plan only activates after Google Play / App Store confirmation
+/// (or a local stub token in development).
+/// </summary>
+public sealed record SubscribeRequest(PlanKind Plan, string? StorePurchaseToken = null);
+
+public sealed record StorePurchaseConfirmation(
+    Guid UsuarioId,
+    PlanKind Plan,
+    string PurchaseToken,
+    string Store);
 
 public sealed record PlanOfferResponse(
     PlanKind Kind,

@@ -1,4 +1,5 @@
 using Conora.Domain.Ports;
+using Conora.Infrastructure.Billing;
 using Conora.Infrastructure.Email;
 using Conora.Infrastructure.Persistence;
 using Conora.Infrastructure.Security;
@@ -39,6 +40,7 @@ public static class DependencyInjection
         services.AddScoped<IReceiptOcrQueue, Persistence.EfReceiptOcrQueue>();
         services.AddSingleton<IReceiptImageStore, Storage.LocalReceiptImageStore>();
         services.AddScoped<IEmailSender, SmtpEmailSender>();
+        services.AddScoped<IStoreBillingGateway, LocalStoreBillingGateway>();
         services.AddHttpClient("ses-sns", client => client.Timeout = TimeSpan.FromSeconds(15));
         services.AddHttpClient<IGeminiClient, Ai.GeminiClient>(client => client.Timeout = TimeSpan.FromSeconds(45));
         services.AddHttpClient<IWhatsAppMessenger, WhatsApp.CloudApiWhatsAppMessenger>(client =>

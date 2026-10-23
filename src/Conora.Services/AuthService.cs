@@ -13,6 +13,8 @@ namespace Conora.Services;
 
 public sealed class AuthService
 {
+    private static readonly TimeSpan EmailVerificationTtl = TimeSpan.FromDays(2);
+
     private readonly IUserRepository _users;
     private readonly IRefreshTokenRepository _refreshTokens;
     private readonly IAuditEventRepository _audits;
@@ -153,7 +155,27 @@ public sealed class AuthService
         stored.Revoke();
         _tenant.Set(stored.UsuarioId);
         var user = await _users.GetByIdAsync(stored.UsuarioId, ct) ?? throw new InvalidTokenException();
-        return await IssueForExistingUserAsync(user, "TokenRefreshed", ct);
+        if (!user.EmailVerified)
+            throw new ValidationException(
+                "email",
+                "O e-mail de validação já foi enviado para a sua conta. Abra a mensagem e valide o endereço para entrar.");
+        return await PersistSessionAsync(user, "TokenRefreshed", notifyWelcome: false, ct);
+    }
+
+    public async Task<AuthResponse> VerifyEmailAsync(VerifyEmailRequest request, CancellationToken ct)
+    {
+        if (string.IsNullOrWhiteSpace(request.Token))
+            throw new ValidationException("token", "Link inválido ou expirado. Peça outro ao tentar entrar.");
+
+        var tokenHash = _tokens.HashRefreshToken(request.Token.Trim());
+        var user = await _users.FindByEmailVerificationHashAsync(tokenHash, ct);
+        if (user is null || !user.EmailVerificationIsActive(tokenHash))
+            throw new ValidationException("token", "Link inválido ou expirado. Peça outro ao tentar entrar.");
+
+        user.MarkEmailVerified();
+        _tenant.Set(user.Id);
+        AuditRecorder.Record(_audits, _correlation, "User", user.Id, "EmailVerified", new { user.Email });
+        return await PersistSessionAsync(user, "EmailVerifiedLogin", notifyWelcome: true, ct);
     }
 
     public async Task RequestPasswordResetAsync(ForgotPasswordRequest request, CancellationToken ct)
@@ -240,21 +262,27 @@ public sealed class AuthService
         _users.Add(user);
         _tenant.Set(user.Id);
         _categories.AddDefaults();
-        return await PersistSessionAsync(user, action, notifyWelcome: true, ct);
+        await SaveUserCreatingAsync(user, action, ct);
+        // Always throws ValidationException after sending (or reusing) the Conora validation e-mail.
+        await SendVerificationAndBlockAsync(user, firstSend: true, ct);
+        return default!;
     }
 
-    private Task<AuthResponse> IssueForExistingUserAsync(User user, string action, CancellationToken ct)
+    private async Task<AuthResponse> IssueForExistingUserAsync(User user, string action, CancellationToken ct)
     {
         _tenant.Set(user.Id);
-        return PersistSessionAsync(user, action, notifyWelcome: false, ct);
+        if (!user.EmailVerified)
+        {
+            await _uow.SaveChangesAsync(ct);
+            await SendVerificationAndBlockAsync(user, firstSend: false, ct);
+        }
+
+        return await PersistSessionAsync(user, action, notifyWelcome: false, ct);
     }
 
-    private async Task<AuthResponse> PersistSessionAsync(User user, string action, bool notifyWelcome, CancellationToken ct)
+    private async Task SaveUserCreatingAsync(User user, string action, CancellationToken ct)
     {
-        var pair = _tokens.Issue(user.Id, user.Email);
-        _refreshTokens.Add(RefreshToken.Create(_tokens.HashRefreshToken(pair.RefreshToken), DateTime.UtcNow.AddDays(14)));
         AuditRecorder.Record(_audits, _correlation, "User", user.Id, action, new { user.Email });
-
         try
         {
             await _uow.SaveChangesAsync(ct);
@@ -267,6 +295,54 @@ public sealed class AuthService
         {
             throw new DuplicateCpfException();
         }
+    }
+
+    private async Task SendVerificationAndBlockAsync(User user, bool firstSend, CancellationToken ct)
+    {
+        var alreadyPending = user.EmailVerificationExpiresAtUtc > DateTime.UtcNow
+                             && !string.IsNullOrEmpty(user.EmailVerificationTokenHash);
+
+        if (!alreadyPending || firstSend)
+        {
+            var token = Convert.ToHexString(RandomNumberGenerator.GetBytes(32));
+            user.IssueEmailVerification(_tokens.HashRefreshToken(token), DateTime.UtcNow.Add(EmailVerificationTtl));
+            await _uow.SaveChangesAsync(ct);
+
+            var link = $"{PublicWebBase()}/app/validar-email?token={token}";
+            try
+            {
+                await _email.SendAsync(user.Email, "Valide seu e-mail no Conora", new EmailContent(
+                    "Confirme seu e-mail",
+                    [
+                        "Para entrar no Conora, confirme este endereço clicando no botão abaixo.",
+                        "Sem essa validação o acesso não abre — vale para cadastro com senha, Google ou Apple."
+                    ])
+                {
+                    Preheader = "Um clique para liberar o acesso ao Conora.",
+                    ActionLabel = "Validar e-mail",
+                    ActionUrl = link,
+                    Note = "O link vale por 48 horas. Se você não pediu, ignore este e-mail."
+                }, ct);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogWarning(ex, "Verification email failed for {Email}.", user.Email);
+                throw new ValidationException("email", "Não foi possível enviar o e-mail de validação. Tente de novo.");
+            }
+        }
+
+        var message = firstSend && !alreadyPending
+            ? "Enviamos um e-mail de validação para a sua conta. Abra a mensagem e clique no link para entrar."
+            : "O e-mail de validação já foi enviado para a sua conta. Abra a mensagem e valide o endereço para entrar.";
+        throw new ValidationException("email", message);
+    }
+
+    private async Task<AuthResponse> PersistSessionAsync(User user, string action, bool notifyWelcome, CancellationToken ct)
+    {
+        var pair = _tokens.Issue(user.Id, user.Email);
+        _refreshTokens.Add(RefreshToken.Create(_tokens.HashRefreshToken(pair.RefreshToken), DateTime.UtcNow.AddDays(14)));
+        AuditRecorder.Record(_audits, _correlation, "User", user.Id, action, new { user.Email });
+        await _uow.SaveChangesAsync(ct);
 
         if (notifyWelcome)
         {
@@ -274,9 +350,9 @@ public sealed class AuthService
             {
                 await _email.SendAsync(user.Email, "Bem-vindo ao Conora", new EmailContent(
                     $"Bem-vindo ao Conora, {user.Name}.",
-                    ["Para aproveitar ao máximo, comece por estes três passos:"])
+                    ["A organização da sua vida financeira começa aqui. Para aproveitar ao máximo, comece por estes três passos:"])
                 {
-                    Preheader = "Sua conta está pronta. Veja como dar os primeiros passos no Conora.",
+                    Preheader = "Bem-vindo ao Conora. A organização da sua vida financeira começa aqui.",
                     Subtitle = "Sua vida financeira, com clareza. Sua conta já está pronta para uso.",
                     Steps =
                     [
@@ -290,7 +366,6 @@ public sealed class AuthService
             }
             catch (Exception ex)
             {
-                // Registration must succeed even when SES/SMTP is unavailable (sandbox / DNS pending).
                 _logger.LogWarning(ex, "Welcome email failed for {Email}; account created anyway.", user.Email);
             }
         }

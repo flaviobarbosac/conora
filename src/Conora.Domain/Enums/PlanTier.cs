@@ -4,8 +4,8 @@ public enum PlanTier
 {
     /// <summary>All features except the family group.</summary>
     Individual = 0,
-    /// <summary>Family group with the owner plus up to 2 people.</summary>
+    /// <summary>Sold as Duo: owner plus one other person (2 total).</summary>
     Family = 1,
-    /// <summary>Family group with the owner plus 3 or more people.</summary>
+    /// <summary>Sold as Family: owner plus 3 or more people.</summary>
     FamilyPlus = 2
 }

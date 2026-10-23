@@ -1283,6 +1283,11 @@ namespace Conora.Infrastructure.Persistence.Migrations
                         .HasMaxLength(40)
                         .HasColumnType("character varying(40)");
 
+                    b.Property<string>("Purpose")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)");
+
                     b.Property<Guid?>("SelectedBankAccountId")
                         .HasColumnType("uuid");
 
@@ -1464,6 +1469,43 @@ namespace Conora.Infrastructure.Persistence.Migrations
                     b.ToTable("suppliers", (string)null);
                 });
 
+            modelBuilder.Entity("Conora.Domain.Entities.SupplierUserCategory", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("CategoryCode")
+                        .IsRequired()
+                        .HasMaxLength(40)
+                        .HasColumnType("character varying(40)");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<DateTime?>("DeletedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid>("SupplierId")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid>("UsuarioId")
+                        .HasColumnType("uuid");
+
+                    b.Property<long>("Version")
+                        .HasColumnType("bigint");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("SupplierId", "UsuarioId")
+                        .IsUnique();
+
+                    b.ToTable("supplier_user_categories", (string)null);
+                });
+
             modelBuilder.Entity("Conora.Domain.Entities.User", b =>
                 {
                     b.Property<Guid>("Id")
@@ -1473,6 +1515,11 @@ namespace Conora.Infrastructure.Persistence.Migrations
                     b.Property<string>("AppleId")
                         .HasMaxLength(100)
                         .HasColumnType("character varying(100)");
+
+                    b.Property<int>("BudgetAlertPercent")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer")
+                        .HasDefaultValue(70);
 
                     b.Property<string>("Cpf")
                         .HasMaxLength(11)
@@ -1488,6 +1535,13 @@ namespace Conora.Infrastructure.Persistence.Migrations
                         .IsRequired()
                         .HasMaxLength(320)
                         .HasColumnType("character varying(320)");
+
+                    b.Property<DateTime?>("EmailVerificationExpiresAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("EmailVerificationTokenHash")
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)");
 
                     b.Property<bool>("EmailVerified")
                         .HasColumnType("boolean");
@@ -1525,6 +1579,11 @@ namespace Conora.Infrastructure.Persistence.Migrations
                     b.Property<string>("PasswordResetTokenHash")
                         .HasMaxLength(64)
                         .HasColumnType("character varying(64)");
+
+                    b.Property<bool>("PhotoEvolutionEnabled")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("boolean")
+                        .HasDefaultValue(true);
 
                     b.Property<bool>("QuietMode")
                         .HasColumnType("boolean");
@@ -1565,6 +1624,11 @@ namespace Conora.Infrastructure.Persistence.Migrations
                         .HasDatabaseName("IX_Users_Email")
                         .HasFilter("\"DeletedAt\" IS NULL");
 
+                    b.HasIndex("EmailVerificationTokenHash")
+                        .IsUnique()
+                        .HasDatabaseName("IX_Users_EmailVerificationTokenHash")
+                        .HasFilter("\"EmailVerificationTokenHash\" IS NOT NULL");
+
                     b.HasIndex("GoogleId")
                         .IsUnique()
                         .HasDatabaseName("IX_Users_GoogleId")
@@ -1576,6 +1640,51 @@ namespace Conora.Infrastructure.Persistence.Migrations
                         .HasFilter("\"PasswordResetTokenHash\" IS NOT NULL");
 
                     b.ToTable("users", (string)null);
+                });
+
+            modelBuilder.Entity("Conora.Domain.Entities.UserMilestone", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<int>("Age")
+                        .HasColumnType("integer");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<DateTime?>("DeletedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<DateTime>("GrantedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("Key")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)");
+
+                    b.Property<int>("Points")
+                        .HasColumnType("integer");
+
+                    b.Property<DateTime>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid>("UsuarioId")
+                        .HasColumnType("uuid");
+
+                    b.Property<long>("Version")
+                        .HasColumnType("bigint");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("UsuarioId", "Key")
+                        .IsUnique()
+                        .HasDatabaseName("IX_user_milestones_Usuario_Key")
+                        .HasFilter("\"DeletedAt\" IS NULL");
+
+                    b.ToTable("user_milestones", (string)null);
                 });
 
             modelBuilder.Entity("Conora.Domain.Entities.WhatsAppDraft", b =>

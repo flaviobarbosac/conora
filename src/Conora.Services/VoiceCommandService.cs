@@ -68,10 +68,10 @@ public sealed class VoiceCommandService
         _budget = budget;
     }
 
-    public Task<byte[]?> SpeakAsync(string text, string? voice, CancellationToken ct)
+    public Task<byte[]?> SpeakAsync(string text, string? voice, string? band, CancellationToken ct)
     {
-        var name = string.Equals(voice, "clara", StringComparison.OrdinalIgnoreCase) ? "Aoede" : "Charon";
-        return _gemini.SpeakAsync(text, name, ct);
+        var profile = IanVoiceProfile.Resolve(voice, band);
+        return _gemini.SpeakAsync(text, profile.VoiceName, profile.Style, ct);
     }
 
     public const int MaxCategorySuggestions = 4;

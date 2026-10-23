@@ -1,4 +1,5 @@
-﻿using Conora.Domain.Catalog;
+﻿using Conora.Domain;
+using Conora.Domain.Catalog;
 using Conora.Domain.Entities;
 using Conora.Domain.Enums;
 using Conora.Domain.Exceptions;
@@ -18,6 +19,8 @@ public sealed class EntryService
     private readonly IAuditEventRepository _audits;
     private readonly IUnitOfWork _uow;
     private readonly ICorrelationContext _correlation;
+    private readonly ITenantContext _tenant;
+    private readonly ISupplierStore _suppliers;
     private readonly PlanService _plan;
     private readonly MonthService _months;
     private readonly CategoryService _categories;
@@ -28,6 +31,8 @@ public sealed class EntryService
         IAuditEventRepository audits,
         IUnitOfWork uow,
         ICorrelationContext correlation,
+        ITenantContext tenant,
+        ISupplierStore suppliers,
         PlanService plan,
         MonthService months,
         CategoryService categories,
@@ -37,6 +42,8 @@ public sealed class EntryService
         _audits = audits;
         _uow = uow;
         _correlation = correlation;
+        _tenant = tenant;
+        _suppliers = suppliers;
         _plan = plan;
         _months = months;
         _categories = categories;
@@ -267,6 +274,7 @@ public sealed class EntryService
         await ValidateIncomeLinkAsync(entry.Type, request.IncomeSourceId, request.Amount, newYm, 1, entry.Id, ct);
         await ValidateContributionDuplicateAsync(entry.Type, request.Amount, newYm, request.ConfirmDuplicate, entry.Id, ct);
 
+        var previousCategoryId = entry.CategoryId;
         await EntryLedger.ApplyAsync(_repo, entry, -1, ct);
         await ApplyProjectAsync(entry, -1, ct);
         await ApplyPatrimonyAsync(entry, -1, ct);
@@ -275,6 +283,13 @@ public sealed class EntryService
         await EntryLedger.ApplyAsync(_repo, entry, 1, ct);
         await ApplyProjectAsync(entry, 1, ct);
         await ApplyPatrimonyAsync(entry, 1, ct);
+
+        if (entry.Type == EntryType.Expense
+            && categoryId is Guid newCategoryId
+            && newCategoryId != previousCategoryId)
+        {
+            await TryRecordSupplierOverrideAsync(entry.Description, newCategoryId, ct);
+        }
 
         AuditRecorder.Record(_audits, _correlation, "Entry", entry.Id, "EntryUpdated", new { entry.Type, entry.Amount, entry.CompetenceYm });
         await _uow.SaveChangesAsync(ct);
@@ -344,6 +359,33 @@ public sealed class EntryService
     {
         if (entry.Type == EntryType.CardPayment)
             throw new ValidationException("type", "Pagamento de fatura não pode ser editado ou excluído por aqui.");
+    }
+
+    /// <summary>
+    /// When the person changes an expense category, persist a per-user override for that supplier
+    /// (matched by CNPJ in the description or by normalized razão social).
+    /// </summary>
+    private async Task TryRecordSupplierOverrideAsync(string description, Guid categoryId, CancellationToken ct)
+    {
+        var userId = _tenant.UsuarioId;
+        if (userId is null)
+            return;
+
+        var category = await _repo.FirstOrDefaultAsync<Category>(c => c.Id == categoryId, ct, track: false);
+        if (category?.Code is null)
+            return;
+
+        Supplier? supplier = null;
+        if (BrazilianCnpj.TryExtract(description, out var cnpj))
+            supplier = await _suppliers.FindByCnpjAsync(cnpj, ct);
+
+        if (supplier is null && !string.IsNullOrWhiteSpace(description))
+            supplier = await _suppliers.FindByNormalizedNameAsync(Supplier.NormalizeName(description), ct);
+
+        if (supplier is null)
+            return;
+
+        await _suppliers.UpsertUserCategoryAsync(supplier.Id, userId.Value, category.Code, ct);
     }
 
     private async Task<Guid?> ResolveCategoryAsync(EntryType type, Guid? requested, CancellationToken ct)

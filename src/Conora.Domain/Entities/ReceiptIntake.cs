@@ -7,6 +7,7 @@ public class ReceiptIntake : ModelBase, ITenantOwned
 {
     public Guid UsuarioId { get; set; }
     public ReceiptChannel Channel { get; private set; }
+    public ReceiptPurpose Purpose { get; private set; }
     public string ImageObjectKey { get; private set; } = default!;
     public ReceiptIntakeStatus Status { get; private set; }
     public string? ExtractedCnpj { get; private set; }
@@ -26,10 +27,16 @@ public class ReceiptIntake : ModelBase, ITenantOwned
     {
     }
 
-    public static ReceiptIntake Create(ReceiptChannel channel, string imageObjectKey, TimeSpan imageTtl, string? phoneE164 = null)
+    public static ReceiptIntake Create(
+        ReceiptChannel channel,
+        string imageObjectKey,
+        TimeSpan imageTtl,
+        string? phoneE164 = null,
+        ReceiptPurpose purpose = ReceiptPurpose.Expense)
         => new()
         {
             Channel = channel,
+            Purpose = purpose,
             ImageObjectKey = imageObjectKey,
             Status = ReceiptIntakeStatus.Processing,
             PhoneE164 = phoneE164,
@@ -86,9 +93,35 @@ public class ReceiptIntake : ModelBase, ITenantOwned
         if (supplierId is Guid sid)
             SupplierId = sid;
         Status = ReceiptIntakeStatus.Ready;
+        // App/ShareTarget auto-confirm after classify; WhatsApp keeps an explicit confirm step only when auto-save cannot run.
         WhatsAppAwaiting = Channel == ReceiptChannel.WhatsApp
             ? WhatsAppReceiptAwaiting.Confirm
             : WhatsAppReceiptAwaiting.None;
+    }
+
+    /// <summary>Binds an existing global supplier (link instead of duplicate).</summary>
+    public void AttachSupplier(Guid supplierId, string? proposedCategoryCode)
+    {
+        if (Status is ReceiptIntakeStatus.Confirmed or ReceiptIntakeStatus.Failed)
+            throw new ValidationException("status", "Este recibo não pode ser vinculado agora.");
+
+        SupplierId = supplierId;
+        if (string.IsNullOrWhiteSpace(proposedCategoryCode))
+        {
+            ProposedCategoryCode = null;
+            Status = ReceiptIntakeStatus.NeedsClassification;
+            WhatsAppAwaiting = Channel == ReceiptChannel.WhatsApp
+                ? WhatsAppReceiptAwaiting.Classification
+                : WhatsAppReceiptAwaiting.None;
+        }
+        else
+        {
+            ProposedCategoryCode = proposedCategoryCode.Trim().ToUpperInvariant();
+            Status = ReceiptIntakeStatus.Ready;
+            WhatsAppAwaiting = Channel == ReceiptChannel.WhatsApp
+                ? WhatsAppReceiptAwaiting.Confirm
+                : WhatsAppReceiptAwaiting.None;
+        }
     }
 
     public void ReopenClassification()
