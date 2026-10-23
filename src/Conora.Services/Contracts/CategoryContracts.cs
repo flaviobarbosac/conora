@@ -23,4 +23,6 @@ public sealed record CreateCategoryRequest(string Name, Guid ParentId);
 
 public sealed record UpdateCategoryRequest(string Name, bool IsActive = true, SharingScope? SharingScope = null);
 
+public sealed record SetCategoryActiveRequest(bool IsActive);
+
 public sealed record UpdateCategorySharingRequest(SharingScope SharingScope);

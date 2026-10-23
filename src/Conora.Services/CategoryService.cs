@@ -188,6 +188,23 @@ public sealed class CategoryService
         return ToResponse(account);
     }
 
+    /// <summary>
+    /// Toggles IsActive only — allowed for system analytical accounts (name/delete stay protected).
+    /// </summary>
+    public async Task<CategoryResponse> SetActiveAsync(Guid id, SetCategoryActiveRequest request, CancellationToken ct)
+    {
+        await _plan.EnsureWritableAsync(ct);
+        await EnsureCanManageChartAsync(ct);
+        var account = await RequireAsync(id, ct);
+        if (account.IsPendingReview)
+            throw new ValidationException("id", "Aceite ou recuse a categoria antes de editá-la.");
+
+        account.SetActive(request.IsActive);
+        await _uow.SaveChangesAsync(ct);
+        await PropagateAcceptedAsync(account.Id, ct);
+        return ToResponse(account);
+    }
+
     public async Task DeleteAsync(Guid id, CancellationToken ct)
     {
         await _plan.EnsureWritableAsync(ct);

@@ -73,6 +73,17 @@ public class FinanceDomainTests
     }
 
     [Fact]
+    public void System_analytical_can_toggle_active()
+    {
+        var account = Category.CreateSystem(SystemCategories.All.First(c => c.Level == CategoryLevel.Analytical), Guid.NewGuid());
+        Assert.True(account.IsActive);
+        account.SetActive(false);
+        Assert.False(account.IsActive);
+        account.SetActive(true);
+        Assert.True(account.IsActive);
+    }
+
+    [Fact]
     public void User_analytical_can_be_renamed()
     {
         var account = Category.CreateAnalytical("Extra", Guid.NewGuid(), CategorySection.Essential);
