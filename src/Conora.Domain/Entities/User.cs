@@ -8,6 +8,8 @@ public class User : ModelBase
 {
     public string Name { get; private set; } = default!;
     public string Email { get; private set; } = default!;
+    public string? Phone { get; private set; }
+    public string? Cep { get; private set; }
     public string? Cpf { get; private set; }
     public string? PasswordHash { get; private set; }
     public string? PasswordResetTokenHash { get; private set; }
@@ -19,6 +21,12 @@ public class User : ModelBase
     public bool EmailVerified { get; private set; }
 
     public bool OnboardingCompleted { get; private set; }
+
+    /// <summary>
+    /// Training student (Leomar Campos): 90-day free trial. Others: 30 days.
+    /// Not a separate store SKU — AccessPolicy resolves length when evaluating access / receipts.
+    /// </summary>
+    public bool IsTrainingStudent { get; private set; } = true;
     public string ThemeId { get; private set; } = ThemeCatalog.Clareza;
     public bool QuietMode { get; private set; }
     /// <summary>When false, Conora system e-mails are not sent (user opt-out).</summary>
@@ -129,7 +137,23 @@ public class User : ModelBase
         Name = name.Trim();
     }
 
+    public void UpdateContact(string? phone, string? cep)
+    {
+        Phone = string.IsNullOrWhiteSpace(phone) ? null : phone.Trim();
+        Cep = string.IsNullOrWhiteSpace(cep) ? null : NormalizeCep(cep);
+    }
+
     public void CompleteOnboarding() => OnboardingCompleted = true;
+
+    public void SetTrainingStudent(bool isTrainingStudent) => IsTrainingStudent = isTrainingStudent;
+
+    private static string NormalizeCep(string cep)
+    {
+        var digits = new string(cep.Where(char.IsDigit).ToArray());
+        if (digits.Length != 8)
+            throw new ArgumentException("CEP deve ter 8 dígitos.", nameof(cep));
+        return $"{digits[..5]}-{digits[5..]}";
+    }
 
     public void UpdatePreferences(
         string themeId,

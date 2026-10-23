@@ -55,7 +55,7 @@ public sealed record FamilyGroupResponse(
     IReadOnlyList<FamilyNoticeResponse> Notices,
     FamilyOwnerTransferResponse? PendingOwnerTransfer);
 
-public sealed record UpdateProfileRequest(string Name);
+public sealed record UpdateProfileRequest(string Name, string? Phone = null, string? Cep = null);
 
 public sealed record UpdatePreferencesRequest(
     string ThemeId,
@@ -82,7 +82,9 @@ public sealed record ProfileResponse(
     bool VoiceEntryConfirm = true,
     bool HasAppleLogin = false,
     int BudgetAlertPercent = 70,
-    bool PhotoEvolutionEnabled = true);
+    bool PhotoEvolutionEnabled = true,
+    string? Phone = null,
+    string? Cep = null);
 
 public sealed record CategoryMemberBreakdownRow(
     Guid UsuarioId,

@@ -71,7 +71,11 @@ public sealed class PlanService
         covering ??= own;
 
         var user = await _family.FindUserByIdAsync(self, ct);
-        var state = AccessPolicy.Evaluate(user?.CreatedAt ?? now, covering, now);
+        var state = AccessPolicy.Evaluate(
+            user?.CreatedAt ?? now,
+            covering,
+            now,
+            user?.IsTrainingStudent ?? true);
         if (familyMemberWithoutCover && state.IsWritable)
             state = new AccessState(AccessPhase.Grace, state.TrialEndsAt, state.BlockAt);
 
@@ -116,9 +120,12 @@ public sealed class PlanService
 
         var max = PlanCatalog.MaxExtraMembers(tier);
         if (max is not null && currentExtraMembers >= max)
+        {
+            var label = tier == PlanTier.Family ? "Duo" : "Family";
             throw new ValidationException(
                 "email",
-                $"Seu plano Duo permite até {max} pessoa além de você. Mude para o Family para adicionar mais.");
+                $"Seu plano {label} permite até {max} pessoa(s) além de você.");
+        }
     }
 
     /// <summary>

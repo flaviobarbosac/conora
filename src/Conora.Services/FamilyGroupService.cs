@@ -163,6 +163,14 @@ public sealed class FamilyGroupService
     {
         var user = await RequireUserAsync(ct, track: true);
         user.Rename(request.Name);
+        try
+        {
+            user.UpdateContact(request.Phone, request.Cep);
+        }
+        catch (ArgumentException ex)
+        {
+            throw new ValidationException(ex.ParamName == "cep" ? "cep" : "phone", ex.Message);
+        }
         await _uow.SaveChangesAsync(ct);
         return ToProfile(user);
     }
@@ -193,6 +201,18 @@ public sealed class FamilyGroupService
     public async Task<ProfileResponse> CompleteOnboardingAsync(CancellationToken ct)
     {
         var user = await RequireUserAsync(ct, track: true);
+        var errors = new Dictionary<string, string[]>();
+        if (string.IsNullOrWhiteSpace(user.Phone))
+            errors["phone"] = ["Informe o telefone."];
+        if (string.IsNullOrWhiteSpace(user.Cep))
+            errors["cep"] = ["Informe o CEP."];
+        if (!await _repo.AnyAsync<Account>(a => !a.IsArchived, ct))
+            errors["account"] = ["Cadastre ao menos uma conta bancária."];
+        if (!await _repo.AnyAsync<CreditCard>(_ => true, ct))
+            errors["card"] = ["Cadastre ao menos um cartão de crédito."];
+        if (errors.Count > 0)
+            throw new ValidationException(errors);
+
         user.CompleteOnboarding();
         await _uow.SaveChangesAsync(ct);
         return ToProfile(user);
@@ -866,7 +886,9 @@ public sealed class FamilyGroupService
             user.VoiceEntryConfirm,
             !string.IsNullOrEmpty(user.AppleId),
             user.BudgetAlertPercent,
-            user.PhotoEvolutionEnabled);
+            user.PhotoEvolutionEnabled,
+            user.Phone,
+            user.Cep);
 
     private static FamilyInviteResponse ToInvite(FamilyInvite i)
         => new(i.Id, i.Email, i.ExpiresAt, i.AcceptedAt, i.CancelledAt, i.IsOpen);

@@ -10,10 +10,12 @@
     <PackageReference Include="Microsoft.Extensions.DependencyInjection.Abstractions" Version="10.0.0" />
     <PackageReference Include="Microsoft.Extensions.Http" Version="10.0.0" />
     <PackageReference Include="Microsoft.Extensions.Logging.Abstractions" Version="10.0.0" />
+    <PackageReference Include="Microsoft.Extensions.Options" Version="10.0.0" />
   </ItemGroup>
 
   <ItemGroup>
     <ProjectReference Include="..\Conora.Domain\Conora.Domain.csproj" />
+    <ProjectReference Include="..\Conora.Infrastructure\Conora.Infrastructure.csproj" />
     <ProjectReference Include="..\Conora.Repository\Conora.Repository.csproj" />
   </ItemGroup>
 

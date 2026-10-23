@@ -158,25 +158,47 @@ public sealed class GamificationService
 
     private async Task<IReadOnlyList<JourneyStepResponse>> BuildJourneyStepsAsync(CancellationToken ct)
     {
-        var hasDiagnosis = await _repo.AnyAsync<IncomeSource>(_ => true, ct);
         var hasBudget = await _repo.AnyAsync<Budget>(_ => true, ct);
-        var hasCard = await _repo.AnyAsync<CreditCard>(_ => true, ct);
-        var hasClosed = await _repo.AnyAsync<MonthLock>(m => m.IsClosed, ct);
-        var hasReserve = await HasReserveProgressAsync(ct);
+        var hasMonthlyDebt = await HasMonthlyDebtAsync(ct);
+        var hasLiability = await HasLiabilityAsync(ct);
         var hasProject = await _repo.AnyAsync<LifeProject>(_ => true, ct);
 
         var defs = new (string Key, string Title, string Route, bool Done)[]
         {
-            ("diagnosis", "Diagnóstico", "/diagnostico", hasDiagnosis),
             ("budget", "Orçamento", "/orcamento", hasBudget),
-            ("card", "Cartão", "/cartoes", hasCard),
-            ("close", "Fechamento", "/mes", hasClosed),
-            ("reserve", "Reserva", "/projetos", hasReserve),
+            ("debt", "Dívida mensal", "/orcamento", hasMonthlyDebt),
+            ("patrimony", "Patrimônio · passivo", "/patrimonio", hasLiability),
             ("projects", "Projetos de vida", "/projetos", hasProject),
         };
 
         var nextKey = defs.FirstOrDefault(d => !d.Done).Key;
         return defs.Select(d => new JourneyStepResponse(d.Key, d.Title, d.Route, d.Done, d.Key == nextKey && !d.Done)).ToList();
+    }
+
+    private async Task<bool> HasMonthlyDebtAsync(CancellationToken ct)
+    {
+        var debtCodes = new HashSet<string>(StringComparer.Ordinal)
+        {
+            "ESS_LOAN", "ESS_CONSIGNED", "ESS_OVERDRAFT", "ESS_CAR_FIN", "ESS_MORTGAGE",
+            "ESS_RENEG", "ESS_CARD_INST", "ESS_CARD_INT", "ESS_INTEREST", "ESS_FINES",
+            "ESS_BANK_FEE", "ESS_IOF", "ESS_DEBT_OTHER",
+        };
+        var categories = await _repo.ListAsync<Category>(
+            c => c.Code != null && debtCodes.Contains(c.Code!), ct, track: false);
+        if (categories.Count == 0)
+            return false;
+        var ids = categories.Select(c => c.Id).ToHashSet();
+        return await _repo.AnyAsync<BudgetLine>(l => ids.Contains(l.CategoryId) && l.PlannedAmount > 0, ct);
+    }
+
+    private async Task<bool> HasLiabilityAsync(CancellationToken ct)
+    {
+        var liabilityCategories = await _repo.ListAsync<Category>(
+            c => c.Section == CategorySection.Liability, ct, track: false);
+        if (liabilityCategories.Count == 0)
+            return false;
+        var ids = liabilityCategories.Select(c => c.Id).ToHashSet();
+        return await _repo.AnyAsync<PatrimonyItem>(p => ids.Contains(p.CategoryId) && p.Amount > 0, ct);
     }
 
     private async Task<IReadOnlyList<AchievementResponse>> BuildAchievementsAsync(CancellationToken ct)
