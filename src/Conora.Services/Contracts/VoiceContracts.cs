@@ -1,6 +1,6 @@
 namespace Conora.Services.Contracts;
 
-public sealed record SpeakRequest(string Text, string? Voice);
+public sealed record SpeakRequest(string Text, string? Voice, string? Band = null);
 
 public sealed record VoiceTurn(string Role, string Text);
 

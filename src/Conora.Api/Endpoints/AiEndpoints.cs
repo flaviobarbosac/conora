@@ -23,7 +23,7 @@ public static class AiEndpoints
 
         group.MapPost("/speak", async (SpeakRequest request, VoiceCommandService service, CancellationToken ct) =>
         {
-            var wav = await service.SpeakAsync(request.Text ?? string.Empty, request.Voice, ct);
+            var wav = await service.SpeakAsync(request.Text ?? string.Empty, request.Voice, request.Band, ct);
             return wav is { Length: > 44 }
                 ? Results.File(wav, "audio/wav")
                 : Results.NoContent();

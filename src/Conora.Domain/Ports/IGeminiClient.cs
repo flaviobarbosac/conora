@@ -17,5 +17,6 @@ public interface IGeminiClient
         CancellationToken ct);
 
     /// <summary>Spoken reply as a WAV clip, or null when speech is unavailable.</summary>
-    Task<byte[]?> SpeakAsync(string text, string voiceName, CancellationToken ct);
+    /// <param name="style">Natural-language speaking style, e.g. the age the voice should sound.</param>
+    Task<byte[]?> SpeakAsync(string text, string voiceName, string style, CancellationToken ct);
 }
