@@ -425,6 +425,7 @@ public sealed class EntryService
                 EntryType.Expense => category.Section is CategorySection.Discount
                     or CategorySection.Essential
                     or CategorySection.Social
+                    or CategorySection.Debt
                     or CategorySection.Asset
                     or CategorySection.Liability,
                 EntryType.Contribution => category.Section is CategorySection.Discount

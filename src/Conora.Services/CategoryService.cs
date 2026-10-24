@@ -86,6 +86,28 @@ public sealed class CategoryService
             }
         }
 
+        if (byCode.TryGetValue("ESS_DEBT", out var debtHead))
+        {
+            var custom = await _repo.ListAsync<Category>(c => !c.IsSystem, ct, track: true);
+            var inDebt = new HashSet<Guid> { debtHead.Id };
+            var pending = new Queue<Guid>();
+            pending.Enqueue(debtHead.Id);
+            while (pending.Count > 0)
+            {
+                var id = pending.Dequeue();
+                foreach (var child in custom.Where(c => c.DeletedAt is null && c.ParentId == id))
+                {
+                    if (inDebt.Add(child.Id))
+                        pending.Enqueue(child.Id);
+                    if (child.Section != CategorySection.Debt)
+                    {
+                        child.Reparent(id, CategorySection.Debt);
+                        changed = true;
+                    }
+                }
+            }
+        }
+
         if (await RetireObsoleteAsync(byCode, ct))
             changed = true;
 
