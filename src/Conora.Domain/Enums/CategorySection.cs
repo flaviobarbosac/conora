@@ -18,5 +18,7 @@ public enum CategorySection
     /// <summary>Structural group under Budget (Despesa).</summary>
     Expense = 9,
     /// <summary>Master: balance sheet (Patrimônio).</summary>
-    Patrimony = 10
+    Patrimony = 10,
+    /// <summary>Expense head: debts and financial expenses, sibling of Essential.</summary>
+    Debt = 11
 }

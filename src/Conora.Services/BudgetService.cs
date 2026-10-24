@@ -14,10 +14,11 @@ public sealed class BudgetService
 
     private static readonly CategorySection[] ExpenseSections =
     [
-        CategorySection.LifeProject,
+        CategorySection.Discount,
+        CategorySection.Debt,
         CategorySection.Essential,
-        CategorySection.Social,
-        CategorySection.Discount
+        CategorySection.LifeProject,
+        CategorySection.Social
     ];
 
     /** Cash-flow sections shown in budget/Raio-X (receita + despesa). */
@@ -25,8 +26,9 @@ public sealed class BudgetService
     [
         CategorySection.Income,
         CategorySection.Discount,
-        CategorySection.LifeProject,
+        CategorySection.Debt,
         CategorySection.Essential,
+        CategorySection.LifeProject,
         CategorySection.Social
     ];
 
@@ -85,10 +87,7 @@ public sealed class BudgetService
 
         var allowedCategoryIds = (await _repo.ListForUsuariosAsync<Category>(
                 userIds,
-                c => !c.IsPendingReview
-                     && c.Level == CategoryLevel.Analytical
-                     && c.Section != CategorySection.Asset
-                     && c.Section != CategorySection.Liability,
+                c => !c.IsPendingReview && c.Level == CategoryLevel.Analytical,
                 ct))
             .Select(c => c.Id)
             .ToHashSet();

@@ -227,20 +227,20 @@ public static class SystemCategories
         Leaf("ESS_FEES_TAX", "Taxas e tributos pessoais", CategorySection.Essential, "ESS_TAX");
         Leaf("ESS_MEI", "Contribuição MEI / DAS pessoal", CategorySection.Essential, "ESS_TAX");
         Leaf("ESS_TAX_OTHER", "Outras obrigações tributárias", CategorySection.Essential, "ESS_TAX");
-        Group("ESS_DEBT", "Dívidas e despesas financeiras", CategorySection.Essential, "ESS");
-        Leaf("ESS_LOAN", "Empréstimo pessoal", CategorySection.Essential, "ESS_DEBT");
-        Leaf("ESS_CONSIGNED", "Empréstimo consignado", CategorySection.Essential, "ESS_DEBT");
-        Leaf("ESS_OVERDRAFT", "Cheque especial", CategorySection.Essential, "ESS_DEBT");
-        Leaf("ESS_CAR_FIN", "Financiamento de veículo", CategorySection.Essential, "ESS_DEBT");
-        Leaf("ESS_MORTGAGE", "Financiamento imobiliário", CategorySection.Essential, "ESS_DEBT");
-        Leaf("ESS_RENEG", "Renegociação de dívida", CategorySection.Essential, "ESS_DEBT");
-        Leaf("ESS_CARD_INST", "Parcelamento de cartão", CategorySection.Essential, "ESS_DEBT");
-        Leaf("ESS_CARD_INT", "Juros do cartão de crédito", CategorySection.Essential, "ESS_DEBT");
-        Leaf("ESS_INTEREST", "Juros e encargos", CategorySection.Essential, "ESS_DEBT");
-        Leaf("ESS_FINES", "Multas por atraso", CategorySection.Essential, "ESS_DEBT");
-        Leaf("ESS_BANK_FEE", "Tarifas bancárias", CategorySection.Essential, "ESS_DEBT");
-        Leaf("ESS_IOF", "IOF e tarifas financeiras", CategorySection.Essential, "ESS_DEBT");
-        Leaf("ESS_DEBT_OTHER", "Outras dívidas / despesas financeiras", CategorySection.Essential, "ESS_DEBT");
+        Group("ESS_DEBT", "Dívidas e despesas financeiras", CategorySection.Debt, "EXPENSE");
+        Leaf("ESS_LOAN", "Empréstimo pessoal", CategorySection.Debt, "ESS_DEBT");
+        Leaf("ESS_CONSIGNED", "Empréstimo consignado", CategorySection.Debt, "ESS_DEBT");
+        Leaf("ESS_OVERDRAFT", "Cheque especial", CategorySection.Debt, "ESS_DEBT");
+        Leaf("ESS_CAR_FIN", "Financiamento de veículo", CategorySection.Debt, "ESS_DEBT");
+        Leaf("ESS_MORTGAGE", "Financiamento imobiliário", CategorySection.Debt, "ESS_DEBT");
+        Leaf("ESS_RENEG", "Renegociação de dívida", CategorySection.Debt, "ESS_DEBT");
+        Leaf("ESS_CARD_INST", "Parcelamento de cartão", CategorySection.Debt, "ESS_DEBT");
+        Leaf("ESS_CARD_INT", "Juros do cartão de crédito", CategorySection.Debt, "ESS_DEBT");
+        Leaf("ESS_INTEREST", "Juros e encargos", CategorySection.Debt, "ESS_DEBT");
+        Leaf("ESS_FINES", "Multas por atraso", CategorySection.Debt, "ESS_DEBT");
+        Leaf("ESS_BANK_FEE", "Tarifas bancárias", CategorySection.Debt, "ESS_DEBT");
+        Leaf("ESS_IOF", "IOF e tarifas financeiras", CategorySection.Debt, "ESS_DEBT");
+        Leaf("ESS_DEBT_OTHER", "Outras dívidas / despesas financeiras", CategorySection.Debt, "ESS_DEBT");
         Group("ESS_CARE", "Cuidados pessoais", CategorySection.Essential, "ESS");
         Leaf("ESS_HAIR", "Barbearia / cabeleireiro", CategorySection.Essential, "ESS_CARE");
         Leaf("ESS_SALON", "Salão de beleza", CategorySection.Essential, "ESS_CARE");
@@ -373,6 +373,7 @@ public static class SystemCategories
         CategorySection.LifeProject => "Projetos de vida",
         CategorySection.Essential => "Essencial",
         CategorySection.Social => "Social",
+        CategorySection.Debt => "Dívidas e despesas financeiras",
         CategorySection.Asset => "Ativo",
         CategorySection.Liability => "Passivo",
         _ => section.ToString()
@@ -388,6 +389,7 @@ public static class SystemCategories
         CategorySection.LifeProject => "o que você separa para o futuro",
         CategorySection.Essential => "o que a casa precisa",
         CategorySection.Social => "o que é escolha",
+        CategorySection.Debt => "parcelas e custos financeiros",
         CategorySection.Asset => "o que você tem",
         CategorySection.Liability => "o que você deve",
         _ => ""
@@ -395,7 +397,7 @@ public static class SystemCategories
 
     public static bool IsCashFlowSection(CategorySection section)
         => section is CategorySection.Income or CategorySection.Discount or CategorySection.LifeProject
-            or CategorySection.Essential or CategorySection.Social;
+            or CategorySection.Essential or CategorySection.Social or CategorySection.Debt;
 
     public static bool IsPatrimonySection(CategorySection section)
         => section is CategorySection.Asset or CategorySection.Liability;
