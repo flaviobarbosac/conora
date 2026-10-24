@@ -27,11 +27,11 @@ assinar pelo app; a assinatura vale em qualquer lugar porque o direito de acesso
 | SKU | Plano | Preço |
 |---|---|---:|
 | `conora.individual.monthly` | Individual mensal | R$ 49,90 |
-| `conora.individual.yearly` | Individual anual | R$ 499,00 |
+| `conora.individual.yearly` | Individual anual | R$ 499,90 |
 | `conora.duo.monthly` | Duo mensal (2 pessoas) | R$ 59,90 |
-| `conora.duo.yearly` | Duo anual | R$ 599,00 |
-| `conora.family.monthly` | Family mensal (até 5) | R$ 79,00 |
-| `conora.family.yearly` | Family anual | R$ 790,00 |
+| `conora.duo.yearly` | Duo anual | R$ 599,90 |
+| `conora.family.monthly` | Família mensal (até 5) | R$ 79,90 |
+| `conora.family.yearly` | Família anual | R$ 799,90 |
 
 ## Checklist manual (Flavio)
 

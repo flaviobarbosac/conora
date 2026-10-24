@@ -116,12 +116,12 @@ public sealed class PlanService
         var tier = access.Subscription.Tier;
         if (tier == PlanTier.Individual)
             throw new ForbiddenException(
-                "O plano Individual não inclui grupo familiar. Mude para o Duo ou Family para convidar pessoas.");
+                "O plano Individual não inclui grupo familiar. Mude para o Duo ou Família para convidar pessoas.");
 
         var max = PlanCatalog.MaxExtraMembers(tier);
         if (max is not null && currentExtraMembers >= max)
         {
-            var label = tier == PlanTier.Family ? "Duo" : "Family";
+            var label = tier == PlanTier.Family ? "Duo" : "Família";
             throw new ValidationException(
                 "email",
                 $"Seu plano {label} permite até {max} pessoa(s) além de você.");
