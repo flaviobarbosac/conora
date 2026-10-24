@@ -1,7 +1,9 @@
 using Conora.Domain.Exceptions;
 using Conora.Domain.Ports;
+using Conora.Infrastructure.Billing;
 using Conora.Services;
 using Conora.Services.Contracts;
+using Microsoft.Extensions.Options;
 
 namespace Conora.Api.Endpoints;
 
@@ -9,6 +11,12 @@ public static class PlanEndpoints
 {
     public static IEndpointRouteBuilder MapPlanEndpoints(this IEndpointRouteBuilder app)
     {
+        app.MapGet("/plan/course", (IOptions<HotmartOptions> hotmart) =>
+        {
+            var url = hotmart.Value.CheckoutUrl?.Trim();
+            return Results.Ok(new { checkoutUrl = string.IsNullOrEmpty(url) ? null : url });
+        }).AllowAnonymous().WithTags("Plan");
+
         var group = app.MapGroup("/plan").WithTags("Plan").RequireAuthorization();
 
         group.MapGet("/", async (PlanService service, CancellationToken ct) =>

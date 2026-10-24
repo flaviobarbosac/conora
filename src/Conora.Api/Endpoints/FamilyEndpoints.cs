@@ -25,6 +25,9 @@ public static class FamilyEndpoints
         group.MapPost("/onboarding/complete", async (FamilyGroupService service, CancellationToken ct) =>
             Results.Ok(await service.CompleteOnboardingAsync(ct)));
 
+        group.MapPost("/profile/contract-acknowledgment", async (FamilyGroupService service, CancellationToken ct) =>
+            Results.Ok(await service.AcknowledgeContractAsync(ct)));
+
         group.MapGet("/group", async (FamilyGroupService service, CancellationToken ct) =>
             Results.Ok(await service.GetGroupAsync(ct)));
 
@@ -66,6 +69,12 @@ public static class FamilyEndpoints
 
         group.MapPost("/owner-transfer/{token}/accept", async (string token, FamilyGroupService service, CancellationToken ct) =>
             Results.Ok(await service.AcceptOwnerTransferAsync(token, ct)));
+
+        group.MapPost("/owner-transfer/store-cancelled", async (FamilyGroupService service, CancellationToken ct) =>
+        {
+            await service.ConfirmStoreCancelledAsync(ct);
+            return Results.NoContent();
+        });
 
         group.MapPost("/notices/{id:guid}/read", async (Guid id, FamilyGroupService service, CancellationToken ct) =>
         {

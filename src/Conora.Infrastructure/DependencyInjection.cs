@@ -36,6 +36,8 @@ public static class DependencyInjection
         services.AddHttpClient(nameof(Security.AppleTokenRevoker), client => client.Timeout = TimeSpan.FromSeconds(15));
         services.AddSingleton<IAppleTokenRevoker, Security.AppleTokenRevoker>();
         services.AddScoped<IEmailSuppressionStore, EfEmailSuppressionStore>();
+        services.Configure<HotmartOptions>(configuration.GetSection(HotmartOptions.SectionName));
+        services.AddScoped<IHotmartCourseStore, EfHotmartCourseStore>();
         services.AddScoped<ISupplierStore, Persistence.EfSupplierStore>();
         services.AddScoped<IReceiptOcrQueue, Persistence.EfReceiptOcrQueue>();
         services.AddSingleton<IReceiptImageStore, Storage.LocalReceiptImageStore>();

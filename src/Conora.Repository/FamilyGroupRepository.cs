@@ -100,6 +100,19 @@ public sealed class FamilyGroupRepository : IFamilyGroupRepository
                  && t.ExpiresAt > DateTime.UtcNow, ct);
     }
 
+    public Task<FamilyOwnerTransfer?> FindAuthorizedHandoverAsync(Guid ownerUsuarioId, CancellationToken ct = default, bool track = false)
+    {
+        IQueryable<FamilyOwnerTransfer> query = _db.FamilyOwnerTransfers;
+        if (!track)
+            query = query.AsNoTracking();
+        return query.FirstOrDefaultAsync(
+            t => t.FromUsuarioId == ownerUsuarioId
+                 && t.DeletedAt == null
+                 && t.AuthorizedAt != null
+                 && t.AcceptedAt == null
+                 && t.CancelledAt == null, ct);
+    }
+
     public Task<List<FamilyOwnerTransfer>> ListOpenOwnerTransfersForUserAsync(Guid usuarioId, CancellationToken ct = default)
         => _db.FamilyOwnerTransfers.AsNoTracking()
             .Where(t => t.DeletedAt == null

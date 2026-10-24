@@ -41,7 +41,9 @@ public sealed record FamilyOwnerTransferResponse(
     string ToName,
     DateTime ExpiresAt,
     bool IsOpen,
-    bool IsIncoming);
+    bool IsIncoming,
+    bool IsAuthorized = false,
+    string? AuthorizeUrl = null);
 
 public sealed record FamilyOwnerTransferRequest(Guid ToUsuarioId);
 
@@ -84,7 +86,8 @@ public sealed record ProfileResponse(
     int BudgetAlertPercent = 70,
     bool PhotoEvolutionEnabled = true,
     string? Phone = null,
-    string? Cep = null);
+    string? Cep = null,
+    DateTime? ContractAcknowledgedAt = null);
 
 public sealed record CategoryMemberBreakdownRow(
     Guid UsuarioId,

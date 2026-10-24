@@ -871,6 +871,12 @@ namespace Conora.Infrastructure.Persistence.Migrations
                     b.Property<DateTime?>("AcceptedAt")
                         .HasColumnType("timestamp with time zone");
 
+                    b.Property<DateTime?>("AuthorizedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<DateTime?>("BudgetsMovedAt")
+                        .HasColumnType("timestamp with time zone");
+
                     b.Property<DateTime?>("CancelledAt")
                         .HasColumnType("timestamp with time zone");
 
@@ -920,6 +926,43 @@ namespace Conora.Infrastructure.Persistence.Migrations
                     b.HasIndex("FamilyGroupId", "AcceptedAt", "CancelledAt");
 
                     b.ToTable("family_owner_transfers", (string)null);
+                });
+
+            modelBuilder.Entity("Conora.Domain.Entities.HotmartCoursePurchase", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<bool>("Approved")
+                        .HasColumnType("boolean");
+
+                    b.Property<string>("Email")
+                        .IsRequired()
+                        .HasMaxLength(320)
+                        .HasColumnType("character varying(320)");
+
+                    b.Property<long?>("ProductId")
+                        .HasColumnType("bigint");
+
+                    b.Property<DateTime>("ReceivedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("Transaction")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("Email")
+                        .HasDatabaseName("IX_HotmartCoursePurchases_Email");
+
+                    b.HasIndex("Transaction")
+                        .IsUnique()
+                        .HasDatabaseName("IX_HotmartCoursePurchases_Transaction");
+
+                    b.ToTable("hotmart_course_purchases", (string)null);
                 });
 
             modelBuilder.Entity("Conora.Domain.Entities.ImportBatch", b =>
@@ -1571,6 +1614,9 @@ namespace Conora.Infrastructure.Persistence.Migrations
                     b.Property<string>("Cep")
                         .HasMaxLength(9)
                         .HasColumnType("character varying(9)");
+
+                    b.Property<DateTime?>("ContractAcknowledgedAt")
+                        .HasColumnType("timestamp with time zone");
 
                     b.Property<string>("Cpf")
                         .HasMaxLength(11)

@@ -59,6 +59,7 @@ public class StoreSubscriptionBillingTests
     private static StoreSubscriptionBilling CreateSut() =>
         new(
             null!,
+            null!,
             new FakeStoreReceiptValidator(),
             null!,
             Options.Create(new StoreBillingOptions()),

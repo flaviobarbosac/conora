@@ -193,6 +193,7 @@ app.MapWhatsAppEndpoints();
 app.MapReceiptEndpoints();
 app.MapSesWebhookEndpoints();
 app.MapStoreBillingWebhookEndpoints();
+app.MapHotmartWebhookEndpoints();
 
 using (var scope = app.Services.CreateScope())
 {

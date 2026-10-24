@@ -30,6 +30,7 @@ public sealed class AuthService
     private readonly IConfiguration _config;
     private readonly IHostEnvironment _env;
     private readonly CategoryService _categories;
+    private readonly IHotmartCourseStore _hotmart;
     private readonly ILogger<AuthService> _logger;
 
     public AuthService(
@@ -47,6 +48,7 @@ public sealed class AuthService
         IConfiguration config,
         IHostEnvironment env,
         CategoryService categories,
+        IHotmartCourseStore hotmart,
         ILogger<AuthService> logger)
     {
         _users = users;
@@ -63,6 +65,7 @@ public sealed class AuthService
         _config = config;
         _env = env;
         _categories = categories;
+        _hotmart = hotmart;
         _logger = logger;
     }
 
@@ -263,6 +266,8 @@ public sealed class AuthService
 
     private async Task<AuthResponse> IssueForNewUserAsync(User user, string action, CancellationToken ct)
     {
+        if (await _hotmart.HasApprovedAsync(user.Email, ct))
+            user.SetTrainingStudent(true);
         _users.Add(user);
         _tenant.Set(user.Id);
         _categories.AddDefaults();

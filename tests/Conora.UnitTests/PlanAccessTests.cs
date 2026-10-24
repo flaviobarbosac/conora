@@ -85,6 +85,6 @@ public class PlanAccessTests
         Assert.False(PlanCatalog.IsSellable(PlanKind.Yearly14990));
         Assert.Equal(0, PlanCatalog.MaxExtraMembers(PlanTier.Individual));
         Assert.Equal(1, PlanCatalog.MaxExtraMembers(PlanTier.Family));
-        Assert.Equal(4, PlanCatalog.MaxExtraMembers(PlanTier.FamilyPlus));
+        Assert.Equal(5, PlanCatalog.MaxExtraMembers(PlanTier.FamilyPlus));
     }
 }
