@@ -16,6 +16,9 @@ services:
     restart: unless-stopped
     logging: *default-logging
     env_file: .env.app
+    volumes:
+      # Store billing keys written by generate-env.sh (App Store .p8, Google Play service account).
+      - ./secrets:/run/secrets:ro
     expose:
       - "8080"
 

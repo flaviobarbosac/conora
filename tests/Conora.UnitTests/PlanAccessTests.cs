@@ -63,11 +63,11 @@ public class PlanAccessTests
 
     [Theory]
     [InlineData(PlanKind.IndividualMonthly, 49.90, PlanTier.Individual)]
-    [InlineData(PlanKind.IndividualYearly, 499.00, PlanTier.Individual)]
+    [InlineData(PlanKind.IndividualYearly, 499.90, PlanTier.Individual)]
     [InlineData(PlanKind.FamilyMonthly, 59.90, PlanTier.Family)]
-    [InlineData(PlanKind.FamilyYearly, 599.00, PlanTier.Family)]
-    [InlineData(PlanKind.FamilyPlusMonthly, 79.00, PlanTier.FamilyPlus)]
-    [InlineData(PlanKind.FamilyPlusYearly, 790.00, PlanTier.FamilyPlus)]
+    [InlineData(PlanKind.FamilyYearly, 599.90, PlanTier.Family)]
+    [InlineData(PlanKind.FamilyPlusMonthly, 79.90, PlanTier.FamilyPlus)]
+    [InlineData(PlanKind.FamilyPlusYearly, 799.90, PlanTier.FamilyPlus)]
     public void Catalog_prices_yearly_with_two_free_months(PlanKind kind, double price, PlanTier tier)
     {
         Assert.Equal((decimal)price, PlanCatalog.PriceOf(kind));

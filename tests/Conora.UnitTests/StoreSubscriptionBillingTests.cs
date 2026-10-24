@@ -13,11 +13,11 @@ public class StoreSubscriptionBillingTests
 {
     [Theory]
     [InlineData(StoreProductIds.IndividualMonthly, PlanKind.IndividualMonthly, 49.90)]
-    [InlineData(StoreProductIds.IndividualYearly, PlanKind.IndividualYearly, 499.00)]
+    [InlineData(StoreProductIds.IndividualYearly, PlanKind.IndividualYearly, 499.90)]
     [InlineData(StoreProductIds.DuoMonthly, PlanKind.FamilyMonthly, 59.90)]
-    [InlineData(StoreProductIds.DuoYearly, PlanKind.FamilyYearly, 599.00)]
-    [InlineData(StoreProductIds.FamilyMonthly, PlanKind.FamilyPlusMonthly, 79.00)]
-    [InlineData(StoreProductIds.FamilyYearly, PlanKind.FamilyPlusYearly, 790.00)]
+    [InlineData(StoreProductIds.DuoYearly, PlanKind.FamilyYearly, 599.90)]
+    [InlineData(StoreProductIds.FamilyMonthly, PlanKind.FamilyPlusMonthly, 79.90)]
+    [InlineData(StoreProductIds.FamilyYearly, PlanKind.FamilyPlusYearly, 799.90)]
     public void TryMapProduct_maps_conora_skus(string productId, PlanKind expected, double price)
     {
         var sut = CreateSut();

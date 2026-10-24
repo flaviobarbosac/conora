@@ -27,11 +27,11 @@ assinar pelo app; a assinatura vale em qualquer lugar porque o direito de acesso
 | SKU | Plano | Preço |
 |---|---|---:|
 | `conora.individual.monthly` | Individual mensal | R$ 49,90 |
-| `conora.individual.yearly` | Individual anual | R$ 499,00 |
+| `conora.individual.yearly` | Individual anual | R$ 499,90 |
 | `conora.duo.monthly` | Duo mensal (2 pessoas) | R$ 59,90 |
-| `conora.duo.yearly` | Duo anual | R$ 599,00 |
-| `conora.family.monthly` | Family mensal (até 5) | R$ 79,00 |
-| `conora.family.yearly` | Family anual | R$ 790,00 |
+| `conora.duo.yearly` | Duo anual | R$ 599,90 |
+| `conora.family.monthly` | Família mensal (até 5) | R$ 79,90 |
+| `conora.family.yearly` | Família anual | R$ 799,90 |
 
 ## Checklist manual (Flavio)
 
@@ -60,7 +60,10 @@ StoreBilling__AppleIssuerId=<Issuer ID>
 StoreBilling__AppleKeyId=<Key ID>
 StoreBilling__ApplePrivateKeyPath=/run/secrets/SubscriptionKey.p8
 ```
-O `docker-compose.aws.yml` ainda não monta esses arquivos no serviço `api`: incluir o volume (somente leitura) antes do deploy.
+Esses valores vêm do bloco `storeBilling` do segredo `conora/<env>/integrations`. Para gravá-lo:
+`.\infra\scripts\set-store-billing.ps1 -AppleKeyFile <SubscriptionKey_XXXX.p8> -AppleIssuerId <issuer> [-GoogleServiceAccountFile <play.json>]`
+(gera a `NotificationKey` se não existir). No deploy, `generate-env.sh` grava os arquivos em `./secrets` e o
+`docker-compose.aws.yml` monta essa pasta em `/run/secrets` (somente leitura) no `conora-api`.
 Sem as credenciais a confirmação falha fechada ("Validação da … não está configurada") — nunca libera plano.
 
 ### Banco
