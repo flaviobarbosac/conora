@@ -47,6 +47,8 @@ for part in sys.argv[2].strip(".").split("."):
     cur = cur[part]
 if isinstance(cur, bool):
     print("true" if cur else "false")
+elif isinstance(cur, (dict, list)):
+    print(json.dumps(cur))
 else:
     print(cur)
 PY
@@ -124,6 +126,30 @@ if [ -n "$APPLE_KEY_ID" ] && [ -n "$APPLE_PRIVATE_KEY" ]; then
   printf 'Apple__KeyId=%s\n' "$APPLE_KEY_ID" >> "${OUT_DIR}/.env.app"
   printf 'Apple__PrivateKey=%s\n' "$APPLE_PRIVATE_KEY" >> "${OUT_DIR}/.env.app"
 fi
+
+# Store billing: key files are written to ./secrets, mounted read-only at /run/secrets in conora-api.
+# Without these values purchase confirmation fails closed, so a missing block only disables billing.
+SECRETS_DIR="${OUT_DIR}/secrets"
+mkdir -p "$SECRETS_DIR"
+# The API container runs as a non-root user, so the mounted files must be world-readable on this single-purpose host.
+chmod 755 "$SECRETS_DIR"
+STORE_NOTIFICATION_KEY=$(get_int .storeBilling.notificationKey)
+if [ -n "$STORE_NOTIFICATION_KEY" ]; then
+  printf 'StoreBilling__NotificationKey=%s\n' "$(esc "$STORE_NOTIFICATION_KEY")" >> "${OUT_DIR}/.env.app"
+fi
+STORE_APPLE_KEY=$(get_int .storeBilling.applePrivateKey)
+if [ -n "$STORE_APPLE_KEY" ]; then
+  printf '%s\n' "$STORE_APPLE_KEY" > "${SECRETS_DIR}/SubscriptionKey.p8"
+  printf 'StoreBilling__AppleIssuerId=%s\n' "$(get_int .storeBilling.appleIssuerId)" >> "${OUT_DIR}/.env.app"
+  printf 'StoreBilling__AppleKeyId=%s\n' "$(get_int .storeBilling.appleKeyId)" >> "${OUT_DIR}/.env.app"
+  printf 'StoreBilling__ApplePrivateKeyPath=/run/secrets/SubscriptionKey.p8\n' >> "${OUT_DIR}/.env.app"
+fi
+STORE_GOOGLE_JSON=$(get_int .storeBilling.googleServiceAccount)
+if [ -n "$STORE_GOOGLE_JSON" ]; then
+  printf '%s\n' "$STORE_GOOGLE_JSON" > "${SECRETS_DIR}/play-service-account.json"
+  printf 'StoreBilling__GoogleServiceAccountJsonPath=/run/secrets/play-service-account.json\n' >> "${OUT_DIR}/.env.app"
+fi
+chmod 644 "$SECRETS_DIR"/* 2>/dev/null || true
 
 # Allow provisional access via the instance public IP (same-origin front+API on :80).
 if PUBLIC_IP=$(curl -fsS --connect-timeout 2 -H "X-aws-ec2-metadata-token: $(curl -fsS -X PUT --connect-timeout 2 -H 'X-aws-ec2-metadata-token-ttl-seconds: 60' http://169.254.169.254/latest/api/token)" http://169.254.169.254/latest/meta-data/public-ipv4 2>/dev/null); then

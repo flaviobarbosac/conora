@@ -60,7 +60,10 @@ StoreBilling__AppleIssuerId=<Issuer ID>
 StoreBilling__AppleKeyId=<Key ID>
 StoreBilling__ApplePrivateKeyPath=/run/secrets/SubscriptionKey.p8
 ```
-O `docker-compose.aws.yml` ainda não monta esses arquivos no serviço `api`: incluir o volume (somente leitura) antes do deploy.
+Esses valores vêm do bloco `storeBilling` do segredo `conora/<env>/integrations`. Para gravá-lo:
+`.\infra\scripts\set-store-billing.ps1 -AppleKeyFile <SubscriptionKey_XXXX.p8> -AppleIssuerId <issuer> [-GoogleServiceAccountFile <play.json>]`
+(gera a `NotificationKey` se não existir). No deploy, `generate-env.sh` grava os arquivos em `./secrets` e o
+`docker-compose.aws.yml` monta essa pasta em `/run/secrets` (somente leitura) no `conora-api`.
 Sem as credenciais a confirmação falha fechada ("Validação da … não está configurada") — nunca libera plano.
 
 ### Banco
