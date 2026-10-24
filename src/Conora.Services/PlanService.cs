@@ -103,29 +103,18 @@ public sealed class PlanService
     }
 
     /// <summary>
-    /// Validates that the plan allows one more family member. Trial allows everything;
-    /// Individual has no family group; Family allows the owner plus 2 people.
+    /// One more family seat. Without an active Duo or Família plan the limit is Individual (no invites).
     /// </summary>
     public async Task EnsureCanAddFamilyMemberAsync(int currentExtraMembers, CancellationToken ct)
     {
         await EnsureWritableAsync(ct);
         var access = await GetAccessAsync(ct);
-        if (access.State.Phase != AccessPhase.Subscribed || access.Subscription is null)
-            return;
-
-        var tier = access.Subscription.Tier;
-        if (tier == PlanTier.Individual)
-            throw new ForbiddenException(
-                "O plano Individual não inclui grupo familiar. Mude para o Duo ou Família para convidar pessoas.");
-
-        var max = PlanCatalog.MaxExtraMembers(tier);
-        if (max is not null && currentExtraMembers >= max)
-        {
-            var label = tier == PlanTier.Family ? "Duo" : "Família";
-            throw new ValidationException(
-                "email",
-                $"Seu plano {label} permite até {max} pessoa(s) além de você.");
-        }
+        var tier = access.State.Phase == AccessPhase.Subscribed && access.Subscription is not null
+            ? access.Subscription.Tier
+            : PlanTier.Individual;
+        var max = PlanCatalog.MaxExtraMembers(tier) ?? 0;
+        if (currentExtraMembers >= max)
+            throw new ValidationException("email", PlanCatalog.FamilySeatMessage(tier));
     }
 
     /// <summary>

@@ -22,6 +22,7 @@ public sealed class StoreSubscriptionBilling : IStoreSubscriptionBilling
     private const int MaxExternalRef = 120;
 
     private readonly PlanService _plans;
+    private readonly FamilyGroupService _succession;
     private readonly IStoreReceiptValidator _receipts;
     private readonly IFamilyGroupRepository _users;
     private readonly StoreBillingOptions _store;
@@ -29,12 +30,14 @@ public sealed class StoreSubscriptionBilling : IStoreSubscriptionBilling
 
     public StoreSubscriptionBilling(
         PlanService plans,
+        FamilyGroupService succession,
         IStoreReceiptValidator receipts,
         IFamilyGroupRepository users,
         IOptions<StoreBillingOptions> store,
         ILogger<StoreSubscriptionBilling> logger)
     {
         _plans = plans;
+        _succession = succession;
         _receipts = receipts;
         _users = users;
         _store = store.Value;
@@ -125,6 +128,8 @@ public sealed class StoreSubscriptionBilling : IStoreSubscriptionBilling
         }
 
         await _plans.ApplyStoreConfirmationAsync(ToConfirmation(usuarioId.Value, plan, storeLabel, receipt), ct);
+        if (!receipt.Entitled)
+            await _succession.MoveBudgetsOnStoreCancellationAsync(usuarioId.Value, ct);
         _logger.LogInformation(
             "Store notice {Event} applied user={UserId} product={ProductId} entitled={Entitled} expires={ExpiresAt}",
             command.Evento, usuarioId, receipt.ProductId, receipt.Entitled, receipt.ExpiresAt);

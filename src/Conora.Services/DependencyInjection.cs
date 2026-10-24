@@ -16,6 +16,7 @@ public static class DependencyInjection
 
         // Finance domain
         services.AddScoped<PlanService>();
+        services.AddScoped<HotmartCourseService>();
         services.AddScoped<IStoreSubscriptionBilling, StoreSubscriptionBilling>();
         services.AddScoped<MonthService>();
         services.AddScoped<CategoryService>();

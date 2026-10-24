@@ -1,5 +1,6 @@
 using Conora.Domain.Catalog;
 using Conora.Domain.Entities;
+using Conora.Domain.Services;
 using Conora.Domain.Enums;
 using Conora.Domain.Exceptions;
 using Conora.Domain.Ports;
@@ -218,6 +219,14 @@ public sealed class FamilyGroupService
         return ToProfile(user);
     }
 
+    public async Task<ProfileResponse> AcknowledgeContractAsync(CancellationToken ct)
+    {
+        var user = await RequireUserAsync(ct, track: true);
+        user.AcknowledgeContract();
+        await _uow.SaveChangesAsync(ct);
+        return ToProfile(user);
+    }
+
     public async Task<FamilyGroupResponse> GetGroupAsync(CancellationToken ct)
     {
         var self = RequireUserId();
@@ -260,7 +269,9 @@ public sealed class FamilyGroupService
                 to?.Name ?? "",
                 pending.ExpiresAt,
                 pending.IsOpen,
-                pending.ToUsuarioId == self);
+                pending.ToUsuarioId == self,
+                pending.AuthorizedAt is not null,
+                $"{PublicWebBase()}/app/grupo/owner/{pending.Token}");
         }
 
         return new FamilyGroupResponse(
@@ -461,6 +472,7 @@ public sealed class FamilyGroupService
                 throw new ValidationException("token", "Quem convidou não é mais o responsável pelo grupo.");
             if (await _family.CountActiveMembersAsync(gid, ct) >= FamilyGroup.MaxMembers)
                 throw new ValidationException("token", $"O grupo já tem {FamilyGroup.MaxMembers} membros.");
+            await EnsureOwnerSeatAsync(group.BudgetOwnerUsuarioId, await _family.CountActiveMembersAsync(gid, ct) - 1, ct);
         }
         else
         {
@@ -473,9 +485,14 @@ public sealed class FamilyGroupService
                     throw new ValidationException("token", "Quem convidou não é mais o responsável pelo grupo.");
                 if (await _family.CountActiveMembersAsync(group.Id, ct) >= FamilyGroup.MaxMembers)
                     throw new ValidationException("token", $"O grupo já tem {FamilyGroup.MaxMembers} membros.");
+                await EnsureOwnerSeatAsync(
+                    group.BudgetOwnerUsuarioId,
+                    await _family.CountActiveMembersAsync(group.Id, ct) - 1,
+                    ct);
             }
             else
             {
+                await EnsureOwnerSeatAsync(invite.InviterUsuarioId, 0, ct);
                 group = FamilyGroup.Create(invite.InviterUsuarioId);
                 _family.AddGroup(group);
                 _family.AddMember(FamilyGroupMember.Create(group.Id, invite.InviterUsuarioId));
@@ -526,6 +543,15 @@ public sealed class FamilyGroupService
         await _categories.EnsureDefaultsAsync(ct);
         await _categories.MergeOnJoinAsync(group.BudgetOwnerUsuarioId, self, ct);
         return await GetGroupAsync(ct);
+    }
+
+    private async Task EnsureOwnerSeatAsync(Guid ownerId, int currentExtraMembers, CancellationToken ct)
+    {
+        var sub = await _family.FindSubscriptionAsync(ownerId, ct);
+        var tier = sub is not null && sub.IsWritable(DateTime.UtcNow) ? sub.Tier : PlanTier.Individual;
+        var max = PlanCatalog.MaxExtraMembers(tier) ?? 0;
+        if (currentExtraMembers >= max)
+            throw new ValidationException("token", PlanCatalog.FamilySeatMessage(tier));
     }
 
     public async Task LeaveAsync(CancellationToken ct)
@@ -581,6 +607,8 @@ public sealed class FamilyGroupService
         var (group, isOwner) = await RequireGroupAsync(ct);
         if (!isOwner)
             throw new ForbiddenException("Só o responsável pelo orçamento pode transferir.");
+        if (!FamilySuccessionRules.CanRequest(DateTime.UtcNow))
+            throw new ValidationException("transfer", FamilySuccessionRules.OutsideWindowMessage);
 
         if (await _family.FindOpenOwnerTransferAsync(group.Id, ct) is not null)
             throw new ValidationException("transfer", "Já existe uma transferência aberta.");
@@ -606,11 +634,11 @@ public sealed class FamilyGroupService
                     "Transferência do orçamento familiar",
                     [
                         $"{from.Name} pediu que você assuma o orçamento do grupo familiar no Conora.",
-                        "Ao aceitar, você passa a ser o único que edita o orçamento familiar e recebe as linhas de planejamento atuais."
+                        "Ao autorizar no QR, você aceita assumir a administração. O orçamento passa para você quando o titular cancelar a assinatura na loja. Você tem 24 horas depois disso para assinar e o grupo seguir com você."
                     ])
                 {
                     Preheader = "Pedido de transferência do orçamento familiar.",
-                    ActionLabel = "Aceitar transferência",
+                    ActionLabel = "Autorizar",
                     ActionUrl = link,
                     Note = $"O pedido vale até {transfer.ExpiresAt:dd/MM/yyyy HH:mm} UTC."
                 },
@@ -631,7 +659,7 @@ public sealed class FamilyGroupService
         await _uow.SaveChangesAsync(ct);
 
         return new FamilyOwnerTransferResponse(
-            transfer.Id, self, from.Name, to.Id, to.Name, transfer.ExpiresAt, true, false);
+            transfer.Id, self, from.Name, to.Id, to.Name, transfer.ExpiresAt, true, false, false, link);
     }
 
     public async Task CancelOwnerTransferAsync(CancellationToken ct)
@@ -657,8 +685,8 @@ public sealed class FamilyGroupService
         var self = RequireUserId();
         var transfer = await _family.FindOwnerTransferByTokenAsync(token, ct, track: true)
                        ?? throw new ValidationException("token", "Transferência inválida.");
-        var wasOpen = transfer.IsOpen;
-        transfer.Accept(self);
+        var wasOpen = transfer.AuthorizedAt is null && transfer.IsOpen;
+        transfer.Authorize(self);
 
         var group = await _family.GetGroupAsync(transfer.FamilyGroupId, ct)
                     ?? throw new ValidationException("token", "Grupo não encontrado.");
@@ -666,26 +694,12 @@ public sealed class FamilyGroupService
         if (members.All(m => m.UsuarioId != self))
             throw new ValidationException("token", "Você não faz mais parte deste grupo.");
 
-        if (!group.IsBudgetOwner(self))
-        {
-            if (!group.IsBudgetOwner(transfer.FromUsuarioId))
-                throw new ValidationException("token", "O solicitante não é mais o responsável.");
-
-            group.TransferBudgetOwner(self);
-            await CopyOwnerBudgetsAsync(transfer.FromUsuarioId, self, ct);
-            await _repo.ReassignCategoryCreatorAsync(transfer.FromUsuarioId, self, ct);
-
-            var openInvites = await _family.ListOpenInvitesByGroupAsync(group.Id, ct);
-            foreach (var invite in openInvites)
-                invite.ReassignInviter(self);
-        }
-
         if (wasOpen)
         {
             _family.AddNotice(FamilyNotice.Create(
                 transfer.FromUsuarioId,
                 "OwnerTransferAccepted",
-                "A transferência do orçamento familiar foi aceita."));
+                "A autorização para assumir a administração foi registrada."));
 
             AuditRecorder.Record(_audits, _correlation, "FamilyOwnerTransfer", transfer.Id, "OwnerTransferAccepted",
                 new { transfer.FromUsuarioId, to = self });
@@ -768,9 +782,60 @@ public sealed class FamilyGroupService
         await _repo.SetLifeProjectScopeForUsuarioAsync(usuarioId, LifeProjectScope.Personal, ct);
     }
 
-    private async Task CopyOwnerBudgetsAsync(Guid fromUsuarioId, Guid toUsuarioId, CancellationToken ct)
+    public async Task ConfirmStoreCancelledAsync(CancellationToken ct)
     {
-        var fromBudgets = await _repo.ListForUsuariosAsync<Budget>([fromUsuarioId], _ => true, ct);
+        var self = RequireUserId();
+        if (await _family.FindAuthorizedHandoverAsync(self, ct) is null)
+            throw new ValidationException("transfer", "A outra pessoa ainda não autorizou a transferência.");
+        await MoveBudgetsOnStoreCancellationAsync(self, ct);
+        await _storeBilling.CancelOwnerSubscriptionAsync(self, ct);
+    }
+
+    /// <summary>
+    /// At store cancellation: from the handover month forward, her planned budgets are removed
+    /// and replaced by every planned month he had. Earlier months stay on each side.
+    /// </summary>
+    public async Task MoveBudgetsOnStoreCancellationAsync(Guid ownerUsuarioId, CancellationToken ct)
+    {
+        var transfer = await _family.FindAuthorizedHandoverAsync(ownerUsuarioId, ct, track: true);
+        if (transfer is null || transfer.BudgetsMovedAt is not null)
+            return;
+
+        var handover = FamilySuccessionRules.HandoverMonth(DateTime.UtcNow);
+        var previousTenant = _tenant.UsuarioId;
+        _tenant.Set(transfer.ToUsuarioId);
+        try
+        {
+            await ReplaceBudgetsFromHandoverAsync(transfer.FromUsuarioId, transfer.ToUsuarioId, handover, ct);
+            transfer.MarkBudgetsMoved(DateTime.UtcNow);
+            await _uow.SaveChangesAsync(ct);
+        }
+        finally
+        {
+            if (previousTenant is Guid tenantId)
+                _tenant.Set(tenantId);
+        }
+    }
+
+    private async Task ReplaceBudgetsFromHandoverAsync(
+        Guid fromUsuarioId,
+        Guid toUsuarioId,
+        string handoverMonth,
+        CancellationToken ct)
+    {
+        var toBudgets = await _repo.ListForUsuariosAsync<Budget>([toUsuarioId], _ => true, ct, track: true);
+        foreach (var toBudget in toBudgets.Where(budget => FamilySuccessionRules.IsHandoverOrLater(budget.CompetenceYm, handoverMonth)))
+        {
+            var existingLines = await _repo.ListForUsuariosAsync<BudgetLine>(
+                [toUsuarioId], line => line.BudgetId == toBudget.Id, ct, track: true);
+            foreach (var line in existingLines)
+                _repo.SoftDelete(line);
+            _repo.SoftDelete(toBudget);
+        }
+
+        var fromBudgets = (await _repo.ListForUsuariosAsync<Budget>([fromUsuarioId], _ => true, ct))
+            .Where(budget => FamilySuccessionRules.IsHandoverOrLater(budget.CompetenceYm, handoverMonth))
+            .ToList();
         if (fromBudgets.Count == 0)
             return;
 
@@ -888,7 +953,8 @@ public sealed class FamilyGroupService
             user.BudgetAlertPercent,
             user.PhotoEvolutionEnabled,
             user.Phone,
-            user.Cep);
+            user.Cep,
+            user.ContractAcknowledgedAt);
 
     private static FamilyInviteResponse ToInvite(FamilyInvite i)
         => new(i.Id, i.Email, i.ExpiresAt, i.AcceptedAt, i.CancelledAt, i.IsOpen);

@@ -41,6 +41,9 @@ public class User : ModelBase
     /// <summary>When true, Ian and Clara portraits and voice bands follow milestone age. When false, both stay at age 30 / adult.</summary>
     public bool PhotoEvolutionEnabled { get; private set; } = true;
 
+    /// <summary>Set when the user acknowledges the paid-plan contract and LGPD. Later subscriptions skip that screen.</summary>
+    public DateTime? ContractAcknowledgedAt { get; private set; }
+
     private User()
     {
     }
@@ -146,6 +149,8 @@ public class User : ModelBase
     public void CompleteOnboarding() => OnboardingCompleted = true;
 
     public void SetTrainingStudent(bool isTrainingStudent) => IsTrainingStudent = isTrainingStudent;
+
+    public void AcknowledgeContract() => ContractAcknowledgedAt ??= DateTime.UtcNow;
 
     private static string NormalizeCep(string cep)
     {

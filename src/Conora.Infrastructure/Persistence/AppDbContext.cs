@@ -50,6 +50,7 @@ public class AppDbContext : DbContext
     public DbSet<WhatsAppLink> WhatsAppLinks => Set<WhatsAppLink>();
     public DbSet<WhatsAppDraft> WhatsAppDrafts => Set<WhatsAppDraft>();
     public DbSet<ReceiptIntake> ReceiptIntakes => Set<ReceiptIntake>();
+    public DbSet<HotmartCoursePurchase> HotmartCoursePurchases => Set<HotmartCoursePurchase>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {

@@ -14,8 +14,8 @@ public static class PlanCatalog
     /// <summary>Extra people on Duo (PlanTier.Family): owner + 1 = 2 people total.</summary>
     public const int FamilyExtraMembers = 1;
 
-    /// <summary>Extra people on Family (PlanTier.FamilyPlus): owner + 4 = 5 people total.</summary>
-    public const int FamilyPlusExtraMembers = 4;
+    /// <summary>Extra people on Family (PlanTier.FamilyPlus): owner + 5 = 6 people total.</summary>
+    public const int FamilyPlusExtraMembers = 5;
 
     public static readonly IReadOnlyList<PlanOfferDefinition> Offers =
     [
@@ -54,6 +54,17 @@ public static class PlanCatalog
         PlanTier.Family => FamilyExtraMembers,
         PlanTier.FamilyPlus => FamilyPlusExtraMembers,
         _ => null
+    };
+
+    /// <summary>Shown when an invite would pass the tier seat limit.</summary>
+    public static string FamilySeatMessage(PlanTier tier) => tier switch
+    {
+        PlanTier.Family =>
+            "O plano Duo permite só você e mais 1 pessoa (2 no total). Para incluir mais gente, mude para o plano Família.",
+        PlanTier.FamilyPlus =>
+            "O plano Família permite você e mais 5 pessoas (6 no total).",
+        _ =>
+            "O plano Individual é só para você. Para convidar alguém, mude para o Duo (você + 1) ou para o Família (você + 5)."
     };
 
     private static PlanOfferDefinition Offer(PlanKind kind, PlanTier tier, decimal price, bool yearly) =>
