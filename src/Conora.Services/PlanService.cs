@@ -75,7 +75,7 @@ public sealed class PlanService
             user?.CreatedAt ?? now,
             covering,
             now,
-            user?.IsTrainingStudent ?? true);
+            user?.IsTrainingStudent ?? false);
         if (familyMemberWithoutCover && state.IsWritable)
             state = new AccessState(AccessPhase.Grace, state.TrialEndsAt, state.BlockAt);
 

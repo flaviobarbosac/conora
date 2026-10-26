@@ -1658,7 +1658,7 @@ namespace Conora.Infrastructure.Persistence.Migrations
                     b.Property<bool>("IsTrainingStudent")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("boolean")
-                        .HasDefaultValue(true);
+                        .HasDefaultValue(false);
 
                     b.Property<int>("MonthCloseDay")
                         .HasColumnType("integer");

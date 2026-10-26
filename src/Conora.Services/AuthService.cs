@@ -3,12 +3,14 @@ using Conora.Domain;
 using Conora.Domain.Entities;
 using Conora.Domain.Exceptions;
 using Conora.Domain.Ports;
+using Conora.Infrastructure.Billing;
 using Conora.Repository.Interface;
 using Conora.Services.Common;
 using Conora.Services.Contracts;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
 
 namespace Conora.Services;
 
@@ -31,6 +33,7 @@ public sealed class AuthService
     private readonly IHostEnvironment _env;
     private readonly CategoryService _categories;
     private readonly IHotmartCourseStore _hotmart;
+    private readonly HotmartOptions _hotmartOptions;
     private readonly ILogger<AuthService> _logger;
 
     public AuthService(
@@ -49,6 +52,7 @@ public sealed class AuthService
         IHostEnvironment env,
         CategoryService categories,
         IHotmartCourseStore hotmart,
+        IOptions<HotmartOptions> hotmartOptions,
         ILogger<AuthService> logger)
     {
         _users = users;
@@ -66,6 +70,7 @@ public sealed class AuthService
         _env = env;
         _categories = categories;
         _hotmart = hotmart;
+        _hotmartOptions = hotmartOptions.Value;
         _logger = logger;
     }
 
@@ -266,7 +271,8 @@ public sealed class AuthService
 
     private async Task<AuthResponse> IssueForNewUserAsync(User user, string action, CancellationToken ct)
     {
-        if (await _hotmart.HasApprovedAsync(user.Email, ct))
+        if (_hotmartOptions.ProductId > 0
+            && await _hotmart.HasApprovedAsync(user.Email, _hotmartOptions.ProductId, ct))
             user.SetTrainingStudent(true);
         _users.Add(user);
         _tenant.Set(user.Id);

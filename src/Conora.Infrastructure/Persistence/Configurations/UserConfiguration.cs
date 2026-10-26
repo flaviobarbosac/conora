@@ -23,7 +23,7 @@ public class UserConfiguration : IEntityTypeConfiguration<User>
         builder.Property(u => u.AppleId).HasMaxLength(100);
         builder.Property(u => u.EmailVerified).IsRequired();
         builder.Property(u => u.OnboardingCompleted).IsRequired();
-        builder.Property(u => u.IsTrainingStudent).IsRequired().HasDefaultValue(true);
+        builder.Property(u => u.IsTrainingStudent).IsRequired().HasDefaultValue(false);
         builder.Property(u => u.ThemeId).IsRequired().HasMaxLength(40);
         builder.Property(u => u.QuietMode).IsRequired();
         builder.Property(u => u.EmailsEnabled).IsRequired().HasDefaultValue(true);

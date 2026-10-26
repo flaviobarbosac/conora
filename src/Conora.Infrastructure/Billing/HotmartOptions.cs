@@ -10,6 +10,6 @@ public sealed class HotmartOptions
     /// <summary>Value of the X-HOTMART-HOTTOK header configured in the Hotmart webhook panel.</summary>
     public string Hottok { get; set; } = "";
 
-    /// <summary>When set, only this product id grants the student trial. Zero accepts any product.</summary>
+    /// <summary>Hotmart product id of Leomar Campos's training. Zero disables the extra 60-day grant.</summary>
     public long ProductId { get; set; }
 }

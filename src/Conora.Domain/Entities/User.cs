@@ -23,10 +23,10 @@ public class User : ModelBase
     public bool OnboardingCompleted { get; private set; }
 
     /// <summary>
-    /// Training student (Leomar Campos): 90-day free trial. Others: 30 days.
-    /// Not a separate store SKU — AccessPolicy resolves length when evaluating access / receipts.
+    /// Training student (Leomar Campos course purchase): 90-day free trial (30 + 60).
+    /// Everyone else gets 30 days. Not a store SKU — AccessPolicy resolves length.
     /// </summary>
-    public bool IsTrainingStudent { get; private set; } = true;
+    public bool IsTrainingStudent { get; private set; }
     public string ThemeId { get; private set; } = ThemeCatalog.Clareza;
     public bool QuietMode { get; private set; }
     /// <summary>When false, Conora system e-mails are not sent (user opt-out).</summary>
