@@ -202,7 +202,7 @@ public sealed class AuthService
         AuditRecorder.Record(_audits, _correlation, "User", user.Id, "PasswordResetRequested", new { user.Email });
         await _uow.SaveChangesAsync(ct);
 
-        var link = $"{PublicWebBase()}/app/redefinir-senha?token={token}";
+        var link = AuthLink("redefinir-senha", token);
         try
         {
             await _email.SendAsync(user.Email, "Redefinir senha do Conora", new EmailContent(
@@ -330,7 +330,7 @@ public sealed class AuthService
             user.IssueEmailVerification(_tokens.HashRefreshToken(token), DateTime.UtcNow.Add(EmailVerificationTtl));
             await _uow.SaveChangesAsync(ct);
 
-            var link = $"{PublicWebBase()}/app/validar-email?token={token}";
+            var link = AuthLink("validar-email", token);
             try
             {
                 await _email.SendAsync(user.Email, "Valide seu e-mail no Conora", new EmailContent(
@@ -393,6 +393,13 @@ public sealed class AuthService
         }
 
         return new AuthResponse(user.Id, user.Email, pair.AccessToken, pair.RefreshToken, pair.AccessExpiresAtUtc);
+    }
+
+    /// <summary>E-mail link; requests from the native app add app=1 so the web page hands off to the app.</summary>
+    private string AuthLink(string page, string token)
+    {
+        var link = $"{PublicWebBase()}/app/{page}?token={token}";
+        return _correlation.FromNativeApp ? link + "&app=1" : link;
     }
 
     private string PublicWebBase()
