@@ -7,7 +7,8 @@ using Microsoft.Extensions.Options;
 namespace Conora.Services;
 
 /// <summary>
-/// Hotmart course sale grants the training-student trial (90 days via AccessPolicy), matched by buyer e-mail.
+/// Hotmart sale of Leomar Campos's training product adds 60 days on top of the standard 30-day trial
+/// (90 total from account creation), matched by buyer e-mail and configured ProductId.
 /// </summary>
 public sealed class HotmartCourseService
 {
@@ -39,7 +40,8 @@ public sealed class HotmartCourseService
             return false;
         if (string.IsNullOrWhiteSpace(email) || string.IsNullOrWhiteSpace(transaction))
             return false;
-        if (_options.ProductId > 0 && productId != _options.ProductId)
+        // ProductId must be configured: zero means the extra 60 days stay off.
+        if (_options.ProductId <= 0 || productId != _options.ProductId)
             return false;
 
         var normalized = email.Trim().ToLowerInvariant();

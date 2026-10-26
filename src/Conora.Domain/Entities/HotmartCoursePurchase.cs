@@ -1,7 +1,7 @@
 namespace Conora.Domain.Entities;
 
 /// <summary>
-/// Approved Hotmart course purchase. Matching this e-mail marks the Conora account as a training student (90-day trial).
+/// Approved Hotmart purchase of Leomar Campos's training. Matching e-mail marks the account as a training student (30 + 60 days).
 /// </summary>
 public class HotmartCoursePurchase
 {

@@ -11,7 +11,8 @@ public sealed record AccessState(AccessPhase Phase, DateTime TrialEndsAt, DateTi
 
 /// <summary>
 /// Access lifecycle without a paid plan: free full access (trial), then read-only grace, then blocked.
-/// Trial length is profile-based (not a store product): 90 days for training students, 30 for others.
+/// Trial length is profile-based (not a store product): 30 days for everyone;
+/// training students (Hotmart purchase of Leomar Campos's course) get 30 + 60 = 90 days.
 /// </summary>
 public static class AccessPolicy
 {
