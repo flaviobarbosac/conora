@@ -14,7 +14,11 @@ internal static class AppleStoreServerJwt
         using var ecdsa = ECDsa.Create();
         ecdsa.ImportFromPem(File.ReadAllText(privateKeyPath));
         var key = new ECDsaSecurityKey(ecdsa) { KeyId = keyId };
-        var credentials = new SigningCredentials(key, SecurityAlgorithms.EcdsaSha256);
+        // The ECDsa instance is disposed on return; a cached signature provider would reuse it on the next call.
+        var credentials = new SigningCredentials(key, SecurityAlgorithms.EcdsaSha256)
+        {
+            CryptoProviderFactory = new CryptoProviderFactory { CacheSignatureProviders = false }
+        };
         var now = DateTime.UtcNow;
         var token = new JwtSecurityToken(
             issuerId,

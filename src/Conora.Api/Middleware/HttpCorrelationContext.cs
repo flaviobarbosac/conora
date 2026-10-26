@@ -5,6 +5,7 @@ namespace Conora.Api.Middleware;
 public sealed class HttpCorrelationContext : ICorrelationContext
 {
     private const string ActorHeaderName = "X-Actor";
+    private const string ClientHeaderName = "X-Conora-Client";
 
     private readonly IHttpContextAccessor _accessor;
 
@@ -20,4 +21,7 @@ public sealed class HttpCorrelationContext : ICorrelationContext
     public string Actor =>
         _accessor.HttpContext?.Request.Headers[ActorHeaderName].FirstOrDefault()
         ?? "system";
+
+    public bool FromNativeApp =>
+        _accessor.HttpContext?.Request.Headers[ClientHeaderName].FirstOrDefault() is "ios" or "android";
 }
