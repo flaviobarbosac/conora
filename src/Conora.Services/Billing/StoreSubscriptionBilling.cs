@@ -69,8 +69,12 @@ public sealed class StoreSubscriptionBilling : IStoreSubscriptionBilling
             throw new ValidationException("store", ex.Message);
         }
 
+        // The store is the source of truth: when the account already has another Conora plan in the
+        // subscription group (upgrade pending, earlier test purchase), the store returns that one.
         if (!string.Equals(receipt.ProductId, command.ProductId.Trim(), StringComparison.Ordinal))
-            throw new ValidationException("productId", "O produto confirmado pela loja não confere.");
+            _logger.LogInformation(
+                "Store returned product {StoreProductId} for requested {RequestedProductId} user={UserId}",
+                receipt.ProductId, command.ProductId, command.UsuarioId);
         if (receipt.AccountId.HasValue && receipt.AccountId.Value != command.UsuarioId)
             throw new ValidationException("store", "Esta compra está presa a outro login.");
         if (!TryMapProduct(receipt.ProductId, out var plan))
