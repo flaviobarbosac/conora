@@ -400,13 +400,16 @@ public sealed class EntryService
 
     private async Task EnsureFreeTierCategoryAsync(EntryType type, Guid? categoryId, CancellationToken ct)
     {
-        if (type is EntryType.Transfer or EntryType.CardPayment)
+        if (type is EntryType.Transfer or EntryType.CardPayment or EntryType.Income)
             return;
         if (await _plan.HasFullAccessAsync(ct))
             return;
         if (type is EntryType.ProjectContribution or EntryType.Contribution)
             throw new PlanReadOnlyException(
                 "Este recurso é liberado nos planos pagos. Assine para cadastrar e editar.");
+        // Free tier only restricts expense categories (the four starter codes).
+        if (type != EntryType.Expense)
+            return;
         string? code = null;
         if (categoryId is Guid cid)
         {
