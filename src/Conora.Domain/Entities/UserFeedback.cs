@@ -9,6 +9,8 @@ public class UserFeedback : ModelBase, ITenantOwned
     public string UsuarioNome { get; private set; } = default!;
     public string Modulo { get; private set; } = default!;
     public string? Rota { get; private set; }
+    /// <summary>Client platform: Web, iOS or Android.</summary>
+    public string Plataforma { get; private set; } = "Web";
     public int Nota { get; private set; }
     public string Comentario { get; private set; } = default!;
     public FeedbackStatus Status { get; private set; } = FeedbackStatus.Novo;
@@ -32,6 +34,7 @@ public class UserFeedback : ModelBase, ITenantOwned
         string usuarioNome,
         string modulo,
         string? rota,
+        string plataforma,
         int nota,
         string comentario) => new()
     {
@@ -39,10 +42,21 @@ public class UserFeedback : ModelBase, ITenantOwned
         UsuarioNome = usuarioNome.Trim(),
         Modulo = modulo.Trim(),
         Rota = string.IsNullOrWhiteSpace(rota) ? null : rota.Trim(),
+        Plataforma = NormalizePlataforma(plataforma),
         Nota = nota,
         Comentario = comentario.Trim(),
         Status = FeedbackStatus.Novo
     };
+
+    private static string NormalizePlataforma(string? plataforma)
+    {
+        var value = (plataforma ?? string.Empty).Trim();
+        if (string.Equals(value, "iOS", StringComparison.OrdinalIgnoreCase))
+            return "iOS";
+        if (string.Equals(value, "Android", StringComparison.OrdinalIgnoreCase))
+            return "Android";
+        return "Web";
+    }
 
     public void MarkReadByAdmin(Guid adminId, string adminNome, DateTime when)
     {

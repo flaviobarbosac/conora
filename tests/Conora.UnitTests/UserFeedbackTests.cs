@@ -15,11 +15,12 @@ public class UserFeedbackTests
     [Fact]
     public void Reply_sets_status_to_respondido()
     {
-        var feedback = UserFeedback.Create(Guid.NewGuid(), "Ana", "Orçamento", "/orcamento", 2, "Travou no salvamento");
+        var feedback = UserFeedback.Create(Guid.NewGuid(), "Ana", "Orçamento", "/orcamento", "Android", 2, "Travou no salvamento");
         var adminId = Guid.NewGuid();
 
         feedback.Reply(adminId, "Flavio", "Já estamos olhando isso.", DateTime.UtcNow);
 
+        Assert.Equal("Android", feedback.Plataforma);
         Assert.Equal(FeedbackStatus.Respondido, feedback.Status);
         Assert.Equal("Já estamos olhando isso.", feedback.Resposta);
         Assert.Equal(adminId, feedback.RespondidoPorUsuarioId);
@@ -33,7 +34,7 @@ public class UserFeedbackTests
         var svc = CreateService();
 
         var ex = await Assert.ThrowsAsync<ValidationException>(() =>
-            svc.CreateAsync(new CreateFeedbackRequest("Orçamento", "/orcamento", 0, "Comentário válido"), default));
+            svc.CreateAsync(new CreateFeedbackRequest("Orçamento", "/orcamento", "Web", 0, "Comentário válido"), default));
 
         Assert.True(ex.Errors.ContainsKey("nota"));
     }
@@ -44,7 +45,7 @@ public class UserFeedbackTests
         var svc = CreateService();
 
         var ex = await Assert.ThrowsAsync<ValidationException>(() =>
-            svc.CreateAsync(new CreateFeedbackRequest("Orçamento", "/orcamento", 4, "  "), default));
+            svc.CreateAsync(new CreateFeedbackRequest("Orçamento", "/orcamento", "iOS", 4, "  "), default));
 
         Assert.True(ex.Errors.ContainsKey("comentario"));
     }
@@ -53,7 +54,7 @@ public class UserFeedbackTests
     public async Task ReplyAdminAsync_sets_respondido()
     {
         var usuarioId = Guid.NewGuid();
-        var feedback = UserFeedback.Create(usuarioId, "Ana", "Orçamento", "/orcamento", 2, "Travou");
+        var feedback = UserFeedback.Create(usuarioId, "Ana", "Orçamento", "/orcamento", "Web", 2, "Travou");
         var repo = new FakeFeedbackRepo(feedback);
         var svc = new FeedbackService(repo, new FakeUserRepo(usuarioId), new FakeUow(), new FakeTenant(usuarioId));
         var adminId = Guid.NewGuid();
