@@ -71,35 +71,59 @@ public sealed class PlanService
         covering ??= own;
 
         var user = await _family.FindUserByIdAsync(self, ct);
+        var isTrainingStudent = user?.IsTrainingStudent ?? false;
         var state = AccessPolicy.Evaluate(
             user?.CreatedAt ?? now,
             covering,
             now,
-            user?.IsTrainingStudent ?? false);
-        if (familyMemberWithoutCover && state.IsWritable)
-            state = new AccessState(AccessPhase.Grace, state.TrialEndsAt, state.BlockAt);
+            isTrainingStudent);
+        if (familyMemberWithoutCover && state.Phase == AccessPhase.Trial)
+            state = new AccessState(AccessPhase.Expired, state.TrialEndsAt, state.BlockAt);
 
-        _snapshot = new AccessSnapshot(state, covering, coveredByFamily);
+        var everSubscribed = own is not null || covering is not null;
+        _snapshot = new AccessSnapshot(state, covering, coveredByFamily, isTrainingStudent, everSubscribed);
         return _snapshot;
     }
 
-    /// <summary>Blocks writes outside trial / active plan (grace, expired, blocked).</summary>
+    /// <summary>True when the workspace has the full product (student trial or paid plan).</summary>
+    public async Task<bool> HasFullAccessAsync(CancellationToken ct)
+    {
+        var access = await GetAccessAsync(ct);
+        return HasFullAccess(access);
+    }
+
+    public static bool HasFullAccess(AccessSnapshot access)
+        => access.State.Phase == AccessPhase.Subscribed
+           || (access.IsTrainingStudent && access.State.Phase == AccessPhase.Trial);
+
+    /// <summary>Blocks writes only when the account is blocked. Free tier still writes limited data.</summary>
     public async Task EnsureWritableAsync(CancellationToken ct)
     {
         var access = await GetAccessAsync(ct);
-        switch (access.State.Phase)
-        {
-            case AccessPhase.Trial or AccessPhase.Subscribed:
-                return;
-            case AccessPhase.Blocked:
-                throw new PlanBlockedException();
-            case AccessPhase.Grace:
-                throw new PlanReadOnlyException(
-                    "O Conora está em modo somente leitura (plano gratuito / consulta). " +
-                    "Você ainda pode consultar e exportar seus dados. Assine um plano para voltar a lançar.");
-            default:
-                throw new PlanReadOnlyException();
-        }
+        if (access.State.Phase == AccessPhase.Blocked)
+            throw new PlanBlockedException();
+        if (!access.State.IsWritable)
+            throw new PlanReadOnlyException();
+    }
+
+    /// <summary>Paid modules (projects, patrimony, members, milestones): full access only.</summary>
+    public async Task EnsureFullAccessAsync(CancellationToken ct)
+    {
+        await EnsureWritableAsync(ct);
+        if (!await HasFullAccessAsync(ct))
+            throw new PlanReadOnlyException(
+                "Este recurso é liberado nos planos pagos. Assine para cadastrar e editar.");
+    }
+
+    /// <summary>Free tier may only launch against the four starter expense categories.</summary>
+    public async Task EnsureCategoryWritableAsync(string? categoryCode, CancellationToken ct)
+    {
+        await EnsureWritableAsync(ct);
+        if (await HasFullAccessAsync(ct))
+            return;
+        if (!FreeTierLimits.AllowsCategoryCode(categoryCode))
+            throw new PlanReadOnlyException(
+                "No Conora grátis você lança só em Aluguel, Energia elétrica, Água e esgoto e Escola. Assine para liberar as outras categorias.");
     }
 
     /// <summary>
@@ -107,7 +131,7 @@ public sealed class PlanService
     /// </summary>
     public async Task EnsureCanAddFamilyMemberAsync(int currentExtraMembers, CancellationToken ct)
     {
-        await EnsureWritableAsync(ct);
+        await EnsureFullAccessAsync(ct);
         var access = await GetAccessAsync(ct);
         var tier = access.State.Phase == AccessPhase.Subscribed && access.Subscription is not null
             ? access.Subscription.Tier
@@ -250,21 +274,30 @@ public sealed class PlanService
             .Select(o => new PlanOfferResponse(o.Kind, o.Tier, o.Yearly, o.Price, o.MonthlyEquivalent, PlanCatalog.MaxExtraMembers(o.Tier)))
             .ToList();
 
+        var full = HasFullAccess(access);
         return new PlanResponse(
             sub?.Plan,
             sub?.Tier,
             sub is not null && PlanCatalog.IsYearly(sub.Plan),
             sub?.EffectiveStatus(now) ?? SubscriptionStatus.Active,
             sub?.ExpiresAt,
-            !access.State.IsWritable,
+            !full,
             sub is null ? null : WorkspaceSubscription.PriceOf(sub.Plan),
             phase,
             access.State.TrialEndsAt,
             access.State.BlockAt,
             daysLeft,
             access.CoveredByFamily,
-            offers);
+            offers,
+            access.IsTrainingStudent,
+            full,
+            access.EverSubscribed);
     }
 }
 
-public sealed record AccessSnapshot(AccessState State, WorkspaceSubscription? Subscription, bool CoveredByFamily);
+public sealed record AccessSnapshot(
+    AccessState State,
+    WorkspaceSubscription? Subscription,
+    bool CoveredByFamily,
+    bool IsTrainingStudent,
+    bool EverSubscribed);

@@ -19,6 +19,20 @@ public static class ConsoleEndpoints
             return Results.Ok(await service.GetAsync(ct));
         }).WithTags("Console").RequireAuthorization();
 
+        app.MapGet("/console/abandonment", async (HttpContext http, ConsoleService service, CancellationToken ct) =>
+        {
+            if (!IsConsoleOperator(http))
+                return Forbidden();
+
+            return Results.Ok(await service.ListAbandonmentAsync(ct));
+        }).WithTags("Console").RequireAuthorization();
+
+        app.MapPost("/journey", async (JourneyTrackRequest request, JourneyService service, CancellationToken ct) =>
+        {
+            await service.TrackAsync(request, ct);
+            return Results.NoContent();
+        }).WithTags("Journey").RequireAuthorization();
+
         var feedback = app.MapGroup("/console/feedback").WithTags("Console").RequireAuthorization();
 
         feedback.MapGet("/", async (

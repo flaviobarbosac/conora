@@ -211,6 +211,7 @@ public sealed class EntryService
 
         var count = Math.Max(installments, repeat);
         var categoryId = await ResolveCategoryAsync(request.Type, request.CategoryId, ct);
+        await EnsureFreeTierCategoryAsync(request.Type, categoryId, ct);
         var firstDate = Competence.ToUtc(request.OccurredAt);
         var baseYm = string.IsNullOrWhiteSpace(request.CompetenceYm) ? Competence.From(firstDate) : Competence.Require(request.CompetenceYm);
         var competences = Enumerable.Range(0, count).Select(i => Competence.AddMonths(baseYm, i)).ToList();
@@ -269,6 +270,7 @@ public sealed class EntryService
         await _months.EnsureOpenAsync([oldYm, newYm], ct);
 
         var categoryId = await ResolveCategoryAsync(entry.Type, request.CategoryId, ct);
+        await EnsureFreeTierCategoryAsync(entry.Type, categoryId, ct);
         await ValidateReferencesAsync(
             entry.Type, request.AccountId, request.ContraAccountId, categoryId, request.MemberId, entry.LifeProjectId, ct);
         await ValidateIncomeLinkAsync(entry.Type, request.IncomeSourceId, request.Amount, newYm, 1, entry.Id, ct);
@@ -394,6 +396,24 @@ public sealed class EntryService
             return (await _categories.GetByCodeAsync(SystemCategories.Tithe, ct)).Id;
 
         return requested;
+    }
+
+    private async Task EnsureFreeTierCategoryAsync(EntryType type, Guid? categoryId, CancellationToken ct)
+    {
+        if (type is EntryType.Transfer or EntryType.CardPayment)
+            return;
+        if (await _plan.HasFullAccessAsync(ct))
+            return;
+        if (type is EntryType.ProjectContribution or EntryType.Contribution)
+            throw new PlanReadOnlyException(
+                "Este recurso é liberado nos planos pagos. Assine para cadastrar e editar.");
+        string? code = null;
+        if (categoryId is Guid cid)
+        {
+            var category = await _categories.RequireAnalyticalAsync(cid, ct);
+            code = category.Code;
+        }
+        await _plan.EnsureCategoryWritableAsync(code, ct);
     }
 
     private async Task ValidateReferencesAsync(

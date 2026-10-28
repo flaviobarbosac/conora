@@ -68,7 +68,7 @@ public sealed class PatrimonyService
 
     public async Task<PatrimonyItemResponse> CreateAsync(PatrimonyItemRequest request, CancellationToken ct)
     {
-        await _plan.EnsureWritableAsync(ct);
+        await _plan.EnsureFullAccessAsync(ct);
         var account = await _categories.RequireAnalyticalAsync(request.CategoryId, ct);
         if (!SystemCategories.IsPatrimonySection(account.Section))
             throw new ValidationException("categoryId", "Patrimônio só aceita contas de Ativo ou Passivo.");
@@ -83,7 +83,7 @@ public sealed class PatrimonyService
 
     public async Task<PatrimonyItemResponse> UpdateAsync(Guid id, UpdatePatrimonyItemRequest request, CancellationToken ct)
     {
-        await _plan.EnsureWritableAsync(ct);
+        await _plan.EnsureFullAccessAsync(ct);
         var item = await _repo.GetAsync<PatrimonyItem>(id, ct) ?? throw new NotFoundException("Item de patrimônio", id);
         var account = await _categories.RequireAnalyticalAsync(request.CategoryId, ct);
         if (!SystemCategories.IsPatrimonySection(account.Section))
@@ -100,7 +100,7 @@ public sealed class PatrimonyService
 
     public async Task DeleteAsync(Guid id, CancellationToken ct)
     {
-        await _plan.EnsureWritableAsync(ct);
+        await _plan.EnsureFullAccessAsync(ct);
         var item = await _repo.GetAsync<PatrimonyItem>(id, ct) ?? throw new NotFoundException("Item de patrimônio", id);
         _repo.SoftDelete(item);
         await _uow.SaveChangesAsync(ct);

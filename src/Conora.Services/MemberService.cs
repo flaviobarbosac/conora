@@ -26,7 +26,7 @@ public sealed class MemberService
 
     public async Task<MemberResponse> CreateAsync(MemberRequest request, CancellationToken ct)
     {
-        await _plan.EnsureWritableAsync(ct);
+        await _plan.EnsureFullAccessAsync(ct);
         var member = FamilyMember.Create(request.Name);
         _repo.Add(member);
         await _uow.SaveChangesAsync(ct);
@@ -35,7 +35,7 @@ public sealed class MemberService
 
     public async Task<MemberResponse> UpdateAsync(Guid id, MemberRequest request, CancellationToken ct)
     {
-        await _plan.EnsureWritableAsync(ct);
+        await _plan.EnsureFullAccessAsync(ct);
         var member = await _repo.GetAsync<FamilyMember>(id, ct) ?? throw new NotFoundException("Membro", id);
         member.Update(request.Name, request.IsActive);
         await _uow.SaveChangesAsync(ct);
@@ -44,7 +44,7 @@ public sealed class MemberService
 
     public async Task DeleteAsync(Guid id, CancellationToken ct)
     {
-        await _plan.EnsureWritableAsync(ct);
+        await _plan.EnsureFullAccessAsync(ct);
         var member = await _repo.GetAsync<FamilyMember>(id, ct) ?? throw new NotFoundException("Membro", id);
         _repo.SoftDelete(member);
         await _uow.SaveChangesAsync(ct);

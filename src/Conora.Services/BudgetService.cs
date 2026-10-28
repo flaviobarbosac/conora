@@ -431,11 +431,14 @@ public sealed class BudgetService
         var budget = await GetOrCreateBudgetAsync(ym, BudgetMode.Detailed, ct);
         budget.SetMode(BudgetMode.Detailed);
 
+        var fullAccess = await _plan.HasFullAccessAsync(ct);
         foreach (var input in request.Lines.GroupBy(l => l.CategoryId).Select(g => g.Last()))
         {
             var account = await _categories.RequireAnalyticalAsync(input.CategoryId, ct);
             if (!BudgetSections.Contains(account.Section))
                 throw new ValidationException("lines", $"A conta '{account.Name}' não aceita orçamento (somente receita e despesa).");
+            if (!fullAccess)
+                await _plan.EnsureCategoryWritableAsync(account.Code, ct);
             await EnsureManualPlanAllowedAsync(input.CategoryId, account, ct);
 
             await SetLineAsync(budget, input.CategoryId, decimal.Round(input.PlannedAmount, 2), ct, input.ExpenseDay, updateDay: true);
