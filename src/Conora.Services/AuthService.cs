@@ -184,9 +184,13 @@ public sealed class AuthService
         if (user is null || !user.EmailVerificationIsActive(tokenHash))
             throw new ValidationException("token", "Link inválido ou expirado. Peça outro ao tentar entrar.");
 
-        user.MarkEmailVerified();
         _tenant.Set(user.Id);
-        AuditRecorder.Record(_audits, _correlation, "User", user.Id, "EmailVerified", new { user.Email });
+        if (!user.EmailVerified)
+        {
+            user.MarkEmailVerified();
+            AuditRecorder.Record(_audits, _correlation, "User", user.Id, "EmailVerified", new { user.Email });
+        }
+
         return await PersistSessionAsync(user, "EmailVerifiedLogin", notifyWelcome: true, ct);
     }
 
