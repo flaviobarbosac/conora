@@ -50,7 +50,7 @@ public sealed class FeedbackService
             rota = rota[..200];
 
         var nome = string.IsNullOrWhiteSpace(user.Name) ? user.Email : user.Name;
-        var entity = UserFeedback.Create(usuarioId, nome, modulo, rota, request.Nota, comentario);
+        var entity = UserFeedback.Create(usuarioId, nome, modulo, rota, request.Plataforma ?? "Web", request.Nota, comentario);
         await _feedbacks.AddAsync(entity, ct);
         await _uow.SaveChangesAsync(ct);
         return ToResponse(entity);
@@ -150,6 +150,7 @@ public sealed class FeedbackService
         f.UsuarioNome,
         f.Modulo,
         f.Rota,
+        f.Plataforma,
         f.Nota,
         f.Comentario,
         f.CreatedAt,
@@ -163,6 +164,7 @@ public sealed class FeedbackService
         f.UsuarioNome,
         f.Modulo,
         f.Rota,
+        f.Plataforma,
         f.Nota,
         f.Comentario,
         f.CreatedAt,

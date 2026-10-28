@@ -14,6 +14,7 @@ public class UserFeedbackConfiguration : IEntityTypeConfiguration<UserFeedback>
         builder.Property(e => e.UsuarioNome).IsRequired().HasMaxLength(200);
         builder.Property(e => e.Modulo).IsRequired().HasMaxLength(80);
         builder.Property(e => e.Rota).HasMaxLength(200);
+        builder.Property(e => e.Plataforma).IsRequired().HasMaxLength(16).HasDefaultValue("Web");
         builder.Property(e => e.Nota).IsRequired();
         builder.Property(e => e.Comentario).IsRequired().HasMaxLength(2000);
         builder.Property(e => e.Status).IsRequired().HasConversion<int>();

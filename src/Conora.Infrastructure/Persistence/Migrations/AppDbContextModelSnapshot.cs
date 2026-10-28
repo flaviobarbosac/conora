@@ -1783,6 +1783,13 @@ namespace Conora.Infrastructure.Persistence.Migrations
                     b.Property<int>("Nota")
                         .HasColumnType("integer");
 
+                    b.Property<string>("Plataforma")
+                        .IsRequired()
+                        .ValueGeneratedOnAdd()
+                        .HasMaxLength(16)
+                        .HasColumnType("character varying(16)")
+                        .HasDefaultValue("Web");
+
                     b.Property<DateTime?>("RespondidoEm")
                         .HasColumnType("timestamp with time zone");
 

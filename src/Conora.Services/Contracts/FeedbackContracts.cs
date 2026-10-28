@@ -2,7 +2,7 @@ using Conora.Domain.Enums;
 
 namespace Conora.Services.Contracts;
 
-public sealed record CreateFeedbackRequest(string Modulo, string? Rota, int Nota, string Comentario);
+public sealed record CreateFeedbackRequest(string Modulo, string? Rota, string? Plataforma, int Nota, string Comentario);
 
 public sealed record ReplyFeedbackRequest(string Resposta);
 
@@ -12,6 +12,7 @@ public sealed record FeedbackResponse(
     string UsuarioNome,
     string Modulo,
     string? Rota,
+    string Plataforma,
     int Nota,
     string Comentario,
     DateTime CreatedAt,
@@ -25,6 +26,7 @@ public sealed record ConsoleFeedbackResponse(
     string UsuarioNome,
     string Modulo,
     string? Rota,
+    string Plataforma,
     int Nota,
     string Comentario,
     DateTime CreatedAt,
