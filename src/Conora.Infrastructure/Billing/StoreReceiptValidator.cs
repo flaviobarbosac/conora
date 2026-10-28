@@ -172,25 +172,28 @@ public sealed class StoreReceiptValidator : IStoreReceiptValidator
 
         var jwt = AppleStoreServerJwt.Create(_options.AppleIssuerId, _options.AppleKeyId, _options.ApplePrivateKeyPath, _options.BundleId);
         // Production first; App Review and TestFlight purchases live in the sandbox.
+        // Any production failure falls back to the sandbox: besides 404, production answers 401
+        // while the app has never been released.
         var production = await GetAppleTransactionAsync(AppleProductionApi, jwt, transactionId, ct);
-        if (production.StatusCode == HttpStatusCode.NotFound
-            || string.Equals(AppleEnvironment(production.Payload), "Sandbox", StringComparison.OrdinalIgnoreCase))
+        if (production.Payload is not null
+            && !string.Equals(AppleEnvironment(production.Payload), "Sandbox", StringComparison.OrdinalIgnoreCase))
         {
-            production.Payload?.Dispose();
-            var sandbox = await GetAppleTransactionAsync(AppleSandboxApi, jwt, transactionId, ct);
-            using (sandbox.Payload)
-            {
-                if (sandbox.Payload is null)
-                    throw new InvalidOperationException("A App Store não confirmou esta compra.");
-                return ReadAppleTransaction(sandbox.Payload.RootElement, _options.BundleId, "Sandbox", DateTime.UtcNow);
-            }
+            using (production.Payload)
+                return ReadAppleTransaction(production.Payload.RootElement, _options.BundleId, "Production", DateTime.UtcNow);
         }
 
-        using (production.Payload)
+        production.Payload?.Dispose();
+        var sandbox = await GetAppleTransactionAsync(AppleSandboxApi, jwt, transactionId, ct);
+        using (sandbox.Payload)
         {
-            if (production.Payload is null)
+            if (sandbox.Payload is null)
+            {
+                _logger.LogWarning(
+                    "App Store transaction {TransactionId} not confirmed: production {ProductionStatus}, sandbox {SandboxStatus}",
+                    transactionId, (int)production.StatusCode, (int)sandbox.StatusCode);
                 throw new InvalidOperationException("A App Store não confirmou esta compra.");
-            return ReadAppleTransaction(production.Payload.RootElement, _options.BundleId, "Production", DateTime.UtcNow);
+            }
+            return ReadAppleTransaction(sandbox.Payload.RootElement, _options.BundleId, "Sandbox", DateTime.UtcNow);
         }
     }
 
