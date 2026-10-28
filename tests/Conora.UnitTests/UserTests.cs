@@ -40,7 +40,7 @@ public class UserTests
     }
 
     [Fact]
-    public void MarkEmailVerified_clears_verification_token()
+    public void MarkEmailVerified_keeps_hash_for_idempotent_link_replay()
     {
         var user = User.Create("Ana", "ana@example.com");
         user.IssueEmailVerification("vhash", DateTime.UtcNow.AddHours(24));
@@ -49,6 +49,6 @@ public class UserTests
         user.MarkEmailVerified();
 
         Assert.True(user.EmailVerified);
-        Assert.False(user.EmailVerificationIsActive("vhash"));
+        Assert.True(user.EmailVerificationIsActive("vhash"));
     }
 }

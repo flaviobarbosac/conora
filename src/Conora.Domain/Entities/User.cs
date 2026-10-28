@@ -126,11 +126,13 @@ public class User : ModelBase
            && string.Equals(EmailVerificationTokenHash, tokenHash, StringComparison.Ordinal)
            && EmailVerificationExpiresAtUtc > DateTime.UtcNow;
 
+    /// <summary>
+    /// Marks the address verified. Keeps the hash until a new IssueEmailVerification
+    /// so a second open of the same e-mail link (app cold start + appUrlOpen) stays idempotent.
+    /// </summary>
     public void MarkEmailVerified()
     {
         EmailVerified = true;
-        EmailVerificationTokenHash = null;
-        EmailVerificationExpiresAtUtc = null;
     }
 
     public void Rename(string name)
