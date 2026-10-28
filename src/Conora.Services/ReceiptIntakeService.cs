@@ -175,6 +175,7 @@ public sealed class ReceiptIntakeService
                        ?? supplier.DefaultCategoryCode;
 
         intake.AttachSupplier(supplier.Id, proposed);
+        await ApplyPreferredBankAccountAsync(intake, supplier.Id, userId, ct);
         if (!string.IsNullOrWhiteSpace(intake.ExtractedName))
             supplier.UpdateName(intake.ExtractedName);
 
@@ -234,6 +235,13 @@ public sealed class ReceiptIntakeService
                 AccountId: accountId,
                 CategoryId: categoryId,
                 ConfirmDuplicate: request.ConfirmDuplicate), token);
+
+            if (accountId is Guid usedAccount && intake.SupplierId is Guid supplierId)
+            {
+                var userId = _tenant.UsuarioId
+                             ?? throw new UnauthorizedAccessException("Tenant não autenticado.");
+                await _suppliers.UpsertUserBankAccountAsync(supplierId, userId, usedAccount, token);
+            }
 
             intake.Confirm();
             await ClearImageAsync(intake, token);
@@ -334,6 +342,7 @@ public sealed class ReceiptIntakeService
 
             Guid? supplierId = null;
             string? proposedCode = null;
+            Guid? preferredBankAccountId = null;
 
             if (!string.IsNullOrWhiteSpace(cnpj) && BrazilianCnpj.TryNormalize(cnpj, out var normalized))
             {
@@ -347,10 +356,16 @@ public sealed class ReceiptIntakeService
                     supplierId = supplier.Id;
                     name ??= supplier.Name;
                     var userId = _tenant.UsuarioId;
-                    proposedCode = userId is Guid uid
-                        ? await _suppliers.GetUserCategoryCodeAsync(supplier.Id, uid, ct)
-                          ?? supplier.DefaultCategoryCode
-                        : supplier.DefaultCategoryCode;
+                    if (userId is Guid uid)
+                    {
+                        proposedCode = await _suppliers.GetUserCategoryCodeAsync(supplier.Id, uid, ct)
+                                       ?? supplier.DefaultCategoryCode;
+                        preferredBankAccountId = await ResolvePreferredBankAccountAsync(supplier.Id, uid, ct);
+                    }
+                    else
+                    {
+                        proposedCode = supplier.DefaultCategoryCode;
+                    }
                 }
                 // New valid CNPJ: do not create yet — similar matches are offered on the response.
             }
@@ -367,6 +382,8 @@ public sealed class ReceiptIntakeService
             }
 
             intake.ApplyOcr(cnpj, name, amount, occurredAt, supplierId, proposedCode);
+            if (preferredBankAccountId is Guid bankId)
+                intake.SetBankAccount(bankId);
             await _uow.SaveChangesAsync(ct);
 
             await TryAutoPersistAsync(intake, ct);
@@ -499,6 +516,28 @@ public sealed class ReceiptIntakeService
             await _images.DeleteAsync(intake.ImageObjectKey, ct);
             intake.ClearImageKey();
         }
+    }
+
+    private async Task ApplyPreferredBankAccountAsync(
+        ReceiptIntake intake, Guid supplierId, Guid usuarioId, CancellationToken ct)
+    {
+        var accountId = await ResolvePreferredBankAccountAsync(supplierId, usuarioId, ct);
+        if (accountId is Guid id)
+            intake.SetBankAccount(id);
+    }
+
+    private async Task<Guid?> ResolvePreferredBankAccountAsync(
+        Guid supplierId, Guid usuarioId, CancellationToken ct)
+    {
+        var preferred = await _suppliers.GetUserBankAccountIdAsync(supplierId, usuarioId, ct);
+        if (preferred is null)
+            return null;
+
+        var account = await _repo.GetAsync<Account>(preferred.Value, ct);
+        if (account is null || account.UsuarioId != usuarioId || account.DeletedAt is not null)
+            return null;
+
+        return preferred;
     }
 
     private async Task<Supplier> EnsureSupplierAsync(ReceiptIntake intake, CancellationToken ct)

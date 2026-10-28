@@ -40,4 +40,25 @@ public class SupplierClassificationTests
         overrideRow.SetCategoryCode("ess_transport");
         Assert.Equal("ESS_TRANSPORT", overrideRow.CategoryCode);
     }
+
+    [Fact]
+    public void User_bank_account_is_per_person()
+    {
+        var supplier = Supplier.Create("Padaria X", "04.252.011/0001-10");
+        var userA = Guid.CreateVersion7();
+        var userB = Guid.CreateVersion7();
+        var accountA = Guid.CreateVersion7();
+        var accountB = Guid.CreateVersion7();
+
+        var prefA = SupplierUserBankAccount.Create(supplier.Id, userA, accountA);
+        var prefB = SupplierUserBankAccount.Create(supplier.Id, userB, accountB);
+
+        Assert.Equal(accountA, prefA.AccountId);
+        Assert.Equal(accountB, prefB.AccountId);
+        Assert.Equal(userA, prefA.UsuarioId);
+        Assert.Equal(userB, prefB.UsuarioId);
+
+        prefA.SetAccountId(accountB);
+        Assert.Equal(accountB, prefA.AccountId);
+    }
 }
