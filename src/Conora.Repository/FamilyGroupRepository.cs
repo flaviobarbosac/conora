@@ -1,4 +1,5 @@
 using Conora.Domain.Entities;
+using Conora.Domain.Enums;
 using Conora.Infrastructure.Persistence;
 using Conora.Repository.Interface;
 using Microsoft.EntityFrameworkCore;
@@ -145,6 +146,22 @@ public sealed class FamilyGroupRepository : IFamilyGroupRepository
             .FirstOrDefaultAsync(s => s.Store == store
                 && s.StoreSubscriptionId == storeSubscriptionId
                 && s.DeletedAt == null, ct);
+
+    public Task<int> ReleaseStoreSubscriptionAsync(
+        Guid usuarioId, string store, string storeSubscriptionId, DateTime endedAt, CancellationToken ct = default)
+        => _db.WorkspaceSubscriptions.IgnoreQueryFilters()
+            .Where(s => s.UsuarioId == usuarioId
+                && s.Store == store
+                && s.StoreSubscriptionId == storeSubscriptionId
+                && s.DeletedAt == null)
+            .ExecuteUpdateAsync(setters => setters
+                .SetProperty(s => s.Status, SubscriptionStatus.Expired)
+                .SetProperty(s => s.ExpiresAt, s => s.ExpiresAt > endedAt ? endedAt : s.ExpiresAt)
+                .SetProperty(s => s.Store, (string?)null)
+                .SetProperty(s => s.StoreProductId, (string?)null)
+                .SetProperty(s => s.StoreSubscriptionId, (string?)null)
+                .SetProperty(s => s.UpdatedAt, endedAt)
+                .SetProperty(s => s.Version, s => s.Version + 1), ct);
 
     public Task<User?> FindUserByIdAsync(Guid id, CancellationToken ct = default, bool track = false)
     {

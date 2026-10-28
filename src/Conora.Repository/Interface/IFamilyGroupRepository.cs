@@ -39,4 +39,11 @@ public interface IFamilyGroupRepository
 
     /// <summary>Subscription linked to a store subscription id (cross-tenant), used by store notifications.</summary>
     Task<WorkspaceSubscription?> FindSubscriptionByStoreIdAsync(string store, string storeSubscriptionId, CancellationToken ct = default);
+
+    /// <summary>
+    /// Privileged write (bypasses tenant stamp): ends that login's plan and unlinks the store
+    /// subscription so another login can take it over. Used for sandbox purchases only.
+    /// </summary>
+    Task<int> ReleaseStoreSubscriptionAsync(
+        Guid usuarioId, string store, string storeSubscriptionId, DateTime endedAt, CancellationToken ct = default);
 }
