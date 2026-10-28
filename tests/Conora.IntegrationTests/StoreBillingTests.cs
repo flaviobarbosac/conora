@@ -56,6 +56,23 @@ public sealed class StoreBillingTests : IClassFixture<ApiFactory>
     }
 
     [Fact]
+    public async Task Plan_follows_the_product_confirmed_by_the_store()
+    {
+        var user = await RegisterAsync();
+        _store.Receipt = new StoreReceipt(
+            "conora.family.monthly", "tx-2", $"orig-{Guid.NewGuid():N}", DateTime.UtcNow.AddMonths(1),
+            Entitled: true, InTrial: false, user.UserId);
+
+        // The app asked for Individual, but the Apple ID already holds Família in the same group.
+        var confirm = await PostAsync(user, "/plan/store/confirm", new { channel = 2, productId = "conora.individual.monthly", transactionId = "tx-2" });
+        Assert.True(confirm.IsSuccessStatusCode, await confirm.Content.ReadAsStringAsync());
+        var plan = await confirm.Content.ReadFromJsonAsync<PlanDto>(JsonOptions);
+        Assert.Equal("Subscribed", plan!.Phase);
+        Assert.Equal("FamilyPlus", plan.Tier);
+        Assert.False(plan.Yearly);
+    }
+
+    [Fact]
     public async Task Store_purchase_is_bound_to_the_first_login()
     {
         var owner = await RegisterAsync();
