@@ -92,6 +92,40 @@ public sealed class StoreBillingTests : IClassFixture<ApiFactory>
     }
 
     [Fact]
+    public async Task Sandbox_purchase_moves_to_the_login_that_confirms_it()
+    {
+        var first = await RegisterAsync();
+        var second = await RegisterAsync();
+        var original = $"orig-{Guid.NewGuid():N}";
+        _store.Receipt = new StoreReceipt(
+            "conora.individual.monthly", "tx-s1", original, DateTime.UtcNow.AddMinutes(5),
+            Entitled: true, InTrial: false, first.UserId, Sandbox: true);
+
+        var confirmFirst = await PostAsync(first, "/plan/store/confirm",
+            new { channel = 2, productId = "conora.individual.monthly", transactionId = "tx-s1" });
+        Assert.True(confirmFirst.IsSuccessStatusCode, await confirmFirst.Content.ReadAsStringAsync());
+
+        // Same Apple ID (and appAccountToken of the first login), now confirmed by another login.
+        var confirmSecond = await PostAsync(second, "/plan/store/confirm",
+            new { channel = 2, productId = "conora.individual.monthly", transactionId = "tx-s1" });
+        Assert.True(confirmSecond.IsSuccessStatusCode, await confirmSecond.Content.ReadAsStringAsync());
+
+        Assert.Equal("Subscribed", (await GetPlanAsync(second)).Phase);
+        Assert.NotEqual("Subscribed", (await GetPlanAsync(first)).Phase);
+
+        // Store notices now follow the new owner.
+        using (var scope = _factory.Services.CreateScope())
+        {
+            var billing = scope.ServiceProvider.GetRequiredService<IStoreSubscriptionBilling>();
+            await billing.ApplyNoticeAsync(new StoreNoticeCommand(
+                StoreBillingChannel.Apple,
+                "EXPIRED",
+                new StoreReceipt("conora.individual.monthly", "tx-s1", original, DateTime.UtcNow, Entitled: false, InTrial: false, AccountId: null, Sandbox: true)));
+        }
+        Assert.Equal("Expired", (await GetPlanAsync(second)).Phase);
+    }
+
+    [Fact]
     public async Task Unpaid_or_unknown_store_purchase_is_refused()
     {
         var user = await RegisterAsync();
