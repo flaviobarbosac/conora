@@ -68,7 +68,7 @@ public sealed class StoreBillingTests : IClassFixture<ApiFactory>
         Assert.True(confirm.IsSuccessStatusCode, await confirm.Content.ReadAsStringAsync());
         var plan = await confirm.Content.ReadFromJsonAsync<PlanDto>(JsonOptions);
         Assert.Equal("Subscribed", plan!.Phase);
-        Assert.Equal("Family", plan.Tier);
+        Assert.Equal("FamilyPlus", plan.Tier);
         Assert.False(plan.Yearly);
     }
 
