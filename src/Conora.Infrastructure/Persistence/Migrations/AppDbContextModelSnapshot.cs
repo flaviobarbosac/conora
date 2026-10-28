@@ -1748,6 +1748,88 @@ namespace Conora.Infrastructure.Persistence.Migrations
                     b.ToTable("users", (string)null);
                 });
 
+            modelBuilder.Entity("Conora.Domain.Entities.UserFeedback", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("Comentario")
+                        .IsRequired()
+                        .HasMaxLength(2000)
+                        .HasColumnType("character varying(2000)");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<DateTime?>("DeletedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<DateTime?>("LidoEm")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid?>("LidoPorUsuarioId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("LidoPorUsuarioNome")
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)");
+
+                    b.Property<string>("Modulo")
+                        .IsRequired()
+                        .HasMaxLength(80)
+                        .HasColumnType("character varying(80)");
+
+                    b.Property<int>("Nota")
+                        .HasColumnType("integer");
+
+                    b.Property<DateTime?>("RespondidoEm")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid?>("RespondidoPorUsuarioId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("RespondidoPorUsuarioNome")
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)");
+
+                    b.Property<string>("Resposta")
+                        .HasMaxLength(2000)
+                        .HasColumnType("character varying(2000)");
+
+                    b.Property<DateTime?>("RespostaLidaEm")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("Rota")
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)");
+
+                    b.Property<int>("Status")
+                        .HasColumnType("integer");
+
+                    b.Property<DateTime>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid>("UsuarioId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("UsuarioNome")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)");
+
+                    b.Property<long>("Version")
+                        .HasColumnType("bigint");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("Status");
+
+                    b.HasIndex("UsuarioId", "CreatedAt");
+
+                    b.ToTable("user_feedbacks", (string)null);
+                });
+
             modelBuilder.Entity("Conora.Domain.Entities.UserMilestone", b =>
                 {
                     b.Property<Guid>("Id")
@@ -2008,6 +2090,15 @@ namespace Conora.Infrastructure.Persistence.Migrations
                         .WithMany()
                         .HasForeignKey("ToUsuarioId")
                         .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("Conora.Domain.Entities.UserFeedback", b =>
+                {
+                    b.HasOne("Conora.Domain.Entities.User", null)
+                        .WithMany()
+                        .HasForeignKey("UsuarioId")
+                        .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
                 });
 #pragma warning restore 612, 618

@@ -25,6 +25,7 @@
 
   <ItemGroup>
     <ProjectReference Include="..\..\src\Conora.Domain\Conora.Domain.csproj" />
+    <ProjectReference Include="..\..\src\Conora.Repository\Conora.Repository.csproj" />
     <ProjectReference Include="..\..\src\Conora.Services\Conora.Services.csproj" />
   </ItemGroup>
 

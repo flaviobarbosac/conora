@@ -51,4 +51,3 @@ public sealed record PlanResponse(
     bool CoveredByFamily,
     IReadOnlyList<PlanOfferResponse> Offers);
 
-public sealed record FeedbackRequest(string Tried, string Blocked);
