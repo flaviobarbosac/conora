@@ -277,6 +277,7 @@ public sealed class EntryService
         await ValidateContributionDuplicateAsync(entry.Type, request.Amount, newYm, request.ConfirmDuplicate, entry.Id, ct);
 
         var previousCategoryId = entry.CategoryId;
+        var previousAccountId = entry.AccountId;
         await EntryLedger.ApplyAsync(_repo, entry, -1, ct);
         await ApplyProjectAsync(entry, -1, ct);
         await ApplyPatrimonyAsync(entry, -1, ct);
@@ -291,6 +292,13 @@ public sealed class EntryService
             && newCategoryId != previousCategoryId)
         {
             await TryRecordSupplierOverrideAsync(entry.Description, newCategoryId, ct);
+        }
+
+        if (entry.Type == EntryType.Expense
+            && request.AccountId is Guid newAccountId
+            && newAccountId != previousAccountId)
+        {
+            await TryRecordSupplierBankAccountAsync(entry.Description, newAccountId, ct);
         }
 
         AuditRecorder.Record(_audits, _correlation, "Entry", entry.Id, "EntryUpdated", new { entry.Type, entry.Amount, entry.CompetenceYm });
@@ -377,6 +385,31 @@ public sealed class EntryService
         if (category?.Code is null)
             return;
 
+        var supplier = await FindSupplierFromDescriptionAsync(description, ct);
+        if (supplier is null)
+            return;
+
+        await _suppliers.UpsertUserCategoryAsync(supplier.Id, userId.Value, category.Code, ct);
+    }
+
+    /// <summary>
+    /// When the person changes the bank account on an expense, remember it per user + supplier.
+    /// </summary>
+    private async Task TryRecordSupplierBankAccountAsync(string description, Guid accountId, CancellationToken ct)
+    {
+        var userId = _tenant.UsuarioId;
+        if (userId is null)
+            return;
+
+        var supplier = await FindSupplierFromDescriptionAsync(description, ct);
+        if (supplier is null)
+            return;
+
+        await _suppliers.UpsertUserBankAccountAsync(supplier.Id, userId.Value, accountId, ct);
+    }
+
+    private async Task<Supplier?> FindSupplierFromDescriptionAsync(string description, CancellationToken ct)
+    {
         Supplier? supplier = null;
         if (BrazilianCnpj.TryExtract(description, out var cnpj))
             supplier = await _suppliers.FindByCnpjAsync(cnpj, ct);
@@ -384,10 +417,7 @@ public sealed class EntryService
         if (supplier is null && !string.IsNullOrWhiteSpace(description))
             supplier = await _suppliers.FindByNormalizedNameAsync(Supplier.NormalizeName(description), ct);
 
-        if (supplier is null)
-            return;
-
-        await _suppliers.UpsertUserCategoryAsync(supplier.Id, userId.Value, category.Code, ct);
+        return supplier;
     }
 
     private async Task<Guid?> ResolveCategoryAsync(EntryType type, Guid? requested, CancellationToken ct)

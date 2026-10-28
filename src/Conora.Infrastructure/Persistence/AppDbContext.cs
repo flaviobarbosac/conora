@@ -23,6 +23,7 @@ public class AppDbContext : DbContext
     public DbSet<EmailSuppression> EmailSuppressions => Set<EmailSuppression>();
     public DbSet<Supplier> Suppliers => Set<Supplier>();
     public DbSet<SupplierUserCategory> SupplierUserCategories => Set<SupplierUserCategory>();
+    public DbSet<SupplierUserBankAccount> SupplierUserBankAccounts => Set<SupplierUserBankAccount>();
     // Finance domain (all tenant-owned)
     public DbSet<Category> Categories => Set<Category>();
     public DbSet<IncomeSource> IncomeSources => Set<IncomeSource>();

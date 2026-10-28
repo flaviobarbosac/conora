@@ -41,6 +41,26 @@ public sealed class EfSupplierStore : ISupplierStore
         row.SetCategoryCode(categoryCode);
     }
 
+    public async Task<Guid?> GetUserBankAccountIdAsync(Guid supplierId, Guid usuarioId, CancellationToken ct = default)
+    {
+        var row = await _db.Set<SupplierUserBankAccount>()
+            .FirstOrDefaultAsync(r => r.SupplierId == supplierId && r.UsuarioId == usuarioId, ct);
+        return row?.AccountId;
+    }
+
+    public async Task UpsertUserBankAccountAsync(Guid supplierId, Guid usuarioId, Guid accountId, CancellationToken ct = default)
+    {
+        var row = await _db.Set<SupplierUserBankAccount>()
+            .FirstOrDefaultAsync(r => r.SupplierId == supplierId && r.UsuarioId == usuarioId, ct);
+        if (row is null)
+        {
+            _db.Set<SupplierUserBankAccount>().Add(SupplierUserBankAccount.Create(supplierId, usuarioId, accountId));
+            return;
+        }
+
+        row.SetAccountId(accountId);
+    }
+
     public async Task<IReadOnlyList<Supplier>> FindSimilarByCnpjAsync(string cnpjDigits, int take, CancellationToken ct = default)
     {
         if (string.IsNullOrWhiteSpace(cnpjDigits) || cnpjDigits.Length < 8)
