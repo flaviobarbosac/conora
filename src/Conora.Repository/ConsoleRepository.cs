@@ -507,6 +507,81 @@ public sealed class ConsoleRepository : IConsoleRepository
         return date.AddDays(-diff);
     }
 
+    public async Task<IReadOnlyList<JourneyAbandonmentReadModel>> ListJourneyAbandonmentAsync(CancellationToken ct)
+    {
+        var since = DateTime.UtcNow.AddDays(-30);
+        var events = await _db.AuditEvents.IgnoreQueryFilters().AsNoTracking()
+            .Where(e => e.DeletedAt == null && e.EntityName == "Journey" && e.TimestampUtc >= since)
+            .OrderBy(e => e.TimestampUtc)
+            .Select(e => new { e.UsuarioId, e.Action, e.TimestampUtc, e.DetailsJson })
+            .ToListAsync(ct);
+
+        var byUser = events.GroupBy(e => e.UsuarioId).ToList();
+        if (byUser.Count == 0)
+            return [];
+
+        var userIds = byUser.Select(g => g.Key).ToList();
+        var users = await _db.Users.IgnoreQueryFilters().AsNoTracking()
+            .Where(u => userIds.Contains(u.Id))
+            .Select(u => new { u.Id, u.Email, u.Name, u.OnboardingCompleted })
+            .ToListAsync(ct);
+        var userMap = users.ToDictionary(u => u.Id);
+
+        var withEntry = await _db.Entries.IgnoreQueryFilters().AsNoTracking()
+            .Where(e => userIds.Contains(e.UsuarioId) && e.DeletedAt == null)
+            .Select(e => e.UsuarioId)
+            .Distinct()
+            .ToListAsync(ct);
+        var entrySet = withEntry.ToHashSet();
+
+        var rows = new List<JourneyAbandonmentReadModel>(byUser.Count);
+        foreach (var group in byUser)
+        {
+            if (!userMap.TryGetValue(group.Key, out var user))
+                continue;
+            var ordered = group.OrderBy(e => e.TimestampUtc).ToList();
+            var trail = new List<string>();
+            foreach (var item in ordered)
+            {
+                var path = PathFromDetails(item.DetailsJson);
+                if (!string.IsNullOrWhiteSpace(path) && (trail.Count == 0 || trail[^1] != path))
+                    trail.Add(path);
+                if (trail.Count >= 40)
+                    break;
+            }
+            var firstLogin = ordered.FirstOrDefault(e =>
+                e.Action.Equals("Login", StringComparison.OrdinalIgnoreCase)
+                || e.Action.Equals("Register", StringComparison.OrdinalIgnoreCase));
+            rows.Add(new JourneyAbandonmentReadModel(
+                user.Id,
+                user.Email,
+                user.Name,
+                firstLogin?.TimestampUtc ?? ordered.First().TimestampUtc,
+                ordered.Last().TimestampUtc,
+                trail.FirstOrDefault(),
+                trail.LastOrDefault(),
+                entrySet.Contains(user.Id),
+                user.OnboardingCompleted,
+                trail));
+        }
+
+        return rows.OrderByDescending(r => r.LastSeenAt).Take(200).ToList();
+    }
+
+    private static string? PathFromDetails(string detailsJson)
+    {
+        try
+        {
+            using var doc = System.Text.Json.JsonDocument.Parse(detailsJson);
+            if (doc.RootElement.TryGetProperty("path", out var path))
+                return path.GetString();
+        }
+        catch (System.Text.Json.JsonException)
+        {
+        }
+        return null;
+    }
+
     private sealed record UserRow(Guid Id, DateTime CreatedAt, bool OnboardingCompleted, int ReserveTargetMonths);
     private sealed record MonthRow(Guid UsuarioId, string CompetenceYm);
     private sealed record ProjectRow(Guid UsuarioId, Guid? CategoryId, decimal AccumulatedAmount);

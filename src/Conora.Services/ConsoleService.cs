@@ -64,6 +64,22 @@ public sealed class ConsoleService
         _console = console;
     }
 
+    public async Task<IReadOnlyList<JourneyAbandonmentRow>> ListAbandonmentAsync(CancellationToken ct)
+    {
+        var rows = await _console.ListJourneyAbandonmentAsync(ct);
+        return rows.Select(r => new JourneyAbandonmentRow(
+            r.UsuarioId,
+            r.Email,
+            r.Name,
+            r.FirstLoginAt,
+            r.LastSeenAt,
+            r.FirstPath,
+            r.LastPath,
+            r.HasEntry,
+            r.OnboardingCompleted,
+            r.PathTrail)).ToList();
+    }
+
     public async Task<ConsoleKpisResponse> GetAsync(CancellationToken ct)
     {
         var data = await _console.ReadAsync(ct);

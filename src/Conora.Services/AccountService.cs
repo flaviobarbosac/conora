@@ -46,6 +46,14 @@ public sealed class AccountService
     public async Task<AccountResponse> CreateAsync(CreateAccountRequest request, CancellationToken ct)
     {
         await _plan.EnsureWritableAsync(ct);
+        if (!await _plan.HasFullAccessAsync(ct))
+        {
+            var active = await _repo.CountAsync<Account>(a => !a.IsArchived, ct);
+            if (active >= FreeTierLimits.MaxBankAccounts)
+                throw new ValidationException(
+                    "name",
+                    "No Conora grátis você cadastra só uma conta, usada nos lançamentos. Assine para incluir mais contas.");
+        }
         var account = Account.Create(
             request.Name,
             request.Kind,

@@ -5,7 +5,10 @@ namespace Conora.Domain.Services;
 
 public sealed record AccessState(AccessPhase Phase, DateTime TrialEndsAt, DateTime BlockAt)
 {
-    public bool IsWritable => Phase is AccessPhase.Trial or AccessPhase.Subscribed;
+    /// <summary>
+    /// Free tier (grace / expired) still writes limited data; blocked is plans-only.
+    /// </summary>
+    public bool IsWritable => Phase is AccessPhase.Trial or AccessPhase.Subscribed or AccessPhase.Grace or AccessPhase.Expired;
     public bool IsBlocked => Phase == AccessPhase.Blocked;
 }
 
@@ -58,9 +61,8 @@ public static class AccessPolicy
 
         if (now < trialEnds)
             return new AccessState(AccessPhase.Trial, trialEnds, blockAt);
-        if (now < blockAt)
-            return new AccessState(AccessPhase.Grace, trialEnds, blockAt);
-        return new AccessState(AccessPhase.Blocked, trialEnds, blockAt);
+        // After trial without a plan the product stays on free-tier limits (not app-wide read-only / blocked).
+        return new AccessState(AccessPhase.Expired, trialEnds, blockAt);
     }
 
     /// <summary>Whole days left until <paramref name="until"/> (rounded up, never negative).</summary>

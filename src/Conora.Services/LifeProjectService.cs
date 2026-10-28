@@ -70,7 +70,7 @@ public sealed class LifeProjectService
 
     public async Task<LifeProjectResponse> CreateAsync(LifeProjectRequest request, CancellationToken ct)
     {
-        await _plan.EnsureWritableAsync(ct);
+        await _plan.EnsureFullAccessAsync(ct);
         if (request.Scope == LifeProjectScope.Group)
         {
             var peers = await _family.GetReadableUsuarioIdsAsync(ct);
@@ -96,7 +96,7 @@ public sealed class LifeProjectService
 
     public async Task<LifeProjectResponse> UpdateAsync(Guid id, LifeProjectRequest request, CancellationToken ct)
     {
-        await _plan.EnsureWritableAsync(ct);
+        await _plan.EnsureFullAccessAsync(ct);
         var self = _tenant.UsuarioId ?? throw new ForbiddenException("Usuário não autenticado.");
         var project = await _repo.FirstOrDefaultAsync<LifeProject>(p => p.Id == id, ct)
                       ?? throw new NotFoundException("Projeto de vida", id);
@@ -134,7 +134,7 @@ public sealed class LifeProjectService
 
     public async Task DeleteAsync(Guid id, CancellationToken ct)
     {
-        await _plan.EnsureWritableAsync(ct);
+        await _plan.EnsureFullAccessAsync(ct);
         var self = _tenant.UsuarioId ?? throw new ForbiddenException("Usuário não autenticado.");
         var project = await _repo.FirstOrDefaultAsync<LifeProject>(p => p.Id == id, ct)
                       ?? throw new NotFoundException("Projeto de vida", id);

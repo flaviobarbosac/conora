@@ -13,31 +13,30 @@ public class PlanAccessTests
     [Theory]
     [InlineData(0, AccessPhase.Trial)]
     [InlineData(89, AccessPhase.Trial)]
-    [InlineData(90, AccessPhase.Grace)]
-    [InlineData(99, AccessPhase.Grace)]
-    [InlineData(100, AccessPhase.Blocked)]
-    [InlineData(150, AccessPhase.Blocked)]
-    public void Student_trial_lifecycle_without_plan(int days, AccessPhase expected)
+    [InlineData(90, AccessPhase.Expired)]
+    [InlineData(99, AccessPhase.Expired)]
+    [InlineData(100, AccessPhase.Expired)]
+    [InlineData(150, AccessPhase.Expired)]
+    public void Student_trial_then_free_tier_without_plan(int days, AccessPhase expected)
     {
         var state = AccessPolicy.Evaluate(Created, null, Created.AddDays(days), isTrainingStudent: true);
 
         Assert.Equal(expected, state.Phase);
-        Assert.Equal(expected == AccessPhase.Trial, state.IsWritable);
+        Assert.True(state.IsWritable);
     }
 
     [Theory]
     [InlineData(0, AccessPhase.Trial)]
     [InlineData(29, AccessPhase.Trial)]
-    [InlineData(30, AccessPhase.Grace)]
-    [InlineData(39, AccessPhase.Grace)]
-    [InlineData(40, AccessPhase.Blocked)]
-    public void Standard_trial_is_30_days_then_10_grace(int days, AccessPhase expected)
+    [InlineData(30, AccessPhase.Expired)]
+    [InlineData(40, AccessPhase.Expired)]
+    public void Standard_trial_is_30_days_then_free_tier(int days, AccessPhase expected)
     {
         var state = AccessPolicy.Evaluate(Created, null, Created.AddDays(days), isTrainingStudent: false);
 
         Assert.Equal(expected, state.Phase);
         Assert.Equal(Created.AddDays(30), state.TrialEndsAt);
-        Assert.Equal(Created.AddDays(40), state.BlockAt);
+        Assert.True(state.IsWritable);
     }
 
     [Fact]
@@ -51,14 +50,27 @@ public class PlanAccessTests
     }
 
     [Fact]
-    public void Active_plan_overrides_trial_age_and_expired_plan_is_read_only()
+    public void Active_plan_overrides_trial_age_and_expired_plan_stays_writable_free_tier()
     {
         var now = Created.AddDays(200);
         var active = WorkspaceSubscription.Activate(PlanKind.FamilyMonthly, now.AddDays(-5));
         var expired = WorkspaceSubscription.Activate(PlanKind.IndividualMonthly, now.AddMonths(-2));
 
         Assert.Equal(AccessPhase.Subscribed, AccessPolicy.Evaluate(Created, active, now).Phase);
-        Assert.Equal(AccessPhase.Expired, AccessPolicy.Evaluate(Created, expired, now).Phase);
+        var expiredState = AccessPolicy.Evaluate(Created, expired, now);
+        Assert.Equal(AccessPhase.Expired, expiredState.Phase);
+        Assert.True(expiredState.IsWritable);
+    }
+
+    [Fact]
+    public void Free_tier_allows_four_starter_categories()
+    {
+        Assert.True(FreeTierLimits.AllowsCategoryCode("ESS_RENT"));
+        Assert.True(FreeTierLimits.AllowsCategoryCode("ESS_POWER"));
+        Assert.True(FreeTierLimits.AllowsCategoryCode("ESS_WATER"));
+        Assert.True(FreeTierLimits.AllowsCategoryCode("ESS_SCHOOL"));
+        Assert.False(FreeTierLimits.AllowsCategoryCode("ESS_CONDO"));
+        Assert.Equal(1, FreeTierLimits.MaxBankAccounts);
     }
 
     [Theory]

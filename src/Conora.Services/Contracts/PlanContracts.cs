@@ -49,5 +49,8 @@ public sealed record PlanResponse(
     DateTime BlockAt,
     int DaysLeft,
     bool CoveredByFamily,
-    IReadOnlyList<PlanOfferResponse> Offers);
+    IReadOnlyList<PlanOfferResponse> Offers,
+    bool IsTrainingStudent,
+    bool HasFullAccess,
+    bool EverSubscribed);
 
