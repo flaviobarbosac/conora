@@ -209,8 +209,7 @@ public sealed class FamilyGroupService
             errors["cep"] = ["Informe o CEP."];
         if (!await _repo.AnyAsync<Account>(a => !a.IsArchived, ct))
             errors["account"] = ["Cadastre ao menos uma conta bancária."];
-        if (!await _repo.AnyAsync<CreditCard>(_ => true, ct))
-            errors["card"] = ["Cadastre ao menos um cartão de crédito."];
+        // Credit card is optional on onboard (available later under Contas).
         if (errors.Count > 0)
             throw new ValidationException(errors);
 
