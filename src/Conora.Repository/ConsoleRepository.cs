@@ -339,14 +339,19 @@ public sealed class ConsoleRepository : IConsoleRepository
         var audits = await _db.AuditEvents.IgnoreQueryFilters().AsNoTracking()
             .Where(a => a.DeletedAt == null
                         && a.TimestampUtc >= since
-                        && (a.EntityName == "Ian" || a.EntityName == "Gemini" || a.EntityName == "UserFeedback"))
+                        && (a.EntityName == "Ian" || a.EntityName == "Gemini"))
             .Select(a => new AuditHit(a.UsuarioId, a.TimestampUtc, a.EntityName))
             .ToListAsync(ct);
         foreach (var row in audits.Where(row => active.Contains(row.UsuarioId)))
-        {
-            var key = row.EntityName == "UserFeedback" ? "feedback" : "ian";
-            hits.Add(new Hit(key, row.UsuarioId, row.At));
-        }
+            hits.Add(new Hit("ian", row.UsuarioId, row.At));
+
+        hits.AddRange(await FeatureAsync(
+            "feedback",
+            _db.UserFeedbacks.IgnoreQueryFilters().AsNoTracking()
+                .Where(f => f.DeletedAt == null && f.CreatedAt >= since)
+                .Select(f => new WhenRow(f.UsuarioId, f.CreatedAt)),
+            active,
+            ct));
 
         return hits;
     }

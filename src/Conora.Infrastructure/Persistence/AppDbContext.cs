@@ -51,6 +51,7 @@ public class AppDbContext : DbContext
     public DbSet<WhatsAppDraft> WhatsAppDrafts => Set<WhatsAppDraft>();
     public DbSet<ReceiptIntake> ReceiptIntakes => Set<ReceiptIntake>();
     public DbSet<HotmartCoursePurchase> HotmartCoursePurchases => Set<HotmartCoursePurchase>();
+    public DbSet<UserFeedback> UserFeedbacks => Set<UserFeedback>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -82,6 +83,7 @@ public class AppDbContext : DbContext
         TenantFilter<WhatsAppLink>(modelBuilder);
         TenantFilter<WhatsAppDraft>(modelBuilder);
         TenantFilter<ReceiptIntake>(modelBuilder);
+        TenantFilter<UserFeedback>(modelBuilder);
     }
 
     public override async Task<int> SaveChangesAsync(CancellationToken cancellationToken = default)

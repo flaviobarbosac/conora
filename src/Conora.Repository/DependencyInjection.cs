@@ -15,6 +15,7 @@ public static class DependencyInjection
         services.AddScoped<ILgpdRequestRepository, LgpdRequestRepository>();
         services.AddScoped<IFinanceRepository, FinanceRepository>();
         services.AddScoped<IFamilyGroupRepository, FamilyGroupRepository>();
+        services.AddScoped<IUserFeedbackRepository, UserFeedbackRepository>();
         return services;
     }
 }
