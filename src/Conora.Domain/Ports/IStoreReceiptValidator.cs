@@ -5,6 +5,7 @@ namespace Conora.Domain.Ports;
 /// <see cref="SubscriptionId"/> is the stable key across renewals: Apple originalTransactionId,
 /// Google purchase token. <see cref="Entitled"/> is true while the store grants access
 /// (paid, intro offer or billing grace period) and <see cref="ExpiresAt"/> has not passed.
+/// <see cref="Sandbox"/> marks test purchases: App Store sandbox (TestFlight, App Review) or Google Play license testers.
 /// </summary>
 public sealed record StoreReceipt(
     string ProductId,
@@ -13,7 +14,8 @@ public sealed record StoreReceipt(
     DateTime? ExpiresAt,
     bool Entitled,
     bool InTrial,
-    Guid? AccountId);
+    Guid? AccountId,
+    bool Sandbox = false);
 
 /// <summary>Confirms Play / App Store purchases against the store APIs. Missing credentials fail closed.</summary>
 public interface IStoreReceiptValidator

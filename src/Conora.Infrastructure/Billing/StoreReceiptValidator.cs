@@ -108,7 +108,9 @@ public sealed class StoreReceiptValidator : IStoreReceiptValidator
             or "SUBSCRIPTION_STATE_CANCELED";
         var entitled = grantsAccess && expiresAt is DateTime until && until > now;
         var transactionId = string.IsNullOrWhiteSpace(orderId) ? purchaseToken : orderId;
-        return new StoreReceipt(productId, transactionId, purchaseToken, expiresAt, entitled, fromOffer, GoogleAccountId(root));
+        // License-tester purchases carry a testPurchase object.
+        var test = root.TryGetProperty("testPurchase", out _);
+        return new StoreReceipt(productId, transactionId, purchaseToken, expiresAt, entitled, fromOffer, GoogleAccountId(root), test);
     }
 
     private static bool IsAcknowledgementPending(JsonElement root) =>
@@ -236,8 +238,9 @@ public sealed class StoreReceiptValidator : IStoreReceiptValidator
         var inTrial = payload.TryGetProperty("offerType", out var offerEl) && offerEl.TryGetInt32(out var offer) && offer == 1;
         Guid? accountId = Guid.TryParse(GetString(payload, "appAccountToken"), out var parsed) ? parsed : null;
         var entitled = !revoked && expiresAt is DateTime until && until > now;
+        var sandbox = string.Equals(GetString(payload, "environment"), "Sandbox", StringComparison.OrdinalIgnoreCase);
         return new StoreReceipt(productId, transactionId, originalId, revoked ? GetMillis(payload, "revocationDate") : expiresAt,
-            entitled, inTrial, accountId);
+            entitled, inTrial, accountId, sandbox);
     }
 
     private static string? AppleEnvironment(JsonDocument? payload) =>

@@ -75,7 +75,9 @@ public sealed class StoreSubscriptionBilling : IStoreSubscriptionBilling
             _logger.LogInformation(
                 "Store returned product {StoreProductId} for requested {RequestedProductId} user={UserId}",
                 receipt.ProductId, command.ProductId, command.UsuarioId);
-        if (receipt.AccountId.HasValue && receipt.AccountId.Value != command.UsuarioId)
+        // Real purchases stay bound to the first login. Test purchases (TestFlight, App Review, license
+        // testers) share one store account across many logins, so they move to whoever confirms last.
+        if (!receipt.Sandbox && receipt.AccountId.HasValue && receipt.AccountId.Value != command.UsuarioId)
             throw new ValidationException("store", "Esta compra está presa a outro login.");
         if (!TryMapProduct(receipt.ProductId, out var plan))
             throw new ValidationException("productId", "Produto da loja não reconhecido.");
@@ -85,7 +87,14 @@ public sealed class StoreSubscriptionBilling : IStoreSubscriptionBilling
         var storeLabel = StoreLabel(command.Channel);
         var linked = await _users.FindSubscriptionByStoreIdAsync(storeLabel, receipt.SubscriptionId, ct);
         if (linked is not null && linked.UsuarioId != command.UsuarioId)
-            throw new ValidationException("store", "Esta compra está presa a outro login.");
+        {
+            if (!receipt.Sandbox)
+                throw new ValidationException("store", "Esta compra está presa a outro login.");
+            await _users.ReleaseStoreSubscriptionAsync(linked.UsuarioId, storeLabel, receipt.SubscriptionId, DateTime.UtcNow, ct);
+            _logger.LogInformation(
+                "Sandbox store subscription moved from user={PreviousUserId} to user={UserId} channel={Channel}",
+                linked.UsuarioId, command.UsuarioId, command.Channel);
+        }
 
         await _plans.ApplyStoreConfirmationAsync(ToConfirmation(command.UsuarioId, plan, storeLabel, receipt), ct);
         _logger.LogInformation(

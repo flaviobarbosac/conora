@@ -42,6 +42,22 @@ public class StoreReceiptParsingTests
         Assert.Equal("token-abc", receipt.SubscriptionId);
         Assert.Equal(User, receipt.AccountId);
         Assert.Equal(DateTime.Parse(expiry).ToUniversalTime(), receipt.ExpiresAt);
+        Assert.False(receipt.Sandbox);
+    }
+
+    [Fact]
+    public void Google_license_tester_purchase_is_sandbox()
+    {
+        using var doc = JsonDocument.Parse("""
+            {
+              "subscriptionState": "SUBSCRIPTION_STATE_ACTIVE",
+              "latestOrderId": "GPA.1234",
+              "testPurchase": {},
+              "lineItems": [ { "productId": "conora.duo.yearly", "expiryTime": "2026-11-23T12:00:00Z" } ]
+            }
+            """);
+
+        Assert.True(StoreReceiptValidator.ReadGoogleSubscription(doc.RootElement, "token-abc", null, Now).Sandbox);
     }
 
     [Fact]
@@ -55,6 +71,7 @@ public class StoreReceiptParsingTests
         Assert.Equal("2000000002", receipt.TransactionId);
         Assert.Equal("2000000001", receipt.SubscriptionId);
         Assert.Equal(User, receipt.AccountId);
+        Assert.True(receipt.Sandbox);
     }
 
     [Fact]
