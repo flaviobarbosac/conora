@@ -52,5 +52,7 @@ public sealed record PlanResponse(
     IReadOnlyList<PlanOfferResponse> Offers,
     bool IsTrainingStudent,
     bool HasFullAccess,
-    bool EverSubscribed);
+    bool EverSubscribed,
+    /// <summary>Commercial label from PlanKind, e.g. "Individual mensal". Null when not subscribed.</summary>
+    string? PlanLabel = null);
 

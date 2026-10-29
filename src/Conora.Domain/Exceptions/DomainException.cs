@@ -62,6 +62,24 @@ public sealed class InvalidCredentialsException : DomainException
     }
 }
 
+/// <summary>Login attempted with an identity that has no Conora account yet.</summary>
+public sealed class AccountNotFoundException : DomainException
+{
+    public AccountNotFoundException()
+        : base("Não encontramos uma conta com este acesso. Crie uma conta para continuar.")
+    {
+    }
+}
+
+/// <summary>Register attempted with Google/Apple that already has a Conora account.</summary>
+public sealed class SocialAccountExistsException : DomainException
+{
+    public SocialAccountExistsException(string provider)
+        : base($"Já existe uma conta Conora com este {provider}. Use a tela Entrar.")
+    {
+    }
+}
+
 public sealed class InvalidTokenException : DomainException
 {
     public InvalidTokenException() : base("Token inválido ou expirado.")

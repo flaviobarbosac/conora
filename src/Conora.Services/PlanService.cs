@@ -275,9 +275,10 @@ public sealed class PlanService
             .ToList();
 
         var full = HasFullAccess(access);
+        var planLabel = sub is null ? null : PlanCatalog.DisplayLabel(sub.Plan);
         return new PlanResponse(
             sub?.Plan,
-            sub?.Tier,
+            sub is null ? null : PlanCatalog.TierOf(sub.Plan),
             sub is not null && PlanCatalog.IsYearly(sub.Plan),
             sub?.EffectiveStatus(now) ?? SubscriptionStatus.Active,
             sub?.ExpiresAt,
@@ -291,7 +292,8 @@ public sealed class PlanService
             offers,
             access.IsTrainingStudent,
             full,
-            access.EverSubscribed);
+            access.EverSubscribed,
+            planLabel);
     }
 }
 

@@ -449,6 +449,7 @@ public sealed class ReceiptIntakeService
 
     public async Task<IReadOnlyList<CategoryResponse>> ListClassifiableCategoriesAsync(CancellationToken ct)
     {
+        // ListAsync already hides paid categories on the free tier.
         var all = await _categories.ListAsync(null, false, true, ct);
         return all
             .Where(c => c.AcceptsPosting

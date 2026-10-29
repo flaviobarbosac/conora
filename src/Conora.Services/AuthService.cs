@@ -93,7 +93,7 @@ public sealed class AuthService
     {
         var user = await FindByLoginIdentifierAsync(request.Usuario ?? request.Email, ct);
         if (user is null)
-            throw new InvalidCredentialsException();
+            throw new AccountNotFoundException();
 
         if (string.IsNullOrEmpty(user.PasswordHash))
         {
@@ -113,18 +113,22 @@ public sealed class AuthService
     public async Task<AuthResponse> GoogleAsync(GoogleLoginRequest request, CancellationToken ct)
     {
         var identity = await _google.ValidateAsync(request.IdToken, ct);
-        var user = await _users.FindByGoogleIdAsync(identity.GoogleId, ct)
-                   ?? await _users.FindByEmailAsync(identity.Email, ct);
+        // Provider id only — never merge with an e-mail/password or Apple account.
+        var user = await _users.FindByGoogleIdAsync(identity.GoogleId, ct);
+        var register = IsRegisterIntent(request.Intent);
 
-        if (user is null)
+        if (register)
         {
+            if (user is not null)
+                throw new SocialAccountExistsException("Google");
+
             user = User.Create(identity.Name, identity.Email);
             user.SetGoogleId(identity.GoogleId);
             return await IssueForNewUserAsync(user, "UserGoogleRegistered", ct);
         }
 
-        if (string.IsNullOrEmpty(user.GoogleId))
-            user.SetGoogleId(identity.GoogleId);
+        if (user is null)
+            throw new AccountNotFoundException();
 
         return await IssueForExistingUserAsync(user, "UserGoogleLoggedIn", ct);
     }
@@ -139,11 +143,15 @@ public sealed class AuthService
         if (!string.IsNullOrWhiteSpace(identity.Email) && !identity.EmailVerified)
             throw new InvalidTokenException();
 
-        var user = await _users.FindByAppleIdAsync(identity.AppleId, ct)
-                   ?? (string.IsNullOrWhiteSpace(email) ? null : await _users.FindByEmailAsync(email, ct));
+        // Provider id only — Google + Apple with different ids are separate Conora users.
+        var user = await _users.FindByAppleIdAsync(identity.AppleId, ct);
+        var register = IsRegisterIntent(request.Intent);
 
-        if (user is null)
+        if (register)
         {
+            if (user is not null)
+                throw new SocialAccountExistsException("Apple");
+
             if (string.IsNullOrWhiteSpace(email))
                 throw new ValidationException("email", "Não foi possível obter o e-mail da Apple. Autorize o compartilhamento de e-mail.");
 
@@ -153,11 +161,14 @@ public sealed class AuthService
             return await IssueForNewUserAsync(user, "UserAppleRegistered", ct);
         }
 
-        if (string.IsNullOrEmpty(user.AppleId))
-            user.SetAppleId(identity.AppleId);
+        if (user is null)
+            throw new AccountNotFoundException();
 
         return await IssueForExistingUserAsync(user, "UserAppleLoggedIn", ct);
     }
+
+    private static bool IsRegisterIntent(string? intent)
+        => string.Equals(intent?.Trim(), "register", StringComparison.OrdinalIgnoreCase);
 
     public async Task<AuthResponse> RefreshAsync(RefreshRequest request, CancellationToken ct)
     {
@@ -348,6 +359,14 @@ public sealed class AuthService
         catch (UniqueConstraintViolationException ex) when (ex.ConstraintName.Contains("Cpf", StringComparison.OrdinalIgnoreCase))
         {
             throw new DuplicateCpfException();
+        }
+        catch (UniqueConstraintViolationException ex) when (ex.ConstraintName.Contains("GoogleId", StringComparison.OrdinalIgnoreCase))
+        {
+            throw new SocialAccountExistsException("Google");
+        }
+        catch (UniqueConstraintViolationException ex) when (ex.ConstraintName.Contains("AppleId", StringComparison.OrdinalIgnoreCase))
+        {
+            throw new SocialAccountExistsException("Apple");
         }
     }
 

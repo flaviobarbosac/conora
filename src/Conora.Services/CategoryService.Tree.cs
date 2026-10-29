@@ -26,6 +26,10 @@ public sealed partial class CategoryService
                  && (includePending || !c.IsPendingReview),
             ct);
 
+        // Free tier: only unlocked analytical leaves (+ pending when requested) and their ancestors.
+        if (!await _plan.HasFullAccessAsync(ct))
+            items = FilterFreeTierVisible(items, includePending);
+
         var names = await CreatorNamesAsync(items, ct);
         var self = _tenant.UsuarioId;
         return items
@@ -34,6 +38,33 @@ public sealed partial class CategoryService
             .ThenBy(c => c.Name, NameComparer)
             .Select(c => ToResponse(c, CreatorName(c, self, names)))
             .ToList();
+    }
+
+    /// <summary>
+    /// Keeps free-tier analytical codes (and optional pending customs) plus ancestor groups/roots.
+    /// </summary>
+    internal static List<Category> FilterFreeTierVisible(IReadOnlyList<Category> items, bool includePending)
+    {
+        var byId = items.ToDictionary(c => c.Id);
+        var keep = new HashSet<Guid>();
+        foreach (var account in items)
+        {
+            var unlocked = FreeTierLimits.AllowsCategoryCode(account.Code);
+            var pending = includePending && account.IsPendingReview;
+            if (!unlocked && !pending)
+                continue;
+
+            Category? current = account;
+            while (current is not null)
+            {
+                keep.Add(current.Id);
+                current = current.ParentId is Guid parentId && byId.TryGetValue(parentId, out var parent)
+                    ? parent
+                    : null;
+            }
+        }
+
+        return items.Where(c => keep.Contains(c.Id)).ToList();
     }
 
     public async Task<Category> RequireAnalyticalAsync(Guid id, CancellationToken ct)
