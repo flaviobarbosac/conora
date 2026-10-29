@@ -29,14 +29,14 @@ public sealed class SmtpEmailSender : IEmailSender
         if (await _suppressions.IsSuppressedAsync(to, ct))
         {
             _logger.LogWarning("E-mail bloqueado (supressão/opt-out). To={To} Subject={Subject}", to, subject);
-            return;
+            throw new InvalidOperationException($"E-mail bloqueado por supressão/opt-out: {to}");
         }
 
         var host = _configuration["Email:SmtpHost"];
         if (string.IsNullOrWhiteSpace(host))
         {
-            _logger.LogInformation("E-mail não enviado (SMTP ausente). To={To} Subject={Subject}", to, subject);
-            return;
+            _logger.LogWarning("E-mail não enviado (SMTP ausente). To={To} Subject={Subject}", to, subject);
+            throw new InvalidOperationException("SMTP não configurado; e-mail não foi enviado.");
         }
 
         var port = int.TryParse(_configuration["Email:SmtpPort"], out var parsed) ? parsed : 587;
