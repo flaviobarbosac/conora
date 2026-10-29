@@ -17,6 +17,8 @@ namespace Conora.Services;
 public sealed class AuthService
 {
     private static readonly TimeSpan EmailVerificationTtl = TimeSpan.FromDays(2);
+    private static readonly TimeSpan PasswordResetTokenTtl = TimeSpan.FromMinutes(30);
+    private static readonly TimeSpan PasswordResetCooldownDown = TimeSpan.FromMinutes(15);
 
     private readonly IUserRepository _users;
     private readonly IRefreshTokenRepository _refreshTokens;
@@ -200,10 +202,36 @@ public sealed class AuthService
         if (user is null)
             return;
 
+        // Cooldown per account/e-mail: refuse a new send while a recent token window is still warm.
+        if (user.PasswordResetExpiresAtUtc is DateTime expiresAt)
+        {
+            var issuedAt = expiresAt - PasswordResetTokenTtl;
+            if (DateTime.UtcNow - issuedAt < PasswordResetCooldownDown)
+            {
+                AuditRecorder.Record(
+                    _audits,
+                    _correlation,
+                    "User",
+                    user.Id,
+                    "PasswordResetThrottled",
+                    new { user.Email, ip = _correlation.ClientIp });
+                await _uow.SaveChangesAsync(ct);
+                throw new ValidationException(
+                    "usuario",
+                    "Já enviamos um link há pouco. Aguarde alguns minutos antes de pedir outro.");
+            }
+        }
+
         var token = Convert.ToHexString(RandomNumberGenerator.GetBytes(32));
-        user.IssuePasswordReset(_tokens.HashRefreshToken(token), DateTime.UtcNow.AddMinutes(30));
+        user.IssuePasswordReset(_tokens.HashRefreshToken(token), DateTime.UtcNow.Add(PasswordResetTokenTtl));
         _tenant.Set(user.Id);
-        AuditRecorder.Record(_audits, _correlation, "User", user.Id, "PasswordResetRequested", new { user.Email });
+        AuditRecorder.Record(
+            _audits,
+            _correlation,
+            "User",
+            user.Id,
+            "PasswordResetRequested",
+            new { user.Email, ip = _correlation.ClientIp });
         await _uow.SaveChangesAsync(ct);
 
         var link = AuthLink("redefinir-senha", token);

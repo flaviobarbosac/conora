@@ -1,5 +1,6 @@
-﻿using Conora.Domain.Ports;
+using Conora.Domain.Ports;
 using Conora.Services.Billing;
+using Conora.Services.CategoryAccess;
 using Microsoft.Extensions.DependencyInjection;
 
 namespace Conora.Services;
@@ -21,6 +22,7 @@ public static class DependencyInjection
         services.AddScoped<IStoreSubscriptionBilling, StoreSubscriptionBilling>();
         services.AddScoped<MonthService>();
         services.AddScoped<CategoryService>();
+        services.AddSingleton<ICategoryAccessPolicyFactory, CategoryAccessPolicyFactory>();
         services.AddScoped<MemberService>();
         services.AddScoped<FamilyGroupService>();
         services.AddScoped<EntryService>();

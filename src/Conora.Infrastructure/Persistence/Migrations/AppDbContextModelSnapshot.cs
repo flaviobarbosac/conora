@@ -1142,6 +1142,20 @@ namespace Conora.Infrastructure.Persistence.Migrations
                     b.Property<DateTime?>("DeletedAt")
                         .HasColumnType("timestamp with time zone");
 
+                    b.Property<DateTime?>("DownloadConsumedAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("DownloadTokenHash")
+                        .HasMaxLength(128)
+                        .HasColumnType("character varying(128)");
+
+                    b.Property<DateTime?>("ExpiresAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("ExportObjectKey")
+                        .HasMaxLength(260)
+                        .HasColumnType("character varying(260)");
+
                     b.Property<string>("Kind")
                         .IsRequired()
                         .HasMaxLength(40)
@@ -1160,6 +1174,10 @@ namespace Conora.Infrastructure.Persistence.Migrations
                         .HasColumnType("bigint");
 
                     b.HasKey("Id");
+
+                    b.HasIndex("DownloadTokenHash")
+                        .IsUnique()
+                        .HasFilter("\"DownloadTokenHash\" IS NOT NULL");
 
                     b.HasIndex("UsuarioId", "Kind", "RequestedAtUtc");
 

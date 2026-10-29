@@ -63,13 +63,15 @@ public class PlanAccessTests
     }
 
     [Fact]
-    public void Free_tier_allows_four_starter_categories()
+    public void Free_tier_allows_starter_categories_including_salary()
     {
         Assert.True(FreeTierLimits.AllowsCategoryCode("ESS_RENT"));
         Assert.True(FreeTierLimits.AllowsCategoryCode("ESS_POWER"));
         Assert.True(FreeTierLimits.AllowsCategoryCode("ESS_WATER"));
         Assert.True(FreeTierLimits.AllowsCategoryCode("ESS_SCHOOL"));
+        Assert.True(FreeTierLimits.AllowsCategoryCode("INC_SALARY"));
         Assert.False(FreeTierLimits.AllowsCategoryCode("ESS_CONDO"));
+        Assert.False(FreeTierLimits.AllowsCategoryCode("INC_13TH"));
         Assert.Equal(1, FreeTierLimits.MaxBankAccounts);
     }
 

@@ -26,6 +26,11 @@ public sealed record EmailContent(string Title, IReadOnlyList<string> Paragraphs
 
     /// <summary>Highlighted note below the call-to-action (e.g. expiration info).</summary>
     public string? Note { get; init; }
+
+    /// <summary>Optional file attachments (e.g. LGPD export JSON).</summary>
+    public IReadOnlyList<EmailAttachment> Attachments { get; init; } = [];
 }
 
 public sealed record EmailStep(string Title, string Description);
+
+public sealed record EmailAttachment(string FileName, string ContentType, byte[] Content);

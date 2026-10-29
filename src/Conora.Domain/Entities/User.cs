@@ -92,6 +92,13 @@ public class User : ModelBase
            && string.Equals(PasswordResetTokenHash, tokenHash, StringComparison.Ordinal)
            && PasswordResetExpiresAtUtc > DateTime.UtcNow;
 
+    /// <summary>Clears any outstanding password-reset token (e.g. security incident).</summary>
+    public void ClearPasswordReset()
+    {
+        PasswordResetTokenHash = null;
+        PasswordResetExpiresAtUtc = null;
+    }
+
     /// <summary>
     /// Sets a local password and clears the reset token. Google and Apple ids stay,
     /// so the same account can sign in with e-mail and password afterwards.
@@ -102,8 +109,7 @@ public class User : ModelBase
             throw new ArgumentException("Senha inválida.", nameof(passwordHash));
 
         PasswordHash = passwordHash;
-        PasswordResetTokenHash = null;
-        PasswordResetExpiresAtUtc = null;
+        ClearPasswordReset();
     }
 
     public void SetGoogleId(string googleId) => GoogleId = googleId;

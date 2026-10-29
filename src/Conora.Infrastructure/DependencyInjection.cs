@@ -41,6 +41,12 @@ public static class DependencyInjection
         services.AddScoped<ISupplierStore, Persistence.EfSupplierStore>();
         services.AddScoped<IReceiptOcrQueue, Persistence.EfReceiptOcrQueue>();
         services.AddSingleton<IReceiptImageStore, Storage.LocalReceiptImageStore>();
+        var lgpdBucket = configuration["LgpdExport:S3:Bucket"];
+        if (!string.IsNullOrWhiteSpace(lgpdBucket))
+            services.AddSingleton<ILgpdExportStore, Storage.S3LgpdExportStore>();
+        else
+            services.AddSingleton<ILgpdExportStore, Storage.LocalLgpdExportStore>();
+        services.AddScoped<ILgpdExportDataSource, Storage.LgpdExportDataSource>();
         services.AddScoped<IEmailSender, SmtpEmailSender>();
         services.Configure<StoreBillingOptions>(configuration.GetSection(StoreBillingOptions.SectionName));
         services.AddHttpClient<IStoreReceiptValidator, StoreReceiptValidator>(client => client.Timeout = TimeSpan.FromSeconds(20));
