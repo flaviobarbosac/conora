@@ -22,6 +22,27 @@ public sealed class HttpCorrelationContext : ICorrelationContext
         _accessor.HttpContext?.Request.Headers[ActorHeaderName].FirstOrDefault()
         ?? "system";
 
+    public string? ClientIp
+    {
+        get
+        {
+            var http = _accessor.HttpContext;
+            if (http is null)
+                return null;
+
+            var forwarded = http.Request.Headers["X-Forwarded-For"].FirstOrDefault();
+            if (!string.IsNullOrWhiteSpace(forwarded))
+            {
+                var first = forwarded.Split(',', StringSplitOptions.TrimEntries | StringSplitOptions.RemoveEmptyEntries)
+                    .FirstOrDefault();
+                if (!string.IsNullOrWhiteSpace(first))
+                    return first;
+            }
+
+            return http.Connection.RemoteIpAddress?.ToString();
+        }
+    }
+
     public bool FromNativeApp =>
         _accessor.HttpContext?.Request.Headers[ClientHeaderName].FirstOrDefault() is "ios" or "android";
 }

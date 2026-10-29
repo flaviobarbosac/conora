@@ -51,6 +51,33 @@ public class ReceiptIntake : ModelBase, ITenantOwned
         WhatsAppAwaiting = WhatsAppReceiptAwaiting.None;
     }
 
+    /// <summary>
+    /// Cupom (has valor pago) → expense; boleto (no valor pago) → budget.
+    /// Returns true when the purpose changed from the screen that opened the camera.
+    /// </summary>
+    public bool AlignPurposeFromPaidAmount(bool? hasPaidAmount)
+    {
+        if (Status != ReceiptIntakeStatus.Processing)
+            throw new ValidationException("status", "O destino só pode ser ajustado durante a leitura.");
+
+        var before = Purpose;
+        if (hasPaidAmount == true)
+            Purpose = ReceiptPurpose.Expense;
+        else if (hasPaidAmount == false)
+            Purpose = ReceiptPurpose.BudgetBoleto;
+
+        return Purpose != before;
+    }
+
+    /// <summary>Forces the user to pick account/category (used when the photo was sent from the wrong screen).</summary>
+    public void RequireUserClassification()
+    {
+        Status = ReceiptIntakeStatus.NeedsClassification;
+        WhatsAppAwaiting = Channel == ReceiptChannel.WhatsApp
+            ? WhatsAppReceiptAwaiting.Classification
+            : WhatsAppReceiptAwaiting.None;
+    }
+
     public void ApplyOcr(string? cnpj, string? name, decimal? amount, DateTime? occurredAt, Guid? supplierId, string? proposedCategoryCode)
     {
         ExtractedCnpj = cnpj;

@@ -5,6 +5,7 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <PackageReference Include="ClosedXML" Version="0.105.0" />
     <PackageReference Include="Microsoft.Extensions.Configuration.Abstractions" Version="10.0.0" />
     <PackageReference Include="Microsoft.Extensions.DependencyInjection" Version="10.0.0" />
     <PackageReference Include="Microsoft.Extensions.DependencyInjection.Abstractions" Version="10.0.0" />
@@ -17,6 +18,14 @@
     <ProjectReference Include="..\Conora.Domain\Conora.Domain.csproj" />
     <ProjectReference Include="..\Conora.Infrastructure\Conora.Infrastructure.csproj" />
     <ProjectReference Include="..\Conora.Repository\Conora.Repository.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <EmbeddedResource Include="Assets\conora-logo.png" LogicalName="Conora.Services.Assets.conora-logo.png" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <InternalsVisibleTo Include="Conora.UnitTests" />
   </ItemGroup>
 
 </Project>

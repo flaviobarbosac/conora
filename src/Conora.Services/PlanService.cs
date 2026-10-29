@@ -115,7 +115,7 @@ public sealed class PlanService
                 "Este recurso é liberado nos planos pagos. Assine para cadastrar e editar.");
     }
 
-    /// <summary>Free tier may only launch against the four starter expense categories.</summary>
+    /// <summary>Free tier may only launch against starter essentials + salary.</summary>
     public async Task EnsureCategoryWritableAsync(string? categoryCode, CancellationToken ct)
     {
         await EnsureWritableAsync(ct);
@@ -123,7 +123,7 @@ public sealed class PlanService
             return;
         if (!FreeTierLimits.AllowsCategoryCode(categoryCode))
             throw new PlanReadOnlyException(
-                "No Conora grátis você lança só em Aluguel, Energia elétrica, Água e esgoto e Escola. Assine para liberar as outras categorias.");
+                "No Conora grátis você lança só em Salário bruto, Aluguel, Energia elétrica, Água e esgoto e Escola. Assine para liberar as outras categorias.");
     }
 
     /// <summary>

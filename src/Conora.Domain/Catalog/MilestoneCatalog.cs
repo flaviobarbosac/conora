@@ -7,11 +7,11 @@ public static class MilestoneCatalog
     [
         new(8, "budget-half-filled", "Primeiro orçamento", 80),
         new(10, "first-month-closed", "Primeiro mês fechado", 120),
-        new(12, "three-months-in-budget", "Três meses seguidos", 200),
-        new(15, "payment-on-time", "Um mês no prazo", 100),
+        new(12, "three-months-in-budget", "Três meses seguidos no azul", 200),
+        new(15, "payment-on-time", "Um mês de contas pagas em dia", 100),
         new(18, "reserve-started", "Reserva iniciada", 150),
         new(22, "reserve-complete", "Reserva completa", 250),
-        new(30, "project-progress", "Aporte em projeto de vida", 300)
+        new(30, "project-progress", "Primeiro aporte no projeto de vida", 300)
     ];
 
     public static MilestoneDefinition? ByKey(string key)

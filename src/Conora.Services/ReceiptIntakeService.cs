@@ -319,7 +319,7 @@ public sealed class ReceiptIntakeService
             }
 
             var mime = ResolveMime(intake.ImageObjectKey);
-            var extracted = await ExtractAsync(bytes, mime, intake.Purpose, ct);
+            var extracted = await ExtractAsync(bytes, mime, ct);
 
             if (extracted.InvalidCnpj
                 || BrazilianCnpj.LooksLikeInvalid(extracted.Cnpj, out _)
@@ -329,6 +329,9 @@ public sealed class ReceiptIntakeService
                 await _uow.SaveChangesAsync(ct);
                 return;
             }
+
+            // Cupom = has valor pago → expense; boleto = no valor pago → budget. Independent of which screen opened the camera.
+            var purposeRerouted = intake.AlignPurposeFromPaidAmount(extracted.HasPaidAmount);
 
             string? cnpj = extracted.Cnpj;
             if (cnpj is null && BrazilianCnpj.TryExtract(extracted.RawText, out var fromText))
@@ -384,9 +387,15 @@ public sealed class ReceiptIntakeService
             intake.ApplyOcr(cnpj, name, amount, occurredAt, supplierId, proposedCode);
             if (preferredBankAccountId is Guid bankId)
                 intake.SetBankAccount(bankId);
+
+            // Wrong screen: never auto-save — user must pick account/category on the correct destination.
+            if (purposeRerouted)
+                intake.RequireUserClassification();
+
             await _uow.SaveChangesAsync(ct);
 
-            await TryAutoPersistAsync(intake, ct);
+            if (!purposeRerouted)
+                await TryAutoPersistAsync(intake, ct);
         }
         catch (Exception ex) when (ex is not OperationCanceledException)
         {
@@ -576,33 +585,41 @@ public sealed class ReceiptIntakeService
             ct);
     }
 
-    private async Task<OcrResult> ExtractAsync(byte[] bytes, string mime, ReceiptPurpose purpose, CancellationToken ct)
+    private async Task<OcrResult> ExtractAsync(byte[] bytes, string mime, CancellationToken ct)
     {
         if (!_gemini.IsConfigured)
-            return new OcrResult(null, null, null, null, null, false);
+            return new OcrResult(null, null, null, null, null, null, false);
 
-        var system = purpose == ReceiptPurpose.BudgetBoleto
-            ? "Você lê boletos brasileiros (imagem ou PDF). Responda estritamente em JSON: " +
-              "{\"cnpj\":\"somente dígitos do beneficiário ou null\",\"name\":\"razão social do beneficiário\"," +
-              "\"amount\":número ou null,\"date\":\"yyyy-MM-dd do vencimento ou null\",\"rawText\":\"trecho útil\"}. " +
-              "amount é o valor do documento. date é a data de VENCIMENTO, não a de emissão. Se não houver CNPJ, cnpj=null."
-            : "Você lê cupons fiscais brasileiros (imagem ou PDF). Responda estritamente em JSON: " +
-              "{\"cnpj\":\"somente dígitos ou null\",\"name\":\"razão social ou nome fantasia\",\"amount\":número ou null," +
-              "\"date\":\"yyyy-MM-dd ou null\",\"rawText\":\"trecho útil\"}. " +
-              "amount é o valor total pago. Se não houver CNPJ, cnpj=null.";
+        const string system =
+            "Você lê documentos financeiros brasileiros. A regra definitiva é: " +
+            "CUPOM FISCAL / NFC-e / SAT / nota de consumidor TEM valor pago (compra já paga); " +
+            "BOLETO de cobrança NÃO tem valor pago (só valor a pagar / vencimento). " +
+            "Responda estritamente em JSON: " +
+            "{\"hasPaidAmount\":true|false|null," +
+            "\"cnpj\":\"somente dígitos ou null\",\"name\":\"razão social, nome fantasia ou beneficiário\"," +
+            "\"amount\":número ou null,\"date\":\"yyyy-MM-dd ou null\",\"rawText\":\"trecho útil\"}. " +
+            "hasPaidAmount=true se houver indício de valor já pago (valor pago, total pago, valor total da compra, NFC-e/SAT). " +
+            "hasPaidAmount=false se for boleto/cobrança sem pagamento (linha digitável, código de barras de boleto, " +
+            "beneficiário/pagador, valor do documento a pagar, vencimento). " +
+            "hasPaidAmount=null só se for impossível decidir. " +
+            "Se hasPaidAmount=false (boleto), date é a data de VENCIMENTO. " +
+            "Se hasPaidAmount=true (cupom), date é a data da compra/emissão. " +
+            "amount é o valor numérico do documento. Se não houver CNPJ, cnpj=null.";
 
-        var userPrompt = purpose == ReceiptPurpose.BudgetBoleto
-            ? "Extraia os dados do boleto."
-            : "Extraia os dados do cupom.";
-
-        var raw = await _gemini.GenerateJsonFromImageAsync(system, userPrompt, bytes, mime, ct);
+        var raw = await _gemini.GenerateJsonFromImageAsync(system, "Há valor pago? Extraia os dados.", bytes, mime, ct);
         if (raw is null)
-            return new OcrResult(null, null, null, null, null, false);
+            return new OcrResult(null, null, null, null, null, null, false);
 
         try
         {
             using var doc = JsonDocument.Parse(raw);
             var root = doc.RootElement;
+            bool? hasPaidAmount = null;
+            if (root.TryGetProperty("hasPaidAmount", out var paidEl))
+            {
+                if (paidEl.ValueKind == JsonValueKind.True) hasPaidAmount = true;
+                else if (paidEl.ValueKind == JsonValueKind.False) hasPaidAmount = false;
+            }
             string? cnpj = root.TryGetProperty("cnpj", out var c) && c.ValueKind != JsonValueKind.Null
                 ? c.GetString()
                 : null;
@@ -635,11 +652,11 @@ public sealed class ReceiptIntakeService
             if (!invalidCnpj && BrazilianCnpj.LooksLikeInvalid(rawText, out _))
                 invalidCnpj = true;
 
-            return new OcrResult(cnpj, name, amount, occurredAt, rawText, invalidCnpj);
+            return new OcrResult(hasPaidAmount, cnpj, name, amount, occurredAt, rawText, invalidCnpj);
         }
         catch (Exception ex) when (ex is JsonException or InvalidOperationException or FormatException)
         {
-            return new OcrResult(null, null, null, null, raw, false);
+            return new OcrResult(null, null, null, null, null, raw, false);
         }
     }
 
@@ -760,6 +777,7 @@ public sealed class ReceiptIntakeService
     }
 
     private sealed record OcrResult(
+        bool? HasPaidAmount,
         string? Cnpj,
         string? Name,
         decimal? Amount,

@@ -1,3 +1,4 @@
+using System.IO;
 using System.Net;
 using System.Net.Mail;
 using System.Text;
@@ -42,12 +43,15 @@ public sealed class SmtpEmailSender : IEmailSender
         var from = ResolveFrom(_configuration["Email:From"]);
         var configurationSet = _configuration["Email:ConfigurationSet"];
 
+        // Fail fast when the SMTP host is down (common in local dev) so auth screens do not hang on "Criando…".
+        var timeoutMs = int.TryParse(_configuration["Email:SmtpTimeoutMs"], out var timeout) ? timeout : 5_000;
         using var client = new SmtpClient(host, port)
         {
             EnableSsl = string.Equals(_configuration["Email:UseSsl"], "true", StringComparison.OrdinalIgnoreCase),
             Credentials = string.IsNullOrWhiteSpace(_configuration["Email:User"])
                 ? null
-                : new NetworkCredential(_configuration["Email:User"], _configuration["Email:Password"])
+                : new NetworkCredential(_configuration["Email:User"], _configuration["Email:Password"]),
+            Timeout = Math.Clamp(timeoutMs, 1_000, 60_000)
         };
 
         var renderer = CreateRenderer();
@@ -66,6 +70,12 @@ public sealed class SmtpEmailSender : IEmailSender
             AlternateView.CreateAlternateViewFromString(renderer.RenderHtml(content), Encoding.UTF8, "text/html"));
         if (!string.IsNullOrWhiteSpace(configurationSet))
             message.Headers.Add("X-SES-CONFIGURATION-SET", configurationSet);
+
+        foreach (var file in content.Attachments)
+        {
+            var stream = new MemoryStream(file.Content);
+            message.Attachments.Add(new Attachment(stream, file.FileName, file.ContentType));
+        }
 
         await client.SendMailAsync(message, ct);
     }

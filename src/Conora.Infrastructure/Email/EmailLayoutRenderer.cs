@@ -5,8 +5,9 @@ using Conora.Domain.Ports;
 namespace Conora.Infrastructure.Email;
 
 /// <summary>
-/// Renders <see cref="EmailContent"/> into the Conora "Noite" layout (dark brand header, white body,
-/// dark footer). Table-based markup with inline styles for e-mail client compatibility.
+/// Renders <see cref="EmailContent"/> into the Conora light layout (pale header, white body,
+/// soft footer). Table-based markup with inline styles for e-mail client compatibility.
+/// Used by every transactional e-mail (welcome, verify, reset, family, LGPD).
 /// </summary>
 public sealed class EmailLayoutRenderer
 {
@@ -34,6 +35,7 @@ public sealed class EmailLayoutRenderer
             <meta name="viewport" content="width=device-width, initial-scale=1">
             <meta name="x-apple-disable-message-reformatting">
             <meta name="color-scheme" content="light">
+            <meta name="supported-color-schemes" content="light">
             <title>{E(content.Title)}</title>
             <link href="https://fonts.googleapis.com/css2?family=Be+Vietnam+Pro:wght@400;600;700&display=swap" rel="stylesheet">
             """);
@@ -47,23 +49,23 @@ public sealed class EmailLayoutRenderer
               }
             </style>
             </head>
-            <body style="margin:0; padding:0; background-color:#e9ecef;">
+            <body style="margin:0; padding:0; background-color:#eef1f5;">
             """);
 
         if (!string.IsNullOrWhiteSpace(content.Preheader))
             sb.Append($"""<div style="display:none; max-height:0; overflow:hidden; mso-hide:all;">{E(content.Preheader)}&#8199;&#847;&#8199;&#847;&#8199;&#847;</div>""");
 
         sb.Append($"""
-            <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="background-color:#e9ecef;">
+            <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="background-color:#eef1f5;">
             <tr><td align="center" style="padding:32px 12px;">
-            <table role="presentation" class="container" width="600" cellpadding="0" cellspacing="0" border="0" style="width:600px; max-width:600px; background-color:#ffffff; border-radius:16px; overflow:hidden;">
-            <tr><td bgcolor="#0e1826" class="px" style="background-color:#0e1826; padding:36px 48px 44px 48px; font-family:{FontStack};">
-            <img src="{E(_assetBaseUrl)}/conora-escuro.png" width="168" alt="{E(_brandName)}" style="display:block; width:168px; height:auto; border:0; margin:0 0 40px 0;">
-            <h1 class="h1" style="margin:0 0 12px 0; font-size:30px; line-height:38px; font-weight:700; color:#ffffff;">{E(content.Title)}</h1>
+            <table role="presentation" class="container" width="600" cellpadding="0" cellspacing="0" border="0" style="width:600px; max-width:600px; background-color:#ffffff; border-radius:16px; overflow:hidden; border:1px solid #e2e8f0;">
+            <tr><td bgcolor="#ffffff" class="px" style="background-color:#ffffff; padding:36px 48px 36px 48px; font-family:{FontStack};">
+            <img src="{E(_assetBaseUrl)}/conora-claro.png" width="168" alt="{E(_brandName)}" style="display:block; width:168px; height:auto; border:0; margin:0 0 32px 0;">
+            <h1 class="h1" style="margin:0 0 12px 0; font-size:30px; line-height:38px; font-weight:700; color:#172638;">{E(content.Title)}</h1>
             """);
 
         if (!string.IsNullOrWhiteSpace(content.Subtitle))
-            sb.Append($"""<p style="margin:0; font-size:17px; line-height:27px; color:#a9b6c7;">{E(content.Subtitle)}</p>""");
+            sb.Append($"""<p style="margin:0; font-size:17px; line-height:27px; color:#5a6b7d;">{E(content.Subtitle)}</p>""");
 
         sb.Append("""
             </td></tr>
@@ -97,7 +99,7 @@ public sealed class EmailLayoutRenderer
                 <tr><td class="px" align="left" style="padding:12px 48px 32px 48px;">
                 <table role="presentation" cellpadding="0" cellspacing="0" border="0"><tr>
                 <td align="center" bgcolor="#6aacff" style="border-radius:999px;">
-                <a href="{E(content.ActionUrl)}" target="_blank" style="display:inline-block; padding:14px 34px; font-family:{FontStack}; font-size:16px; font-weight:700; color:#0e1826; text-decoration:none; border-radius:999px;">{E(content.ActionLabel)} &rarr;</a>
+                <a href="{E(content.ActionUrl)}" target="_blank" style="display:inline-block; padding:14px 34px; font-family:{FontStack}; font-size:16px; font-weight:700; color:#ffffff; text-decoration:none; border-radius:999px;">{E(content.ActionLabel)} &rarr;</a>
                 </td></tr></table>
                 </td></tr>
                 """);
@@ -122,10 +124,10 @@ public sealed class EmailLayoutRenderer
         }
 
         sb.Append($"""
-            <tr><td bgcolor="#172638" class="px" style="background-color:#172638; padding:28px 48px; font-family:{FontStack};">
+            <tr><td bgcolor="#f4f7fb" class="px" style="background-color:#f4f7fb; padding:28px 48px; font-family:{FontStack}; border-top:1px solid #e2e8f0;">
             <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0"><tr>
             <td valign="middle" width="40"><img src="{E(_assetBaseUrl)}/conora-simbolo.png" width="28" alt="" style="display:block; width:28px; height:auto; border:0;"></td>
-            <td valign="middle" style="font-size:13px; line-height:20px; color:#a9b6c7;">E-mail automático do {E(_brandName)} — não é preciso responder.<br>&copy; {year} {E(_brandName)} &middot; uma solução <strong style="color:#eef0f2; letter-spacing:1px;">ONRA</strong></td>
+            <td valign="middle" style="font-size:13px; line-height:20px; color:#5a6b7d;">E-mail automático do {E(_brandName)} — não é preciso responder.<br>&copy; {year} {E(_brandName)} &middot; uma solução <strong style="color:#172638; letter-spacing:1px;">ONRA</strong></td>
             </tr></table>
             </td></tr>
             </table>
