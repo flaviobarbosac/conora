@@ -427,12 +427,12 @@ public sealed class AuthService
         return new AuthResponse(user.Id, user.Email, pair.AccessToken, pair.RefreshToken, pair.AccessExpiresAtUtc);
     }
 
-    /// <summary>E-mail link; requests from the native app add app=1 so the web page hands off to the app.</summary>
+    /// <summary>
+    /// HTTPS App/Universal Link. Always includes app=1 so a browser (e.g. Gmail in-app) hands
+    /// off to the native app and does not consume the token before the app opens.
+    /// </summary>
     private string AuthLink(string page, string token)
-    {
-        var link = $"{PublicWebBase()}/app/{page}?token={token}";
-        return _correlation.FromNativeApp ? link + "&app=1" : link;
-    }
+        => $"{PublicWebBase()}/app/{page}?token={token}&app=1";
 
     private string PublicWebBase()
     {
