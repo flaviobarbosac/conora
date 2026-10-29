@@ -11,6 +11,7 @@ builder.Services.AddServices();
 builder.Services.AddHostedService<LgpdRetentionWorker>();
 builder.Services.AddHostedService<LgpdExportNightlyWorker>();
 builder.Services.AddHostedService<LgpdExportPurgeWorker>();
+builder.Services.AddHostedService<PreRegistrationPurgeWorker>();
 builder.Services.AddHostedService<ReceiptOcrWorker>();
 builder.Services.AddHostedService<ReceiptImagePurgeWorker>();
 builder.Services.AddHostedService<MilestoneNightlyWorker>();

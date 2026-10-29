@@ -9,6 +9,7 @@ public static class DependencyInjection
     {
         services.AddScoped<IUnitOfWork, UnitOfWork>();
         services.AddScoped<IUserRepository, UserRepository>();
+        services.AddScoped<IPreRegistrationRepository, PreRegistrationRepository>();
         services.AddScoped<IAuditEventRepository, AuditEventRepository>();
         services.AddScoped<IConsoleRepository, ConsoleRepository>();
         services.AddScoped<IRefreshTokenRepository, RefreshTokenRepository>();

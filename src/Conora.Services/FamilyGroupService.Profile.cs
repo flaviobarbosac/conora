@@ -79,6 +79,7 @@ public sealed partial class FamilyGroupService
 
         user.CompleteOnboarding();
         await _uow.SaveChangesAsync(ct);
+        await _categories.EnsureDefaultsAsync(ct);
         return ToProfile(user);
     }
 

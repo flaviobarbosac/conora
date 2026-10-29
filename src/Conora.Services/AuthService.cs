@@ -16,11 +16,12 @@ namespace Conora.Services;
 
 public sealed class AuthService
 {
-    private static readonly TimeSpan EmailVerificationTtl = TimeSpan.FromDays(2);
+    private static readonly TimeSpan PreRegistrationTtl = TimeSpan.FromMinutes(10);
     private static readonly TimeSpan PasswordResetTokenTtl = TimeSpan.FromMinutes(30);
-    private static readonly TimeSpan PasswordResetCooldownDown = TimeSpan.FromMinutes(15);
+    private static readonly TimeSpan PasswordResetCoolDown = TimeSpan.FromMinutes(15);
 
     private readonly IUserRepository _users;
+    private readonly IPreRegistrationRepository _preRegistrations;
     private readonly IRefreshTokenRepository _refreshTokens;
     private readonly IAuditEventRepository _audits;
     private readonly IUnitOfWork _uow;
@@ -33,13 +34,13 @@ public sealed class AuthService
     private readonly IEmailSender _email;
     private readonly IConfiguration _config;
     private readonly IHostEnvironment _env;
-    private readonly CategoryService _categories;
     private readonly IHotmartCourseStore _hotmart;
     private readonly HotmartOptions _hotmartOptions;
     private readonly ILogger<AuthService> _logger;
 
     public AuthService(
         IUserRepository users,
+        IPreRegistrationRepository preRegistrations,
         IRefreshTokenRepository refreshTokens,
         IAuditEventRepository audits,
         IUnitOfWork uow,
@@ -52,12 +53,12 @@ public sealed class AuthService
         IEmailSender email,
         IConfiguration config,
         IHostEnvironment env,
-        CategoryService categories,
         IHotmartCourseStore hotmart,
         IOptions<HotmartOptions> hotmartOptions,
         ILogger<AuthService> logger)
     {
         _users = users;
+        _preRegistrations = preRegistrations;
         _refreshTokens = refreshTokens;
         _audits = audits;
         _uow = uow;
@@ -70,13 +71,12 @@ public sealed class AuthService
         _email = email;
         _config = config;
         _env = env;
-        _categories = categories;
         _hotmart = hotmart;
         _hotmartOptions = hotmartOptions.Value;
         _logger = logger;
     }
 
-    public Task<AuthResponse> RegisterAsync(RegisterRequest request, CancellationToken ct)
+    public async Task<AuthResponse> RegisterAsync(RegisterRequest request, CancellationToken ct)
     {
         if (string.IsNullOrWhiteSpace(request.Password) || request.Password.Length < 8)
             throw new ValidationException("password", "Senha deve ter no mínimo 8 caracteres.");
@@ -84,9 +84,37 @@ public sealed class AuthService
         if (!BrazilianCpf.TryNormalize(request.Cpf, out var cpf))
             throw new ValidationException("cpf", "Informe um CPF válido.");
 
-        var user = User.Create(request.Name, request.Email, cpf);
-        user.SetPasswordHash(_passwords.Hash(request.Password));
-        return IssueForNewUserAsync(user, "UserRegistered", ct);
+        var email = request.Email.Trim().ToLowerInvariant();
+        if (await _users.FindByEmailAsync(email, ct) is not null)
+            throw new DuplicateEmailException(email);
+        if (await _users.FindByCpfAsync(cpf, ct) is not null)
+            throw new DuplicateCpfException();
+
+        if (_env.IsEnvironment("Testing"))
+        {
+            var user = User.Create(request.Name, email, cpf);
+            user.SetPasswordHash(_passwords.Hash(request.Password));
+            await ApplyTrainingFlagAsync(user, ct);
+            return await CreateVerifiedUserAsync(user, "UserRegistered", notifyWelcome: false, ct);
+        }
+
+        await EnsurePreRegistrationSlotAsync(email, googleId: null, appleId: null, ct);
+
+        var token = NewRawToken();
+        var pending = PreRegistration.CreatePassword(
+            request.Name,
+            email,
+            cpf,
+            _passwords.Hash(request.Password),
+            _tokens.HashRefreshToken(token),
+            DateTime.UtcNow.Add(PreRegistrationTtl),
+            await IsTrainingStudentAsync(email, ct));
+        _preRegistrations.Add(pending);
+        await _uow.SaveChangesAsync(ct);
+        await SendPreRegistrationEmailAsync(email, token, ct);
+        throw new ValidationException(
+            "email",
+            "Enviamos um e-mail de validação. Abra a mensagem e clique no link em até 10 minutos para criar sua conta.");
     }
 
     public async Task<AuthResponse> LoginAsync(LoginRequest request, CancellationToken ct)
@@ -113,7 +141,6 @@ public sealed class AuthService
     public async Task<AuthResponse> GoogleAsync(GoogleLoginRequest request, CancellationToken ct)
     {
         var identity = await _google.ValidateAsync(request.IdToken, ct);
-        // Provider id only — never merge with an e-mail/password or Apple account.
         var user = await _users.FindByGoogleIdAsync(identity.GoogleId, ct);
         var register = IsRegisterIntent(request.Intent);
 
@@ -122,9 +149,34 @@ public sealed class AuthService
             if (user is not null)
                 throw new SocialAccountExistsException("Google");
 
-            user = User.Create(identity.Name, identity.Email);
-            user.SetGoogleId(identity.GoogleId);
-            return await IssueForNewUserAsync(user, "UserGoogleRegistered", ct);
+            var email = identity.Email.Trim().ToLowerInvariant();
+            if (await _users.FindByEmailAsync(email, ct) is not null)
+                throw new DuplicateEmailException(email);
+
+            if (_env.IsEnvironment("Testing"))
+            {
+                var created = User.Create(identity.Name, email);
+                created.SetGoogleId(identity.GoogleId);
+                await ApplyTrainingFlagAsync(created, ct);
+                return await CreateVerifiedUserAsync(created, "UserGoogleRegistered", notifyWelcome: false, ct);
+            }
+
+            await EnsurePreRegistrationSlotAsync(email, identity.GoogleId, appleId: null, ct);
+
+            var token = NewRawToken();
+            var pending = PreRegistration.CreateGoogle(
+                identity.Name,
+                email,
+                identity.GoogleId,
+                _tokens.HashRefreshToken(token),
+                DateTime.UtcNow.Add(PreRegistrationTtl),
+                await IsTrainingStudentAsync(email, ct));
+            _preRegistrations.Add(pending);
+            await _uow.SaveChangesAsync(ct);
+            await SendPreRegistrationEmailAsync(email, token, ct);
+            throw new ValidationException(
+                "email",
+                "Enviamos um e-mail de validação. Abra a mensagem e clique no link em até 10 minutos para criar sua conta.");
         }
 
         if (user is null)
@@ -143,7 +195,6 @@ public sealed class AuthService
         if (!string.IsNullOrWhiteSpace(identity.Email) && !identity.EmailVerified)
             throw new InvalidTokenException();
 
-        // Provider id only — Google + Apple with different ids are separate Conora users.
         var user = await _users.FindByAppleIdAsync(identity.AppleId, ct);
         var register = IsRegisterIntent(request.Intent);
 
@@ -155,10 +206,36 @@ public sealed class AuthService
             if (string.IsNullOrWhiteSpace(email))
                 throw new ValidationException("email", "Não foi possível obter o e-mail da Apple. Autorize o compartilhamento de e-mail.");
 
+            email = email.Trim().ToLowerInvariant();
+            if (await _users.FindByEmailAsync(email, ct) is not null)
+                throw new DuplicateEmailException(email);
+
             var name = string.IsNullOrWhiteSpace(request.Name) ? email : request.Name.Trim();
-            user = User.Create(name, email);
-            user.SetAppleId(identity.AppleId);
-            return await IssueForNewUserAsync(user, "UserAppleRegistered", ct);
+
+            if (_env.IsEnvironment("Testing"))
+            {
+                var created = User.Create(name, email);
+                created.SetAppleId(identity.AppleId);
+                await ApplyTrainingFlagAsync(created, ct);
+                return await CreateVerifiedUserAsync(created, "UserAppleRegistered", notifyWelcome: false, ct);
+            }
+
+            await EnsurePreRegistrationSlotAsync(email, googleId: null, identity.AppleId, ct);
+
+            var token = NewRawToken();
+            var pending = PreRegistration.CreateApple(
+                name,
+                email,
+                identity.AppleId,
+                _tokens.HashRefreshToken(token),
+                DateTime.UtcNow.Add(PreRegistrationTtl),
+                await IsTrainingStudentAsync(email, ct));
+            _preRegistrations.Add(pending);
+            await _uow.SaveChangesAsync(ct);
+            await SendPreRegistrationEmailAsync(email, token, ct);
+            throw new ValidationException(
+                "email",
+                "Enviamos um e-mail de validação. Abra a mensagem e clique no link em até 10 minutos para criar sua conta.");
         }
 
         if (user is null)
@@ -183,19 +260,34 @@ public sealed class AuthService
         if (!user.EmailVerified)
             throw new ValidationException(
                 "email",
-                "O e-mail de validação já foi enviado para a sua conta. Abra a mensagem e valide o endereço para entrar.");
+                "Confirme seu e-mail pelo link que enviamos (válido por 10 minutos) para entrar.");
         return await PersistSessionAsync(user, "TokenRefreshed", notifyWelcome: false, ct);
     }
 
     public async Task<AuthResponse> VerifyEmailAsync(VerifyEmailRequest request, CancellationToken ct)
     {
         if (string.IsNullOrWhiteSpace(request.Token))
-            throw new ValidationException("token", "Link inválido ou expirado. Peça outro ao tentar entrar.");
+            throw new ValidationException("token", "Link inválido ou expirado. Cadastre-se de novo para receber outro.");
 
         var tokenHash = _tokens.HashRefreshToken(request.Token.Trim());
+
+        var pending = await _preRegistrations.FindByTokenHashAsync(tokenHash, ct);
+        if (pending is not null)
+        {
+            if (!pending.IsActive(tokenHash))
+            {
+                _preRegistrations.Remove(pending);
+                await _uow.SaveChangesAsync(ct);
+                throw new ValidationException("token", "Link expirado. Cadastre-se de novo — o link vale por 10 minutos.");
+            }
+
+            return await PromotePreRegistrationAsync(pending, ct);
+        }
+
+        // Legacy path: user created before pre-registration (e-mail hash on users).
         var user = await _users.FindByEmailVerificationHashAsync(tokenHash, ct);
         if (user is null || !user.EmailVerificationIsActive(tokenHash))
-            throw new ValidationException("token", "Link inválido ou expirado. Peça outro ao tentar entrar.");
+            throw new ValidationException("token", "Link inválido ou expirado. Cadastre-se de novo para receber outro.");
 
         _tenant.Set(user.Id);
         if (!user.EmailVerified)
@@ -207,17 +299,19 @@ public sealed class AuthService
         return await PersistSessionAsync(user, "EmailVerifiedLogin", notifyWelcome: true, ct);
     }
 
+    public async Task<int> PurgeExpiredPreRegistrationsAsync(CancellationToken ct)
+        => await _preRegistrations.DeleteExpiredAsync(DateTime.UtcNow, ct);
+
     public async Task RequestPasswordResetAsync(ForgotPasswordRequest request, CancellationToken ct)
     {
         var user = await FindByLoginIdentifierAsync(request.Usuario, ct);
         if (user is null)
             return;
 
-        // Cooldown per account/e-mail: refuse a new send while a recent token window is still warm.
         if (user.PasswordResetExpiresAtUtc is DateTime expiresAt)
         {
             var issuedAt = expiresAt - PasswordResetTokenTtl;
-            if (DateTime.UtcNow - issuedAt < PasswordResetCooldownDown)
+            if (DateTime.UtcNow - issuedAt < PasswordResetCoolDown)
             {
                 AuditRecorder.Record(
                     _audits,
@@ -233,7 +327,7 @@ public sealed class AuthService
             }
         }
 
-        var token = Convert.ToHexString(RandomNumberGenerator.GetBytes(32));
+        var token = NewRawToken();
         user.IssuePasswordReset(_tokens.HashRefreshToken(token), DateTime.UtcNow.Add(PasswordResetTokenTtl));
         _tenant.Set(user.Id);
         AuditRecorder.Record(
@@ -312,42 +406,91 @@ public sealed class AuthService
         await _uow.SaveChangesAsync(ct);
     }
 
-    private async Task<AuthResponse> IssueForNewUserAsync(User user, string action, CancellationToken ct)
+    private async Task EnsurePreRegistrationSlotAsync(
+        string email,
+        string? googleId,
+        string? appleId,
+        CancellationToken ct)
     {
-        if (_hotmartOptions.ProductId > 0
-            && await _hotmart.HasApprovedAsync(user.Email, _hotmartOptions.ProductId, ct))
+        var removed = new HashSet<Guid>();
+        void Drop(PreRegistration? row)
+        {
+            if (row is null || !removed.Add(row.Id))
+                return;
+            _preRegistrations.Remove(row);
+        }
+
+        Drop(await _preRegistrations.FindByEmailAsync(email, ct));
+        if (!string.IsNullOrEmpty(googleId))
+            Drop(await _preRegistrations.FindByGoogleIdAsync(googleId, ct));
+        if (!string.IsNullOrEmpty(appleId))
+            Drop(await _preRegistrations.FindByAppleIdAsync(appleId, ct));
+
+        if (removed.Count > 0)
+            await _uow.SaveChangesAsync(ct);
+    }
+
+    private async Task<AuthResponse> PromotePreRegistrationAsync(PreRegistration pending, CancellationToken ct)
+    {
+        if (await _users.FindByEmailAsync(pending.Email, ct) is not null)
+        {
+            _preRegistrations.Remove(pending);
+            await _uow.SaveChangesAsync(ct);
+            throw new DuplicateEmailException(pending.Email);
+        }
+
+        if (!string.IsNullOrEmpty(pending.GoogleId)
+            && await _users.FindByGoogleIdAsync(pending.GoogleId, ct) is not null)
+        {
+            _preRegistrations.Remove(pending);
+            await _uow.SaveChangesAsync(ct);
+            throw new SocialAccountExistsException("Google");
+        }
+
+        if (!string.IsNullOrEmpty(pending.AppleId)
+            && await _users.FindByAppleIdAsync(pending.AppleId, ct) is not null)
+        {
+            _preRegistrations.Remove(pending);
+            await _uow.SaveChangesAsync(ct);
+            throw new SocialAccountExistsException("Apple");
+        }
+
+        if (!string.IsNullOrEmpty(pending.Cpf)
+            && await _users.FindByCpfAsync(pending.Cpf, ct) is not null)
+        {
+            _preRegistrations.Remove(pending);
+            await _uow.SaveChangesAsync(ct);
+            throw new DuplicateCpfException();
+        }
+
+        var user = User.Create(pending.Name, pending.Email, pending.Cpf);
+        if (!string.IsNullOrEmpty(pending.PasswordHash))
+            user.SetPasswordHash(pending.PasswordHash);
+        if (!string.IsNullOrEmpty(pending.GoogleId))
+            user.SetGoogleId(pending.GoogleId);
+        if (!string.IsNullOrEmpty(pending.AppleId))
+            user.SetAppleId(pending.AppleId);
+        if (pending.IsTrainingStudent)
             user.SetTrainingStudent(true);
+        user.MarkEmailVerified();
+
+        var action = !string.IsNullOrEmpty(pending.GoogleId) ? "UserGoogleRegistered"
+            : !string.IsNullOrEmpty(pending.AppleId) ? "UserAppleRegistered"
+            : "UserRegistered";
+
+        _preRegistrations.Remove(pending);
+        return await CreateVerifiedUserAsync(user, action, notifyWelcome: true, ct);
+    }
+
+    private async Task<AuthResponse> CreateVerifiedUserAsync(
+        User user,
+        string action,
+        bool notifyWelcome,
+        CancellationToken ct)
+    {
         _users.Add(user);
         _tenant.Set(user.Id);
-        _categories.AddDefaults();
-        await SaveUserCreatingAsync(user, action, ct);
-        // Integration tests run without a real inbox; auto-verify only in Testing.
-        if (_env.IsEnvironment("Testing"))
-        {
-            user.MarkEmailVerified();
-            return await PersistSessionAsync(user, action, notifyWelcome: false, ct);
-        }
-
-        // Always throws ValidationException after sending (or reusing) the Conora validation e-mail.
-        await SendVerificationAndBlockAsync(user, firstSend: true, ct);
-        return default!;
-    }
-
-    private async Task<AuthResponse> IssueForExistingUserAsync(User user, string action, CancellationToken ct)
-    {
-        _tenant.Set(user.Id);
-        if (!user.EmailVerified)
-        {
-            await _uow.SaveChangesAsync(ct);
-            await SendVerificationAndBlockAsync(user, firstSend: false, ct);
-        }
-
-        return await PersistSessionAsync(user, action, notifyWelcome: false, ct);
-    }
-
-    private async Task SaveUserCreatingAsync(User user, string action, CancellationToken ct)
-    {
-        AuditRecorder.Record(_audits, _correlation, "User", user.Id, action, new { user.Email });
+        AuditRecorder.Record(_audits, _correlation, "User", user.Id, action, new { user.Email, ip = _correlation.ClientIp });
         try
         {
             await _uow.SaveChangesAsync(ct);
@@ -368,53 +511,67 @@ public sealed class AuthService
         {
             throw new SocialAccountExistsException("Apple");
         }
+
+        return await PersistSessionAsync(user, "EmailVerifiedLogin", notifyWelcome, ct);
     }
 
-    private async Task SendVerificationAndBlockAsync(User user, bool firstSend, CancellationToken ct)
+    private Task<AuthResponse> IssueForExistingUserAsync(User user, string action, CancellationToken ct)
     {
-        var alreadyPending = user.EmailVerificationExpiresAtUtc > DateTime.UtcNow
-                             && !string.IsNullOrEmpty(user.EmailVerificationTokenHash);
-
-        if (!alreadyPending || firstSend)
+        _tenant.Set(user.Id);
+        if (!user.EmailVerified)
         {
-            var token = Convert.ToHexString(RandomNumberGenerator.GetBytes(32));
-            user.IssueEmailVerification(_tokens.HashRefreshToken(token), DateTime.UtcNow.Add(EmailVerificationTtl));
-            await _uow.SaveChangesAsync(ct);
-
-            var link = AuthLink("validar-email", token);
-            try
-            {
-                await _email.SendAsync(user.Email, "Valide seu e-mail no Conora", new EmailContent(
-                    "Confirme seu e-mail",
-                    [
-                        "Para entrar no Conora, confirme este endereço clicando no botão abaixo.",
-                        "Sem essa validação o acesso não abre — vale para cadastro com senha, Google ou Apple."
-                    ])
-                {
-                    Preheader = "Um clique para liberar o acesso ao Conora.",
-                    ActionLabel = "Validar e-mail",
-                    ActionUrl = link,
-                    Note = "O link vale por 48 horas. Se você não pediu, ignore este e-mail."
-                }, ct);
-            }
-            catch (Exception ex)
-            {
-                _logger.LogWarning(ex, "Verification email failed for {Email}.", user.Email);
-                throw new ValidationException("email", "Não foi possível enviar o e-mail de validação. Tente de novo.");
-            }
+            // Legacy unverified user rows: ask them to register again under the new flow.
+            throw new ValidationException(
+                "email",
+                "Esta conta ainda não confirmou o e-mail. Cadastre-se de novo para receber um link válido por 10 minutos.");
         }
 
-        var message = firstSend && !alreadyPending
-            ? "Enviamos um e-mail de validação para a sua conta. Abra a mensagem e clique no link para entrar."
-            : "O e-mail de validação já foi enviado para a sua conta. Abra a mensagem e valide o endereço para entrar.";
-        throw new ValidationException("email", message);
+        return PersistSessionAsync(user, action, notifyWelcome: false, ct);
     }
+
+    private async Task SendPreRegistrationEmailAsync(string email, string rawToken, CancellationToken ct)
+    {
+        var link = AuthLink("validar-email", rawToken);
+        try
+        {
+            await _email.SendAsync(email, "Valide seu e-mail no Conora", new EmailContent(
+                "Confirme seu e-mail",
+                [
+                    "Para criar sua conta no Conora, confirme este endereço clicando no botão abaixo.",
+                    "Sem essa validação a conta não é criada."
+                ])
+            {
+                Preheader = "Link válido por 10 minutos para criar sua conta Conora.",
+                ActionLabel = "Validar e-mail",
+                ActionUrl = link,
+                Note = "O link expira em 10 minutos. Se você não pediu, ignore este e-mail."
+            }, ct);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "Pre-registration email failed for {Email}.", email);
+            throw new ValidationException("email", "Não foi possível enviar o e-mail de validação. Tente de novo.");
+        }
+    }
+
+    private async Task ApplyTrainingFlagAsync(User user, CancellationToken ct)
+    {
+        if (await IsTrainingStudentAsync(user.Email, ct))
+            user.SetTrainingStudent(true);
+    }
+
+    private async Task<bool> IsTrainingStudentAsync(string email, CancellationToken ct)
+        => _hotmartOptions.ProductId > 0
+           && await _hotmart.HasApprovedAsync(email, _hotmartOptions.ProductId, ct);
+
+    private static string NewRawToken()
+        => Convert.ToHexString(RandomNumberGenerator.GetBytes(32));
 
     private async Task<AuthResponse> PersistSessionAsync(User user, string action, bool notifyWelcome, CancellationToken ct)
     {
         var pair = _tokens.Issue(user.Id, user.Email);
         _refreshTokens.Add(RefreshToken.Create(_tokens.HashRefreshToken(pair.RefreshToken), DateTime.UtcNow.AddDays(14)));
-        AuditRecorder.Record(_audits, _correlation, "User", user.Id, action, new { user.Email });
+        AuditRecorder.Record(_audits, _correlation, "User", user.Id, action, new { user.Email, ip = _correlation.ClientIp });
         await _uow.SaveChangesAsync(ct);
 
         if (notifyWelcome)
@@ -446,10 +603,6 @@ public sealed class AuthService
         return new AuthResponse(user.Id, user.Email, pair.AccessToken, pair.RefreshToken, pair.AccessExpiresAtUtc);
     }
 
-    /// <summary>
-    /// HTTPS App/Universal Link. Always includes app=1 so a browser (e.g. Gmail in-app) hands
-    /// off to the native app and does not consume the token before the app opens.
-    /// </summary>
     private string AuthLink(string page, string token)
         => $"{PublicWebBase()}/app/{page}?token={token}&app=1";
 
