@@ -97,6 +97,8 @@ public sealed class DomainExceptionHandler : IExceptionHandler
         UserNotFoundException => (StatusCodes.Status404NotFound, "Usuário não encontrado"),
         DuplicateEmailException => (StatusCodes.Status409Conflict, "Email duplicado"),
         DuplicateCpfException => (StatusCodes.Status409Conflict, "CPF duplicado"),
+        SocialAccountExistsException => (StatusCodes.Status409Conflict, "Conta já existe"),
+        AccountNotFoundException => (StatusCodes.Status404NotFound, "Conta não encontrada"),
         InvalidCredentialsException => (StatusCodes.Status401Unauthorized, "Não autorizado"),
         InvalidTokenException => (StatusCodes.Status401Unauthorized, "Token inválido"),
         GoogleAuthDisabledException => (StatusCodes.Status503ServiceUnavailable, "Google indisponível"),

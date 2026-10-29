@@ -36,6 +36,18 @@ public static class PlanCatalog
         _ => PlanTier.Individual
     };
 
+    /// <summary>Commercial name shown in the app (Individual / Duo / Família).</summary>
+    public static string DisplayTitle(PlanKind kind) => TierOf(kind) switch
+    {
+        PlanTier.Family => "Duo",
+        PlanTier.FamilyPlus => "Família",
+        _ => "Individual"
+    };
+
+    /// <summary>Title + billing cycle, e.g. "Individual mensal".</summary>
+    public static string DisplayLabel(PlanKind kind) =>
+        $"{DisplayTitle(kind)} {(IsYearly(kind) ? "anual" : "mensal")}";
+
     public static bool IsYearly(PlanKind kind) => kind is PlanKind.Yearly14990
         or PlanKind.IndividualYearly or PlanKind.FamilyYearly or PlanKind.FamilyPlusYearly;
 

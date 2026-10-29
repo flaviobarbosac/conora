@@ -144,6 +144,8 @@ public class DomainExtrasCoverageTests
         _ = new DuplicateCpfException();
         _ = new UniqueConstraintViolationException("ux_email");
         _ = new InvalidCredentialsException();
+        _ = new AccountNotFoundException();
+        _ = new SocialAccountExistsException("Google");
         _ = new InvalidTokenException();
         _ = new GoogleAuthDisabledException();
         _ = new AppleAuthDisabledException();
