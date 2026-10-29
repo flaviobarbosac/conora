@@ -6,6 +6,20 @@
 conora.com.br, www.conora.com.br {
 	encode zstd gzip
 
+	# Universal Links (iOS) + App Links (Android) — must stay on the apex hosts.
+	handle /.well-known/apple-app-site-association {
+		root * /srv/public
+		header Content-Type application/json
+		rewrite * /.well-known/apple-app-site-association
+		file_server
+	}
+
+	handle /.well-known/assetlinks.json {
+		root * /srv/public
+		header Content-Type application/json
+		file_server
+	}
+
 	handle /privacidade/ {
 		redir /privacidade permanent
 	}

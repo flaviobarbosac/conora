@@ -1,0 +1,14 @@
+{
+  "applinks": {
+    "apps": [],
+    "details": [
+      {
+        "appID": "N2JF8644LJ.br.com.conora.app",
+        "paths": [
+          "/app/validar-email*",
+          "/app/redefinir-senha*"
+        ]
+      }
+    ]
+  }
+}
