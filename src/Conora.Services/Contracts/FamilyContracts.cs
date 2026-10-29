@@ -87,7 +87,11 @@ public sealed record ProfileResponse(
     bool PhotoEvolutionEnabled = true,
     string? Phone = null,
     string? Cep = null,
-    DateTime? ContractAcknowledgedAt = null);
+    DateTime? ContractAcknowledgedAt = null,
+    bool HasPhoto = false,
+    string? PhotoContentHash = null);
+
+public sealed record ProfilePhotoContent(byte[] Content, string ContentType, string ContentHash);
 
 public sealed record CategoryMemberBreakdownRow(
     Guid UsuarioId,
