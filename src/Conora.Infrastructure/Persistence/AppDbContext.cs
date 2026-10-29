@@ -16,6 +16,7 @@ public class AppDbContext : DbContext
     }
 
     public DbSet<User> Users => Set<User>();
+    public DbSet<PreRegistration> PreRegistrations => Set<PreRegistration>();
     public DbSet<AuditEvent> AuditEvents => Set<AuditEvent>();
     public DbSet<RequestFailure> RequestFailures => Set<RequestFailure>();
     public DbSet<RefreshToken> RefreshTokens => Set<RefreshToken>();

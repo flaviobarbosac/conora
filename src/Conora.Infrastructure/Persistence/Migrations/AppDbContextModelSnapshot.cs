@@ -1339,6 +1339,78 @@ namespace Conora.Infrastructure.Persistence.Migrations
                     b.ToTable("patrimony_items", (string)null);
                 });
 
+            modelBuilder.Entity("Conora.Domain.Entities.PreRegistration", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("AppleId")
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)");
+
+                    b.Property<string>("Cpf")
+                        .HasMaxLength(11)
+                        .HasColumnType("character varying(11)");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("Email")
+                        .IsRequired()
+                        .HasMaxLength(320)
+                        .HasColumnType("character varying(320)");
+
+                    b.Property<DateTime>("ExpiresAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("GoogleId")
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)");
+
+                    b.Property<bool>("IsTrainingStudent")
+                        .HasColumnType("boolean");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)");
+
+                    b.Property<string>("PasswordHash")
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)");
+
+                    b.Property<string>("TokenHash")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("AppleId")
+                        .IsUnique()
+                        .HasDatabaseName("IX_PreRegistrations_AppleId")
+                        .HasFilter("\"AppleId\" IS NOT NULL");
+
+                    b.HasIndex("Email")
+                        .IsUnique()
+                        .HasDatabaseName("IX_PreRegistrations_Email");
+
+                    b.HasIndex("ExpiresAtUtc")
+                        .HasDatabaseName("IX_PreRegistrations_ExpiresAtUtc");
+
+                    b.HasIndex("GoogleId")
+                        .IsUnique()
+                        .HasDatabaseName("IX_PreRegistrations_GoogleId")
+                        .HasFilter("\"GoogleId\" IS NOT NULL");
+
+                    b.HasIndex("TokenHash")
+                        .IsUnique()
+                        .HasDatabaseName("IX_PreRegistrations_TokenHash");
+
+                    b.ToTable("pre_registrations", (string)null);
+                });
+
             modelBuilder.Entity("Conora.Domain.Entities.ReceiptIntake", b =>
                 {
                     b.Property<Guid>("Id")
@@ -1739,11 +1811,6 @@ namespace Conora.Infrastructure.Persistence.Migrations
                         .HasMaxLength(32)
                         .HasColumnType("character varying(32)");
 
-                    b.Property<bool>("PhotoEvolutionEnabled")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("boolean")
-                        .HasDefaultValue(true);
-
                     b.Property<string>("PhotoContentHash")
                         .HasMaxLength(64)
                         .HasColumnType("character varying(64)");
@@ -1751,6 +1818,11 @@ namespace Conora.Infrastructure.Persistence.Migrations
                     b.Property<string>("PhotoContentType")
                         .HasMaxLength(100)
                         .HasColumnType("character varying(100)");
+
+                    b.Property<bool>("PhotoEvolutionEnabled")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("boolean")
+                        .HasDefaultValue(true);
 
                     b.Property<string>("PhotoObjectKey")
                         .HasMaxLength(500)

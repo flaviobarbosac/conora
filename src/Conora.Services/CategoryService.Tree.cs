@@ -77,18 +77,4 @@ public sealed partial class CategoryService
             throw new ValidationException("categoryId", "Categoria sob análise. Aceite-a antes de lançar.");
         return account;
     }
-
-    public void AddDefaults()
-    {
-        var byCode = new Dictionary<string, Category>(StringComparer.Ordinal);
-        foreach (var definition in SystemCategories.All.OrderBy(d => d.SortOrder))
-        {
-            Guid? parentId = definition.ParentCode is null ? null : byCode[definition.ParentCode].Id;
-            var account = Category.CreateSystem(definition, parentId);
-            _repo.Add(account);
-            byCode[definition.Code] = account;
-        }
-
-        CategoryDisplayNumbers.Apply(byCode.Values.ToList());
-    }
 }

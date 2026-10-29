@@ -14,6 +14,17 @@ public sealed partial class CategoryService
 public async Task EnsureDefaultsAsync(CancellationToken ct)
     {
         var existing = await _repo.ListAsync<Category>(c => c.IsSystem, ct, track: true);
+        // Signup creates only the user row. Chart is seeded after onboarding.
+        if (existing.Count == 0)
+        {
+            var userId = _tenant.UsuarioId;
+            if (userId is null)
+                return;
+            var user = await _family.FindUserByIdAsync(userId.Value, ct);
+            if (user is null || !user.OnboardingCompleted)
+                return;
+        }
+
         var byCode = existing.Where(c => c.Code is not null).ToDictionary(c => c.Code!);
         var changed = false;
 
