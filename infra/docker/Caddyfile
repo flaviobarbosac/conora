@@ -45,6 +45,21 @@ conora.com.br, www.conora.com.br {
 		file_server
 	}
 
+	# E-mail links opened in a browser (Gmail, Chrome, etc.): serve a static
+	# handoff to conora:// so the SPA/PWA never burns the token. Native App /
+	# Universal Links open the app directly and never hit this. ?web=1 continues
+	# in the SPA for users who explicitly choose the browser.
+	@emailAppHandoff {
+		path /app/validar-email /app/redefinir-senha
+		not query web=1
+	}
+	handle @emailAppHandoff {
+		root * /srv/public
+		rewrite * /email-app-handoff.html
+		header Cache-Control "no-store"
+		file_server
+	}
+
 	handle_path /app* {
 		root * /srv/app
 		try_files {path} /index.html

@@ -1,0 +1,75 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="robots" content="noindex" />
+    <title>Abrir no Conora</title>
+    <link rel="stylesheet" href="/site.css" />
+    <style>
+      body {
+        margin: 0;
+        min-height: 100vh;
+        display: grid;
+        place-items: center;
+        font-family: system-ui, sans-serif;
+        background: #f3f3f5;
+        color: #1c2430;
+      }
+      main {
+        width: min(24rem, calc(100% - 2rem));
+        text-align: center;
+      }
+      h1 {
+        font-size: 1.35rem;
+        margin: 0 0 0.5rem;
+      }
+      p {
+        margin: 0 0 1.25rem;
+        line-height: 1.45;
+        color: #4a5565;
+      }
+      a.btn {
+        display: block;
+        padding: 0.85rem 1rem;
+        border-radius: 0.75rem;
+        background: #375984;
+        color: #fff;
+        text-decoration: none;
+        font-weight: 600;
+        margin-bottom: 0.75rem;
+      }
+      a.ghost {
+        color: #375984;
+        text-decoration: none;
+        font-size: 0.95rem;
+      }
+    </style>
+  </head>
+  <body>
+    <main>
+      <h1>Abrir no app Conora</h1>
+      <p>Continue no aplicativo para concluir. O navegador não valida o link.</p>
+      <a class="btn" id="open" href="#">Abrir no app Conora</a>
+      <a class="ghost" id="web" href="#">Continuar no navegador</a>
+    </main>
+    <script>
+      (function () {
+        var params = new URLSearchParams(location.search)
+        var token = params.get('token') || ''
+        var path = location.pathname.replace(/\/+$/, '')
+        var page = path.indexOf('redefinir-senha') >= 0 ? 'redefinir-senha' : 'validar-email'
+        var app = 'conora://' + page + '?token=' + encodeURIComponent(token)
+        var web =
+          '/app/' + page + '?token=' + encodeURIComponent(token) + '&web=1'
+        var open = document.getElementById('open')
+        var webLink = document.getElementById('web')
+        open.href = app
+        webLink.href = web
+        if (token) {
+          location.replace(app)
+        }
+      })()
+    </script>
+  </body>
+</html>
