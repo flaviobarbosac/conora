@@ -33,6 +33,9 @@ public class UserConfiguration : IEntityTypeConfiguration<User>
         builder.Property(u => u.VoiceEntryConfirm).IsRequired().HasDefaultValue(true);
         builder.Property(u => u.BudgetAlertPercent).IsRequired().HasDefaultValue(70);
         builder.Property(u => u.PhotoEvolutionEnabled).IsRequired().HasDefaultValue(true);
+        builder.Property(u => u.PhotoObjectKey).HasMaxLength(500);
+        builder.Property(u => u.PhotoContentHash).HasMaxLength(64);
+        builder.Property(u => u.PhotoContentType).HasMaxLength(100);
         builder.Property(u => u.ContractAcknowledgedAt);
         builder.Property(u => u.Version).IsRequired();
         builder.Property(u => u.CreatedAt).IsRequired();

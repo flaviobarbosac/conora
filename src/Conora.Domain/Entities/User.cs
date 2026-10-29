@@ -41,6 +41,13 @@ public class User : ModelBase
     /// <summary>When true, Ian and Clara portraits and voice bands follow milestone age. When false, both stay at age 30 / adult.</summary>
     public bool PhotoEvolutionEnabled { get; private set; } = true;
 
+    /// <summary>Object-store key for the profile photo (not the bytes).</summary>
+    public string? PhotoObjectKey { get; private set; }
+    /// <summary>SHA-256 hex of the stored photo bytes.</summary>
+    public string? PhotoContentHash { get; private set; }
+    /// <summary>MIME type of the stored photo (image/jpeg, image/png, image/webp).</summary>
+    public string? PhotoContentType { get; private set; }
+
     /// <summary>Set when the user acknowledges the paid-plan contract and LGPD. Later subscriptions skip that screen.</summary>
     public DateTime? ContractAcknowledgedAt { get; private set; }
 
@@ -207,5 +214,26 @@ public class User : ModelBase
     {
         DeletedAt = DateTime.UtcNow;
         Version += 1;
+    }
+
+    public void SetPhoto(string objectKey, string contentHash, string contentType)
+    {
+        if (string.IsNullOrWhiteSpace(objectKey))
+            throw new ArgumentException("Chave da foto inválida.", nameof(objectKey));
+        if (string.IsNullOrWhiteSpace(contentHash) || contentHash.Length != 64)
+            throw new ArgumentException("Hash da foto inválido.", nameof(contentHash));
+        if (string.IsNullOrWhiteSpace(contentType) || !contentType.StartsWith("image/", StringComparison.OrdinalIgnoreCase))
+            throw new ArgumentException("Tipo da foto inválido.", nameof(contentType));
+
+        PhotoObjectKey = objectKey.Trim();
+        PhotoContentHash = contentHash.Trim().ToLowerInvariant();
+        PhotoContentType = contentType.Trim().ToLowerInvariant();
+    }
+
+    public void ClearPhoto()
+    {
+        PhotoObjectKey = null;
+        PhotoContentHash = null;
+        PhotoContentType = null;
     }
 }

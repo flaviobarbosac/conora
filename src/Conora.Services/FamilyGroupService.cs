@@ -31,6 +31,7 @@ public sealed partial class FamilyGroupService
     private readonly CategoryService _categories;
     private readonly PlanService _plan;
     private readonly IStoreBillingGateway _storeBilling;
+    private readonly IUserPhotoStore _photos;
 
     public FamilyGroupService(
         IFamilyGroupRepository family,
@@ -45,7 +46,8 @@ public sealed partial class FamilyGroupService
         ILogger<FamilyGroupService> logger,
         CategoryService categories,
         PlanService plan,
-        IStoreBillingGateway storeBilling)
+        IStoreBillingGateway storeBilling,
+        IUserPhotoStore photos)
     {
         _plan = plan;
         _storeBilling = storeBilling;
@@ -60,6 +62,7 @@ public sealed partial class FamilyGroupService
         _correlation = correlation;
         _logger = logger;
         _categories = categories;
+        _photos = photos;
     }
 
     public Guid RequireUserId() => _tenant.UsuarioId ?? throw new ForbiddenException("Usuário não autenticado.");
@@ -273,7 +276,9 @@ public sealed partial class FamilyGroupService
             user.PhotoEvolutionEnabled,
             user.Phone,
             user.Cep,
-            user.ContractAcknowledgedAt);
+            user.ContractAcknowledgedAt,
+            !string.IsNullOrEmpty(user.PhotoObjectKey),
+            user.PhotoContentHash);
 
     private static FamilyInviteResponse ToInvite(FamilyInvite i)
         => new(i.Id, i.Email, i.ExpiresAt, i.AcceptedAt, i.CancelledAt, i.IsOpen);

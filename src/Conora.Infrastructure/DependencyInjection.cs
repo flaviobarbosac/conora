@@ -41,6 +41,7 @@ public static class DependencyInjection
         services.AddScoped<ISupplierStore, Persistence.EfSupplierStore>();
         services.AddScoped<IReceiptOcrQueue, Persistence.EfReceiptOcrQueue>();
         services.AddSingleton<IReceiptImageStore, Storage.LocalReceiptImageStore>();
+        services.AddSingleton<IUserPhotoStore, Storage.LocalUserPhotoStore>();
         var lgpdBucket = configuration["LgpdExport:S3:Bucket"];
         if (!string.IsNullOrWhiteSpace(lgpdBucket))
             services.AddSingleton<ILgpdExportStore, Storage.S3LgpdExportStore>();
