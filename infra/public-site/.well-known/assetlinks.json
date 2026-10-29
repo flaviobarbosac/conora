@@ -1,0 +1,13 @@
+[
+  {
+    "relation": ["delegate_permission/common.handle_all_urls"],
+    "target": {
+      "namespace": "android_app",
+      "package_name": "br.com.conora.app",
+      "sha256_cert_fingerprints": [
+        "A9:FC:0A:13:7B:1B:44:15:1C:A0:94:53:94:92:EE:B4:64:65:7B:40:D4:8F:B9:7F:7F:CA:4C:E7:71:4A:BC:1F",
+        "5B:2C:19:E2:31:90:23:2B:DE:85:05:1D:0D:D6:7F:69:48:B0:7A:9E:51:3C:19:F4:7B:4F:F8:AC:1C:58:32:29"
+      ]
+    }
+  }
+]
