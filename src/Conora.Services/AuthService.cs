@@ -488,6 +488,7 @@ public sealed class AuthService
         bool notifyWelcome,
         CancellationToken ct)
     {
+        user.MarkEmailVerified();
         _users.Add(user);
         _tenant.Set(user.Id);
         AuditRecorder.Record(_audits, _correlation, "User", user.Id, action, new { user.Email, ip = _correlation.ClientIp });
