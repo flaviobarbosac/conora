@@ -153,30 +153,11 @@ public sealed class AuthService
             if (await _users.FindByEmailAsync(email, ct) is not null)
                 throw new DuplicateEmailException(email);
 
-            if (_env.IsEnvironment("Testing"))
-            {
-                var created = User.Create(identity.Name, email);
-                created.SetGoogleId(identity.GoogleId);
-                await ApplyTrainingFlagAsync(created, ct);
-                return await CreateVerifiedUserAsync(created, "UserGoogleRegistered", notifyWelcome: false, ct);
-            }
-
-            await EnsurePreRegistrationSlotAsync(email, identity.GoogleId, appleId: null, ct);
-
-            var token = NewRawToken();
-            var pending = PreRegistration.CreateGoogle(
-                identity.Name,
-                email,
-                identity.GoogleId,
-                _tokens.HashRefreshToken(token),
-                DateTime.UtcNow.Add(PreRegistrationTtl),
-                await IsTrainingStudentAsync(email, ct));
-            _preRegistrations.Add(pending);
-            await _uow.SaveChangesAsync(ct);
-            await SendPreRegistrationEmailAsync(email, token, ct);
-            throw new ValidationException(
-                "email",
-                "Enviamos um e-mail de validação. Abra a mensagem e clique no link em até 10 minutos para criar sua conta.");
+            // Google already verified the e-mail in the ID token — no second inbox hop.
+            var created = User.Create(identity.Name, email);
+            created.SetGoogleId(identity.GoogleId);
+            await ApplyTrainingFlagAsync(created, ct);
+            return await CreateVerifiedUserAsync(created, "UserGoogleRegistered", notifyWelcome: false, ct);
         }
 
         if (user is null)
@@ -212,30 +193,11 @@ public sealed class AuthService
 
             var name = string.IsNullOrWhiteSpace(request.Name) ? email : request.Name.Trim();
 
-            if (_env.IsEnvironment("Testing"))
-            {
-                var created = User.Create(name, email);
-                created.SetAppleId(identity.AppleId);
-                await ApplyTrainingFlagAsync(created, ct);
-                return await CreateVerifiedUserAsync(created, "UserAppleRegistered", notifyWelcome: false, ct);
-            }
-
-            await EnsurePreRegistrationSlotAsync(email, googleId: null, identity.AppleId, ct);
-
-            var token = NewRawToken();
-            var pending = PreRegistration.CreateApple(
-                name,
-                email,
-                identity.AppleId,
-                _tokens.HashRefreshToken(token),
-                DateTime.UtcNow.Add(PreRegistrationTtl),
-                await IsTrainingStudentAsync(email, ct));
-            _preRegistrations.Add(pending);
-            await _uow.SaveChangesAsync(ct);
-            await SendPreRegistrationEmailAsync(email, token, ct);
-            throw new ValidationException(
-                "email",
-                "Enviamos um e-mail de validação. Abra a mensagem e clique no link em até 10 minutos para criar sua conta.");
+            // Apple already verified the e-mail (or private relay) — no second inbox hop.
+            var created = User.Create(name, email);
+            created.SetAppleId(identity.AppleId);
+            await ApplyTrainingFlagAsync(created, ct);
+            return await CreateVerifiedUserAsync(created, "UserAppleRegistered", notifyWelcome: false, ct);
         }
 
         if (user is null)
