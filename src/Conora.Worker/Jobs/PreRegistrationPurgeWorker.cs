@@ -4,7 +4,7 @@ namespace Conora.Worker.Jobs;
 
 public sealed class PreRegistrationPurgeWorker : BackgroundService
 {
-    private static readonly TimeSpan Interval = TimeSpan.FromMinutes(2);
+    private static readonly TimeSpan Interval = TimeSpan.FromMinutes(10);
 
     private readonly IServiceScopeFactory _scopes;
     private readonly ILogger<PreRegistrationPurgeWorker> _logger;
