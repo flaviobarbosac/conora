@@ -9,8 +9,8 @@ using Conora.Services.Contracts;
 namespace Conora.Services;
 
 /// <summary>
-/// Income diagnosis (spec v1.1 §3). Net spendable = gross - INSS - IR. The tithe never reduces income:
-/// it only becomes a planned expense in Contribuições/Doações.
+/// Income diagnosis (spec v1.1 §3). Net spendable = gross - INSS - IR. Tithe never reduces income
+/// (planned Social). INSS/IR also sync as planned Discount lines for Raio-X/orçamento.
 /// </summary>
 public sealed class DiagnosisService
 {
@@ -55,7 +55,12 @@ public sealed class DiagnosisService
 
         var existing = await _repo.ListAsync<IncomeSource>(s => s.CompetenceYm == source.CompetenceYm, ct);
         _repo.Add(source);
-        await _budgets.SyncPlannedTitheAsync(source.CompetenceYm, existing.Sum(s => s.Tithe) + source.Tithe, ct);
+        await SyncDiagnosisBudgetAsync(
+            source.CompetenceYm,
+            existing.Sum(s => s.Tithe) + source.Tithe,
+            existing.Sum(s => s.Inss) + source.Inss,
+            existing.Sum(s => s.Ir) + source.Ir,
+            ct);
 
         AuditRecorder.Record(_audits, _correlation, "IncomeSource", source.Id, "IncomeSourceCreated",
             new { source.CompetenceYm, source.NetSpendable, source.Tithe });
@@ -70,7 +75,7 @@ public sealed class DiagnosisService
         await _months.EnsureOpenAsync(source.CompetenceYm, ct);
 
         source.Update(request.Name, request.Gross, request.Inss, request.Ir, request.Tithe);
-        await SyncTitheAsync(source.CompetenceYm, ct);
+        await SyncDiagnosisBudgetFromSourcesAsync(source.CompetenceYm, ct);
 
         AuditRecorder.Record(_audits, _correlation, "IncomeSource", source.Id, "IncomeSourceUpdated",
             new { source.CompetenceYm, source.NetSpendable, source.Tithe });
@@ -88,7 +93,7 @@ public sealed class DiagnosisService
             throw new ValidationException("id", "A fonte tem receita lançada. Exclua o lançamento primeiro.");
 
         _repo.SoftDelete(source);
-        await SyncTitheAsync(source.CompetenceYm, ct);
+        await SyncDiagnosisBudgetFromSourcesAsync(source.CompetenceYm, ct);
         await _uow.SaveChangesAsync(ct);
     }
 
@@ -96,12 +101,28 @@ public sealed class DiagnosisService
     public static decimal SuggestTithe(decimal gross, decimal inss, decimal ir)
         => IncomeDiagnosisCalculator.SuggestTithe(IncomeDiagnosisCalculator.Calculate(gross, inss, ir, 0).NetSpendable);
 
-    private async Task SyncTitheAsync(string ym, CancellationToken ct)
+    private async Task SyncDiagnosisBudgetFromSourcesAsync(string ym, CancellationToken ct)
     {
         // Tracked entities already carry the pending changes (update/soft delete) even before saving.
         var sources = await _repo.ListAsync<IncomeSource>(s => s.CompetenceYm == ym, ct, track: true);
-        var total = sources.Where(s => s.DeletedAt == null).Sum(s => s.Tithe);
-        await _budgets.SyncPlannedTitheAsync(ym, total, ct);
+        var active = sources.Where(s => s.DeletedAt == null).ToList();
+        await SyncDiagnosisBudgetAsync(
+            ym,
+            active.Sum(s => s.Tithe),
+            active.Sum(s => s.Inss),
+            active.Sum(s => s.Ir),
+            ct);
+    }
+
+    private async Task SyncDiagnosisBudgetAsync(
+        string ym,
+        decimal totalTithe,
+        decimal totalInss,
+        decimal totalIr,
+        CancellationToken ct)
+    {
+        await _budgets.SyncPlannedTitheAsync(ym, totalTithe, ct);
+        await _budgets.SyncPlannedDiscountsAsync(ym, totalInss, totalIr, ct);
     }
 
     private static DiagnosisSummaryResponse BuildSummary(string ym, IReadOnlyList<IncomeSource> sources)

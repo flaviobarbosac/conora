@@ -18,6 +18,8 @@ public static class SystemCategories
 {
     public const string Tithe = "DISC_TITHE";
     public const string Offerings = "DISC_OFFERINGS";
+    public const string Inss = "DISC_INSS";
+    public const string Ir = "DISC_IR";
     public const string AssetsInUse = "Bens de uso";
     public const string AssetsNotInUse = "Bens de não uso";
 
