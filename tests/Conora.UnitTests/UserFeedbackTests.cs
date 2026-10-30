@@ -155,5 +155,21 @@ public class UserFeedbackTests
             => Task.FromResult<IReadOnlyList<(Guid, string)>>(_items.Select(f => (f.UsuarioId, f.UsuarioNome)).Distinct().ToList());
         public Task<UserFeedback?> GetAdminAsync(Guid id, CancellationToken ct = default)
             => Task.FromResult(_items.FirstOrDefault(f => f.Id == id));
+
+        public Task<UserFeedback?> MarkReadAdminAsync(
+            Guid id, Guid adminId, string adminNome, DateTime when, CancellationToken ct = default)
+        {
+            var entity = _items.FirstOrDefault(f => f.Id == id);
+            entity?.MarkReadByAdmin(adminId, adminNome, when);
+            return Task.FromResult(entity);
+        }
+
+        public Task<UserFeedback?> ReplyAdminAsync(
+            Guid id, Guid adminId, string adminNome, string resposta, DateTime when, CancellationToken ct = default)
+        {
+            var entity = _items.FirstOrDefault(f => f.Id == id);
+            entity?.Reply(adminId, adminNome, resposta, when);
+            return Task.FromResult(entity);
+        }
     }
 }

@@ -101,6 +101,7 @@ public sealed class DomainExceptionHandler : IExceptionHandler
         AccountNotFoundException => (StatusCodes.Status404NotFound, "Conta não encontrada"),
         InvalidCredentialsException => (StatusCodes.Status401Unauthorized, "Não autorizado"),
         InvalidTokenException => (StatusCodes.Status401Unauthorized, "Token inválido"),
+        UnauthorizedAccessException => (StatusCodes.Status401Unauthorized, "Não autorizado"),
         GoogleAuthDisabledException => (StatusCodes.Status503ServiceUnavailable, "Google indisponível"),
         AppleAuthDisabledException => (StatusCodes.Status503ServiceUnavailable, "Apple indisponível"),
         DomainException => (StatusCodes.Status400BadRequest, "Erro de negócio"),

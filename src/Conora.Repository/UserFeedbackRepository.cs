@@ -78,6 +78,62 @@ public sealed class UserFeedbackRepository : BaseRepository<UserFeedback>, IUser
     }
 
     public Task<UserFeedback?> GetAdminAsync(Guid id, CancellationToken ct = default)
-        => Set.IgnoreQueryFilters()
+        => Set.IgnoreQueryFilters().AsNoTracking()
             .FirstOrDefaultAsync(f => f.Id == id && f.DeletedAt == null, ct);
+
+    public async Task<UserFeedback?> MarkReadAdminAsync(
+        Guid id, Guid adminId, string adminNome, DateTime when, CancellationToken ct = default)
+    {
+        await Set.IgnoreQueryFilters()
+            .Where(f => f.Id == id && f.DeletedAt == null && f.Status == FeedbackStatus.Novo)
+            .ExecuteUpdateAsync(s => s
+                .SetProperty(f => f.Status, FeedbackStatus.Lido)
+                .SetProperty(f => f.LidoPorUsuarioId, adminId)
+                .SetProperty(f => f.LidoPorUsuarioNome, adminNome)
+                .SetProperty(f => f.LidoEm, when)
+                .SetProperty(f => f.UpdatedAt, when)
+                .SetProperty(f => f.Version, f => f.Version + 1), ct);
+
+        return await GetAdminAsync(id, ct);
+    }
+
+    public async Task<UserFeedback?> ReplyAdminAsync(
+        Guid id, Guid adminId, string adminNome, string resposta, DateTime when, CancellationToken ct = default)
+    {
+        var current = await GetAdminAsync(id, ct);
+        if (current is null)
+            return null;
+
+        if (current.Status == FeedbackStatus.Novo)
+        {
+            await Set.IgnoreQueryFilters()
+                .Where(f => f.Id == id && f.DeletedAt == null)
+                .ExecuteUpdateAsync(s => s
+                    .SetProperty(f => f.Status, FeedbackStatus.Respondido)
+                    .SetProperty(f => f.LidoPorUsuarioId, adminId)
+                    .SetProperty(f => f.LidoPorUsuarioNome, adminNome)
+                    .SetProperty(f => f.LidoEm, when)
+                    .SetProperty(f => f.Resposta, resposta)
+                    .SetProperty(f => f.RespondidoPorUsuarioId, adminId)
+                    .SetProperty(f => f.RespondidoPorUsuarioNome, adminNome)
+                    .SetProperty(f => f.RespondidoEm, when)
+                    .SetProperty(f => f.UpdatedAt, when)
+                    .SetProperty(f => f.Version, f => f.Version + 1), ct);
+        }
+        else
+        {
+            await Set.IgnoreQueryFilters()
+                .Where(f => f.Id == id && f.DeletedAt == null)
+                .ExecuteUpdateAsync(s => s
+                    .SetProperty(f => f.Status, FeedbackStatus.Respondido)
+                    .SetProperty(f => f.Resposta, resposta)
+                    .SetProperty(f => f.RespondidoPorUsuarioId, adminId)
+                    .SetProperty(f => f.RespondidoPorUsuarioNome, adminNome)
+                    .SetProperty(f => f.RespondidoEm, when)
+                    .SetProperty(f => f.UpdatedAt, when)
+                    .SetProperty(f => f.Version, f => f.Version + 1), ct);
+        }
+
+        return await GetAdminAsync(id, ct);
+    }
 }

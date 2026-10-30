@@ -20,4 +20,18 @@ public interface IUserFeedbackRepository : IBaseRepository<UserFeedback>
         CancellationToken ct = default);
     Task<IReadOnlyList<(Guid UsuarioId, string UsuarioNome)>> ListAdminUsuariosAsync(CancellationToken ct = default);
     Task<UserFeedback?> GetAdminAsync(Guid id, CancellationToken ct = default);
+
+    /// <summary>
+    /// Console mark-as-read across tenants. Uses ExecuteUpdate so StampTenant does not block
+    /// the operator updating another user's feedback.
+    /// </summary>
+    Task<UserFeedback?> MarkReadAdminAsync(
+        Guid id, Guid adminId, string adminNome, DateTime when, CancellationToken ct = default);
+
+    /// <summary>
+    /// Console reply across tenants. Uses ExecuteUpdate so StampTenant does not block
+    /// the operator updating another user's feedback.
+    /// </summary>
+    Task<UserFeedback?> ReplyAdminAsync(
+        Guid id, Guid adminId, string adminNome, string resposta, DateTime when, CancellationToken ct = default);
 }
