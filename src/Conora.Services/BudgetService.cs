@@ -83,7 +83,6 @@ public sealed partial class BudgetService
     /// <summary>Purchases whose invoice plan can place a slice in the competence. The caller sums <see cref="CardPurchase.AmountInCompetence"/>.</summary>
     private async Task<IReadOnlyList<CardPurchase>> ListPurchasesTouchingAsync(
         string ym,
-        DateTime until,
         HashSet<Guid> categoryIds,
         IReadOnlyList<Guid> userIds,
         bool multi,
@@ -95,13 +94,11 @@ public sealed partial class BudgetService
                 userIds,
                 p => p.FirstInvoiceYm.CompareTo(windowStart) >= 0
                      && p.FirstInvoiceYm.CompareTo(ym) <= 0
-                     && p.PurchasedAt <= until
                      && categoryIds.Contains(p.CategoryId),
                 ct)
             : await _repo.ListAsync<CardPurchase>(
                 p => p.FirstInvoiceYm.CompareTo(windowStart) >= 0
                      && p.FirstInvoiceYm.CompareTo(ym) <= 0
-                     && p.PurchasedAt <= until
                      && categoryIds.Contains(p.CategoryId),
                 ct);
     }
@@ -255,16 +252,6 @@ public sealed partial class BudgetService
         return decimal.Round(actual / today.Day * daysInMonth, 2);
     }
 
-    /// <summary>For the current competence, only counts amounts through today; past months use the full month.</summary>
-    private static DateTime ActualUntilUtc(string ym)
-    {
-        var today = DateTime.UtcNow;
-        if (ym != Competence.From(today))
-            return DateTime.SpecifyKind(DateTime.MaxValue.AddDays(-1), DateTimeKind.Utc);
-
-        return today;
-    }
-
     private async Task<decimal> GetReceivedIncomeAsync(
         string ym,
         IReadOnlyList<Guid> userIds,
@@ -272,7 +259,6 @@ public sealed partial class BudgetService
         SharingScope scope,
         CancellationToken ct)
     {
-        var until = ActualUntilUtc(ym);
         var selfId = _family.RequireUserId();
         var allowedCategoryIds = (await _repo.ListForUsuariosAsync<Category>(
                 userIds,
@@ -287,7 +273,6 @@ public sealed partial class BudgetService
                 userIds,
                 e => e.CompetenceYm == ym
                      && e.Type == EntryType.Income
-                     && e.OccurredAt <= until
                      && (
                          (e.CategoryId != null && allowedCategoryIds.Contains(e.CategoryId.Value))
                          || (e.UsuarioId == selfId && e.CategoryId == null)),
@@ -297,7 +282,6 @@ public sealed partial class BudgetService
         return await _repo.SumAsync<Entry>(
             e => e.CompetenceYm == ym
                  && e.Type == EntryType.Income
-                 && e.OccurredAt <= until
                  && (
                      (e.CategoryId != null && allowedCategoryIds.Contains(e.CategoryId.Value))
                      || e.CategoryId == null),
@@ -338,11 +322,7 @@ public sealed partial class BudgetService
 
         var totals = new Dictionary<string, decimal>(StringComparer.Ordinal);
         foreach (var entry in entries)
-        {
-            if (entry.OccurredAt > ActualUntilUtc(entry.CompetenceYm))
-                continue;
             totals[entry.CompetenceYm] = totals.GetValueOrDefault(entry.CompetenceYm) + entry.Amount;
-        }
 
         return totals;
     }
