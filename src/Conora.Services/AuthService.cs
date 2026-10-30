@@ -109,6 +109,9 @@ public sealed class AuthService
             _tokens.HashRefreshToken(token),
             DateTime.UtcNow.Add(PreRegistrationTtl),
             await IsTrainingStudentAsync(email, ct));
+        if (_env.IsDevelopment())
+            return await ConsumeLocalConfirmationAsync(pending, token, ct);
+
         _preRegistrations.Add(pending);
         await _uow.SaveChangesAsync(ct);
         await SendPreRegistrationEmailAsync(email, token, ct);
@@ -169,6 +172,9 @@ public sealed class AuthService
                 _tokens.HashRefreshToken(token),
                 DateTime.UtcNow.Add(PreRegistrationTtl),
                 await IsTrainingStudentAsync(email, ct));
+            if (_env.IsDevelopment())
+                return await ConsumeLocalConfirmationAsync(pending, token, ct);
+
             _preRegistrations.Add(pending);
             await _uow.SaveChangesAsync(ct);
             await SendPreRegistrationEmailAsync(email, token, ct);
@@ -226,6 +232,9 @@ public sealed class AuthService
                 _tokens.HashRefreshToken(token),
                 DateTime.UtcNow.Add(PreRegistrationTtl),
                 await IsTrainingStudentAsync(email, ct));
+            if (_env.IsDevelopment())
+                return await ConsumeLocalConfirmationAsync(pending, token, ct);
+
             _preRegistrations.Add(pending);
             await _uow.SaveChangesAsync(ct);
             await SendPreRegistrationEmailAsync(email, token, ct);
@@ -236,6 +245,20 @@ public sealed class AuthService
             throw new AccountNotFoundException();
 
         return await IssueForExistingUserAsync(user, "UserAppleLoggedIn", ct);
+    }
+
+    /// <summary>
+    /// Development only. Saves the confirmation link and consumes it at once, so localhost
+    /// creates the account without an inbox. Production still sends the e-mail.
+    /// </summary>
+    private async Task<AuthResponse> ConsumeLocalConfirmationAsync(
+        PreRegistration pending,
+        string rawToken,
+        CancellationToken ct)
+    {
+        _preRegistrations.Add(pending);
+        await _uow.SaveChangesAsync(ct);
+        return await VerifyEmailAsync(new VerifyEmailRequest(rawToken), ct);
     }
 
     private static string PreRegistrationEmailSentMessage(string email)
