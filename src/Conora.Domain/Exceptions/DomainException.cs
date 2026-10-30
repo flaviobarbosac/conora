@@ -32,7 +32,11 @@ public sealed class UserNotFoundException : DomainException
 
 public sealed class DuplicateEmailException : DomainException
 {
-    public DuplicateEmailException(string email) : base($"Já existe um usuário cadastrado com o email '{email}'.")
+    public DuplicateEmailException(string email)
+        : base(
+            string.IsNullOrWhiteSpace(email)
+                ? "Este e-mail já tem uma conta Conora. Entre com esse acesso."
+                : $"Este e-mail ({email.Trim()}) já tem uma conta Conora. Entre com esse acesso.")
     {
     }
 }

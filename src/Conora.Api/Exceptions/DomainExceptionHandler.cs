@@ -95,7 +95,7 @@ public sealed class DomainExceptionHandler : IExceptionHandler
         PlanBlockedException => (StatusCodes.Status402PaymentRequired, "Conta bloqueada"),
         ForbiddenException => (StatusCodes.Status403Forbidden, "Acesso negado"),
         UserNotFoundException => (StatusCodes.Status404NotFound, "Usuário não encontrado"),
-        DuplicateEmailException => (StatusCodes.Status409Conflict, "Email duplicado"),
+        DuplicateEmailException => (StatusCodes.Status409Conflict, "Conta existente"),
         DuplicateCpfException => (StatusCodes.Status409Conflict, "CPF duplicado"),
         SocialAccountExistsException => (StatusCodes.Status409Conflict, "Conta já existe"),
         AccountNotFoundException => (StatusCodes.Status404NotFound, "Conta não encontrada"),
