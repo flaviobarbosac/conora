@@ -112,9 +112,7 @@ public sealed class AuthService
         _preRegistrations.Add(pending);
         await _uow.SaveChangesAsync(ct);
         await SendPreRegistrationEmailAsync(email, token, ct);
-        throw new ValidationException(
-            "email",
-            "Enviamos um e-mail de validação. Abra a mensagem e clique no link em até 10 minutos para criar sua conta.");
+        throw new ValidationException("email", PreRegistrationEmailSentMessage(email));
     }
 
     public async Task<AuthResponse> LoginAsync(LoginRequest request, CancellationToken ct)
@@ -174,9 +172,7 @@ public sealed class AuthService
             _preRegistrations.Add(pending);
             await _uow.SaveChangesAsync(ct);
             await SendPreRegistrationEmailAsync(email, token, ct);
-            throw new ValidationException(
-                "email",
-                "Enviamos um e-mail de validação. Abra a mensagem e clique no link em até 10 minutos para criar sua conta.");
+            throw new ValidationException("email", PreRegistrationEmailSentMessage(email));
         }
 
         if (user is null)
@@ -233,9 +229,7 @@ public sealed class AuthService
             _preRegistrations.Add(pending);
             await _uow.SaveChangesAsync(ct);
             await SendPreRegistrationEmailAsync(email, token, ct);
-            throw new ValidationException(
-                "email",
-                "Enviamos um e-mail de validação. Abra a mensagem e clique no link em até 10 minutos para criar sua conta.");
+            throw new ValidationException("email", PreRegistrationEmailSentMessage(email));
         }
 
         if (user is null)
@@ -243,6 +237,9 @@ public sealed class AuthService
 
         return await IssueForExistingUserAsync(user, "UserAppleLoggedIn", ct);
     }
+
+    private static string PreRegistrationEmailSentMessage(string email)
+        => $"Enviamos um e-mail de validação para {email}. Abra a mensagem e clique no link em até 10 minutos para criar sua conta.";
 
     private static bool IsRegisterIntent(string? intent)
         => string.Equals(intent?.Trim(), "register", StringComparison.OrdinalIgnoreCase);
