@@ -197,6 +197,23 @@ public sealed partial class BudgetService
         await SetLineAsync(budget, tithe.Id, Math.Max(0, decimal.Round(totalTithe, 2)), ct);
     }
 
+    /// <summary>
+    /// Mirrors diagnosis INSS/IR into planned Discount lines so Raio-X/orçamento show them before payroll entries exist.
+    /// </summary>
+    public async Task SyncPlannedDiscountsAsync(
+        string competenceYm,
+        decimal totalInss,
+        decimal totalIr,
+        CancellationToken ct)
+    {
+        var ym = Competence.Require(competenceYm);
+        var inss = await _categories.GetByCodeAsync(SystemCategories.Inss, ct);
+        var ir = await _categories.GetByCodeAsync(SystemCategories.Ir, ct);
+        var budget = await GetOrCreateBudgetAsync(ym, BudgetMode.Simple, ct);
+        await SetLineAsync(budget, inss.Id, Math.Max(0, decimal.Round(totalInss, 2)), ct);
+        await SetLineAsync(budget, ir.Id, Math.Max(0, decimal.Round(totalIr, 2)), ct);
+    }
+
     public async Task UpsertPlannedForAccountAsync(
         Guid categoryId,
         IReadOnlyList<string> months,
