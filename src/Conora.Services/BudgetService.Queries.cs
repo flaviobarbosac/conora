@@ -19,7 +19,6 @@ public async Task<Dictionary<Guid, decimal>> GetActualsAsync(
         var scope = await _family.ResolveSharingScopeAsync(sharingScope, ct);
         var userIds = await _family.GetReadableUsuarioIdsAsync(ct, scope);
         var multi = userIds.Count > 1;
-        var until = ActualUntilUtc(ym);
 
         var allowedCategoryIds = (await _repo.ListForUsuariosAsync<Category>(
                 userIds,
@@ -31,7 +30,6 @@ public async Task<Dictionary<Guid, decimal>> GetActualsAsync(
         var entries = multi
             ? await _repo.QueryForUsuariosAsync<Entry, AccountSum>(userIds, q => q
                 .Where(e => e.CompetenceYm == ym
-                            && e.OccurredAt <= until
                             && (e.Type == EntryType.Income
                                 || e.Type == EntryType.Expense
                                 || e.Type == EntryType.Contribution
@@ -42,7 +40,6 @@ public async Task<Dictionary<Guid, decimal>> GetActualsAsync(
                 .Select(g => new AccountSum(g.Key, g.Sum(x => x.Amount))), ct)
             : await _repo.QueryAsync<Entry, AccountSum>(q => q
                 .Where(e => e.CompetenceYm == ym
-                            && e.OccurredAt <= until
                             && (e.Type == EntryType.Income
                                 || e.Type == EntryType.Expense
                                 || e.Type == EntryType.Contribution
@@ -52,7 +49,7 @@ public async Task<Dictionary<Guid, decimal>> GetActualsAsync(
                 .GroupBy(e => e.CategoryId!.Value)
                 .Select(g => new AccountSum(g.Key, g.Sum(x => x.Amount))), ct);
 
-        var purchases = await ListPurchasesTouchingAsync(ym, until, allowedCategoryIds, userIds, multi, ct);
+        var purchases = await ListPurchasesTouchingAsync(ym, allowedCategoryIds, userIds, multi, ct);
 
         var totals = new Dictionary<Guid, decimal>();
         foreach (var row in entries)
@@ -146,6 +143,8 @@ public async Task<BudgetResponse> GetAsync(string competenceYm, CancellationToke
         var plannedPairs = plannedByCode.Select(kv =>
         {
             var id = accountIdByCode.GetValueOrDefault(kv.Key);
+            if (id == Guid.Empty && Guid.TryParse(kv.Key, out var fromKey))
+                id = fromKey;
             return (CategoryId: id == Guid.Empty ? Guid.NewGuid() : id, Planned: kv.Value, ExpenseDay: dayByCode.GetValueOrDefault(kv.Key));
         }).ToList();
 
@@ -217,11 +216,9 @@ public async Task<CategoryMemberBreakdownResponse> GetCategoryBreakdownAsync(
                  && ((local.Code != null && c.Code == local.Code) || c.Name == local.Name),
             ct);
         var categoryIds = peerCategories.Select(c => c.Id).ToHashSet();
-        var until = ActualUntilUtc(ym);
         var entries = await _repo.ListForUsuariosAsync<Entry>(
             userIds,
             e => e.CompetenceYm == ym
-                 && e.OccurredAt <= until
                  && e.CategoryId != null
                  && categoryIds.Contains(e.CategoryId.Value)
                  && (e.Type == EntryType.Income
@@ -229,7 +226,7 @@ public async Task<CategoryMemberBreakdownResponse> GetCategoryBreakdownAsync(
                      || e.Type == EntryType.Contribution
                      || e.Type == EntryType.ProjectContribution),
             ct);
-        var purchases = await ListPurchasesTouchingAsync(ym, until, categoryIds, userIds, userIds.Count > 1, ct);
+        var purchases = await ListPurchasesTouchingAsync(ym, categoryIds, userIds, userIds.Count > 1, ct);
 
         var byUser = userIds.ToDictionary(id => id, _ => 0m);
         foreach (var entry in entries)
