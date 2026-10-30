@@ -114,8 +114,10 @@ public sealed class FeedbackService
         if (entity is null)
             return null;
 
-        entity.MarkReadByAdmin(adminId, adminNome, DateTime.UtcNow);
-        await _uow.SaveChangesAsync(ct);
+        // Cross-tenant write: ExecuteUpdate bypasses StampTenant (same pattern as family join).
+        if (entity.Status == FeedbackStatus.Novo)
+            entity = await _feedbacks.MarkReadAdminAsync(id, adminId, adminNome, DateTime.UtcNow, ct) ?? entity;
+
         return ToConsoleResponse(entity);
     }
 
@@ -132,13 +134,8 @@ public sealed class FeedbackService
         if (resposta.Length > 2000)
             throw new ValidationException("resposta", "Resposta deve ter no máximo 2000 caracteres.");
 
-        var entity = await _feedbacks.GetAdminAsync(id, ct);
-        if (entity is null)
-            return null;
-
-        entity.Reply(adminId, adminNome, resposta, DateTime.UtcNow);
-        await _uow.SaveChangesAsync(ct);
-        return ToConsoleResponse(entity);
+        var entity = await _feedbacks.ReplyAdminAsync(id, adminId, adminNome, resposta, DateTime.UtcNow, ct);
+        return entity is null ? null : ToConsoleResponse(entity);
     }
 
     private Guid RequireUserId()
