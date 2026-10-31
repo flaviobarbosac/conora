@@ -16,6 +16,10 @@ public class PreRegistration
     public bool IsTrainingStudent { get; private set; }
     public string TokenHash { get; private set; } = default!;
     public DateTime ExpiresAtUtc { get; private set; }
+    /// <summary>Set when the link first creates the user. Reuse is allowed for 1 minute after this.</summary>
+    public DateTime? FirstConsumedAtUtc { get; private set; }
+    /// <summary>User created by the first successful confirmation of this link.</summary>
+    public Guid? PromotedUserId { get; private set; }
     public DateTime CreatedAt { get; private set; } = DateTime.UtcNow;
 
     private PreRegistration()
@@ -107,6 +111,26 @@ public class PreRegistration
         => string.Equals(TokenHash, tokenHash, StringComparison.Ordinal)
            && ExpiresAtUtc > DateTime.UtcNow;
 
+    /// <summary>Reuse window after first consume: min(ExpiresAtUtc, FirstConsumedAtUtc + 1 minute).</summary>
+    public bool CanReuse(string tokenHash, DateTime utcNow, TimeSpan reuseWindow)
+    {
+        if (!string.Equals(TokenHash, tokenHash, StringComparison.Ordinal))
+            return false;
+        if (FirstConsumedAtUtc is null || PromotedUserId is null)
+            return false;
+        if (ExpiresAtUtc <= utcNow)
+            return false;
+        return utcNow < FirstConsumedAtUtc.Value.Add(reuseWindow);
+    }
+
+    public void MarkConsumed(Guid userId, DateTime utcNow)
+    {
+        if (userId == Guid.Empty)
+            throw new ArgumentException("Usuário inválido.", nameof(userId));
+        FirstConsumedAtUtc ??= utcNow;
+        PromotedUserId ??= userId;
+    }
+
     public void RefreshToken(string tokenHash, DateTime expiresAtUtc)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(tokenHash);
@@ -114,5 +138,7 @@ public class PreRegistration
             throw new ArgumentException("Prazo inválido.", nameof(expiresAtUtc));
         TokenHash = tokenHash;
         ExpiresAtUtc = expiresAtUtc;
+        FirstConsumedAtUtc = null;
+        PromotedUserId = null;
     }
 }

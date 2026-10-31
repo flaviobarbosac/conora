@@ -14,6 +14,29 @@ public static class Competence
 
     public static string From(DateTime date) => date.ToString(Format, CultureInfo.InvariantCulture);
 
+    /// <summary>Current competence in America/Sao_Paulo (same wall clock as the app).</summary>
+    public static string TodayYm(DateTime? utcNow = null)
+    {
+        var utc = utcNow ?? DateTime.UtcNow;
+        if (utc.Kind == DateTimeKind.Unspecified)
+            utc = DateTime.SpecifyKind(utc, DateTimeKind.Utc);
+        else if (utc.Kind == DateTimeKind.Local)
+            utc = utc.ToUniversalTime();
+
+        TimeZoneInfo zone;
+        try
+        {
+            zone = TimeZoneInfo.FindSystemTimeZoneById("America/Sao_Paulo");
+        }
+        catch (TimeZoneNotFoundException)
+        {
+            zone = TimeZoneInfo.FindSystemTimeZoneById("E. South America Standard Time");
+        }
+
+        var local = TimeZoneInfo.ConvertTimeFromUtc(utc, zone);
+        return From(local);
+    }
+
     public static string Require(string? ym, string field = "competenceYm")
     {
         if (!IsValid(ym))

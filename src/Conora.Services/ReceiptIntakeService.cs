@@ -137,17 +137,24 @@ public sealed class ReceiptIntakeService
 
         Guid? supplierId = null;
         string? cnpj = null;
-        // Global registry only when CNPJ is present; otherwise classification is local to this intake.
+        var userId = _tenant.UsuarioId
+                     ?? throw new UnauthorizedAccessException("Tenant não autenticado.");
+        // Prefer CNPJ when present; otherwise remember by normalized supplier name for the next receipt.
         if (!string.IsNullOrWhiteSpace(intake.ExtractedCnpj)
             && BrazilianCnpj.TryNormalize(intake.ExtractedCnpj, out var normalized))
         {
             var supplier = await EnsureSupplierAsync(intake, ct);
-            var userId = _tenant.UsuarioId
-                         ?? throw new UnauthorizedAccessException("Tenant não autenticado.");
             supplier.TrySetClassification(code, userId);
             await _suppliers.UpsertUserCategoryAsync(supplier.Id, userId, code, ct);
             supplierId = supplier.Id;
             cnpj = supplier.Cnpj;
+        }
+        else if (!string.IsNullOrWhiteSpace(intake.ExtractedName))
+        {
+            var supplier = await EnsureSupplierByNameAsync(intake.ExtractedName, ct);
+            supplier.TrySetClassification(code, userId);
+            await _suppliers.UpsertUserCategoryAsync(supplier.Id, userId, code, ct);
+            supplierId = supplier.Id;
         }
 
         intake.SetClassification(code, supplierId);
@@ -372,6 +379,26 @@ public sealed class ReceiptIntakeService
                 }
                 // New valid CNPJ: do not create yet — similar matches are offered on the response.
             }
+            else if (string.IsNullOrWhiteSpace(cnpj) && !string.IsNullOrWhiteSpace(name))
+            {
+                var byName = await _suppliers.FindByNormalizedNameAsync(Supplier.NormalizeName(name), ct);
+                if (byName is not null)
+                {
+                    supplierId = byName.Id;
+                    name = byName.Name;
+                    var userId = _tenant.UsuarioId;
+                    if (userId is Guid uid)
+                    {
+                        proposedCode = await _suppliers.GetUserCategoryCodeAsync(byName.Id, uid, ct)
+                                       ?? byName.DefaultCategoryCode;
+                        preferredBankAccountId = await ResolvePreferredBankAccountAsync(byName.Id, uid, ct);
+                    }
+                    else
+                    {
+                        proposedCode = byName.DefaultCategoryCode;
+                    }
+                }
+            }
             else if (!string.IsNullOrWhiteSpace(cnpj))
             {
                 intake.MarkFailed("CNPJ inválido");
@@ -571,6 +598,19 @@ public sealed class ReceiptIntakeService
             await _uow.SaveChangesAsync(ct);
         }
 
+        return supplier;
+    }
+
+    private async Task<Supplier> EnsureSupplierByNameAsync(string name, CancellationToken ct)
+    {
+        var normalized = Supplier.NormalizeName(name);
+        var supplier = await _suppliers.FindByNormalizedNameAsync(normalized, ct);
+        if (supplier is not null)
+            return supplier;
+
+        supplier = Supplier.Create(name, cnpj: null);
+        _suppliers.Add(supplier);
+        await _uow.SaveChangesAsync(ct);
         return supplier;
     }
 

@@ -253,7 +253,7 @@ public sealed class LifeProjectService
     private static void EnsureContributionWindow(string contributionStartYm, DateTime dueDate, string? previousStartYm)
     {
         var startYm = Competence.Require(contributionStartYm, "contributionStartYm");
-        var currentYm = Competence.From(DateTime.UtcNow);
+        var currentYm = Competence.TodayYm();
         if (Competence.Compare(startYm, currentYm) < 0 && startYm != previousStartYm)
             throw new ValidationException("contributionStartYm", "O início do rateio não pode ser antes do mês atual.");
 

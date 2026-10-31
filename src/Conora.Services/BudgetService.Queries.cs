@@ -68,6 +68,9 @@ public async Task<Dictionary<Guid, decimal>> GetActualsAsync(
 public async Task<BudgetResponse> GetAsync(string competenceYm, CancellationToken ct, SharingScope? sharingScope = null)
     {
         var ym = Competence.Require(competenceYm);
+        // Heal missing parcels from life projects before assembling the response.
+        if (sharingScope is null or SharingScope.Personal)
+            await SyncLifeProjectParcelsAsync(ym, ct);
         var scope = await _family.ResolveSharingScopeAsync(sharingScope, ct);
         var userIds = await _family.GetReadableUsuarioIdsAsync(ct, scope);
         var multi = userIds.Count > 1;
