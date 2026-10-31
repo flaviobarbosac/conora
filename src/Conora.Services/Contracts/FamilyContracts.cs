@@ -68,7 +68,8 @@ public sealed record UpdatePreferencesRequest(
     bool IncludeAbsoluteValuesInRetrospective,
     bool VoiceEntryConfirm = true,
     int BudgetAlertPercent = 70,
-    bool PhotoEvolutionEnabled = true);
+    bool PhotoEvolutionEnabled = true,
+    bool HomeJourneyTimelineEnabled = true);
 
 public sealed record ProfileResponse(
     Guid UsuarioId,
@@ -85,6 +86,7 @@ public sealed record ProfileResponse(
     bool HasAppleLogin = false,
     int BudgetAlertPercent = 70,
     bool PhotoEvolutionEnabled = true,
+    bool HomeJourneyTimelineEnabled = true,
     string? Phone = null,
     string? Cep = null,
     DateTime? ContractAcknowledgedAt = null,

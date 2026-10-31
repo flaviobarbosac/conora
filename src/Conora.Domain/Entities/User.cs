@@ -40,6 +40,8 @@ public class User : ModelBase
     public int BudgetAlertPercent { get; private set; } = 70;
     /// <summary>When true, Ian and Clara portraits and voice bands follow milestone age. When false, both stay at age 30 / adult.</summary>
     public bool PhotoEvolutionEnabled { get; private set; } = true;
+    /// <summary>When true, the Raio-X journey timeline is shown on the home screen.</summary>
+    public bool HomeJourneyTimelineEnabled { get; private set; } = true;
 
     /// <summary>Object-store key for the profile photo (not the bytes).</summary>
     public string? PhotoObjectKey { get; private set; }
@@ -184,7 +186,8 @@ public class User : ModelBase
         bool includeAbsoluteValuesInRetrospective,
         bool voiceEntryConfirm = true,
         int budgetAlertPercent = 70,
-        bool photoEvolutionEnabled = true)
+        bool photoEvolutionEnabled = true,
+        bool homeJourneyTimelineEnabled = true)
     {
         var errors = new Dictionary<string, string[]>();
         var theme = ThemeCatalog.Normalize(themeId);
@@ -208,6 +211,7 @@ public class User : ModelBase
         VoiceEntryConfirm = voiceEntryConfirm;
         BudgetAlertPercent = budgetAlertPercent;
         PhotoEvolutionEnabled = photoEvolutionEnabled;
+        HomeJourneyTimelineEnabled = homeJourneyTimelineEnabled;
     }
 
     public void RequestDeletion()

@@ -45,8 +45,8 @@ namespace Conora.Infrastructure.Persistence.Migrations
                         .HasColumnType("character varying(3)");
 
                     b.Property<string>("CheckDigit")
-                        .HasMaxLength(2)
-                        .HasColumnType("character varying(2)");
+                        .HasMaxLength(3)
+                        .HasColumnType("character varying(3)");
 
                     b.Property<DateTime>("CreatedAt")
                         .HasColumnType("timestamp with time zone");
@@ -1364,6 +1364,9 @@ namespace Conora.Infrastructure.Persistence.Migrations
                     b.Property<DateTime>("ExpiresAtUtc")
                         .HasColumnType("timestamp with time zone");
 
+                    b.Property<DateTime?>("FirstConsumedAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
                     b.Property<string>("GoogleId")
                         .HasMaxLength(100)
                         .HasColumnType("character varying(100)");
@@ -1379,6 +1382,9 @@ namespace Conora.Infrastructure.Persistence.Migrations
                     b.Property<string>("PasswordHash")
                         .HasMaxLength(500)
                         .HasColumnType("character varying(500)");
+
+                    b.Property<Guid?>("PromotedUserId")
+                        .HasColumnType("uuid");
 
                     b.Property<string>("TokenHash")
                         .IsRequired()
@@ -1776,6 +1782,11 @@ namespace Conora.Infrastructure.Persistence.Migrations
                     b.Property<string>("GoogleId")
                         .HasMaxLength(100)
                         .HasColumnType("character varying(100)");
+
+                    b.Property<bool>("HomeJourneyTimelineEnabled")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("boolean")
+                        .HasDefaultValue(true);
 
                     b.Property<bool>("IncludeAbsoluteValuesInRetrospective")
                         .HasColumnType("boolean");

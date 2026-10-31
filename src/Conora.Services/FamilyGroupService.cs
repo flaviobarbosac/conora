@@ -274,6 +274,7 @@ public sealed partial class FamilyGroupService
             !string.IsNullOrEmpty(user.AppleId),
             user.BudgetAlertPercent,
             user.PhotoEvolutionEnabled,
+            user.HomeJourneyTimelineEnabled,
             user.Phone,
             user.Cep,
             user.ContractAcknowledgedAt,

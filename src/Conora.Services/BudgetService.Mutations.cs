@@ -248,4 +248,49 @@ public sealed partial class BudgetService
 
         await _uow.SaveChangesAsync(ct);
     }
+
+    /// <summary>
+    /// Ensures planned BudgetLines for the competence match active life-project parcels
+    /// (create/rebuild can miss a month; opening the budget heals it).
+    /// </summary>
+    public async Task SyncLifeProjectParcelsAsync(string competenceYm, CancellationToken ct)
+    {
+        var ym = Competence.Require(competenceYm);
+        var projects = await _repo.ListAsync<LifeProject>(p => p.CategoryId != null, ct);
+        if (projects.Count == 0)
+            return;
+
+        var byAccount = new Dictionary<Guid, decimal>();
+        foreach (var project in projects)
+        {
+            if (project.CategoryId is not Guid accountId)
+                continue;
+            var months = Competence.RangeInclusive(project.ContributionStartYm, Competence.From(project.DueDate));
+            if (!months.Contains(ym, StringComparer.Ordinal))
+                continue;
+            var parcel = decimal.Round(project.GoalAmount / months.Count, 2);
+            var allocated = 0m;
+            for (var i = 0; i < months.Count; i++)
+            {
+                var value = i == months.Count - 1 ? project.GoalAmount - allocated : parcel;
+                allocated += value;
+                if (months[i] != ym)
+                    continue;
+                byAccount[accountId] = byAccount.GetValueOrDefault(accountId) + value;
+            }
+        }
+
+        foreach (var (accountId, amount) in byAccount)
+        {
+            if (amount <= 0)
+                continue;
+            var current = 0m;
+            var budget = await _repo.FirstOrDefaultAsync<Budget>(b => b.CompetenceYm == ym, ct, track: false);
+            if (budget is not null)
+                current = await GetPlannedAsync(budget.Id, accountId, ct);
+            if (current == amount)
+                continue;
+            await UpsertPlannedForAccountAsync(accountId, [ym], amount, ct);
+        }
+    }
 }

@@ -52,7 +52,8 @@ public sealed partial class FamilyGroupService
             request.IncludeAbsoluteValuesInRetrospective,
             request.VoiceEntryConfirm,
             request.BudgetAlertPercent,
-            request.PhotoEvolutionEnabled);
+            request.PhotoEvolutionEnabled,
+            request.HomeJourneyTimelineEnabled);
         await _uow.SaveChangesAsync(ct);
 
         if (request.EmailsEnabled)

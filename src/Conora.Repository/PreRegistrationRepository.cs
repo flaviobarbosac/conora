@@ -28,7 +28,12 @@ public sealed class PreRegistrationRepository : IPreRegistrationRepository
         => _db.PreRegistrations.FirstOrDefaultAsync(e => e.AppleId == appleId, ct);
 
     public async Task<int> DeleteExpiredAsync(DateTime utcNow, CancellationToken ct = default)
-        => await _db.PreRegistrations
-            .Where(e => e.ExpiresAtUtc < utcNow)
+    {
+        var reuseCutoff = utcNow.AddMinutes(-1);
+        return await _db.PreRegistrations
+            .Where(e =>
+                e.ExpiresAtUtc < utcNow
+                || (e.FirstConsumedAtUtc != null && e.FirstConsumedAtUtc < reuseCutoff))
             .ExecuteDeleteAsync(ct);
+    }
 }

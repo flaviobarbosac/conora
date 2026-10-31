@@ -84,7 +84,26 @@ public class Account : ModelBase, ITenantOwned
         BankCode = code;
         Agency = NormalizeOptional(agency, 20);
         AccountNumber = NormalizeOptional(accountNumber, 20);
-        CheckDigit = NormalizeOptional(checkDigit, 2);
+        CheckDigit = NormalizeCheckDigit(checkDigit);
+    }
+
+    private static string? NormalizeCheckDigit(string? value)
+    {
+        if (string.IsNullOrWhiteSpace(value))
+            return null;
+
+        var trimmed = value.Trim().ToUpperInvariant();
+        if (trimmed.Length > 3)
+            throw new ValidationException("checkDigit", "Dígito verificador deve ter no máximo 3 caracteres.");
+
+        foreach (var ch in trimmed)
+        {
+            if (ch is (>= '0' and <= '9') or (>= 'A' and <= 'Z'))
+                continue;
+            throw new ValidationException("checkDigit", "Dígito verificador deve ser número ou letra.");
+        }
+
+        return trimmed;
     }
 
     private static string? NormalizeOptional(string? value, int maxLength)
