@@ -33,8 +33,10 @@ public sealed class AppleReceiptValidationTests : IDisposable
 
         Assert.Equal("conora.individual.monthly", receipt.ProductId);
         Assert.True(receipt.Entitled);
-        Assert.Equal(2, handler.Hosts.Count);
+        // Transaction lookup, then the subscription status (renewal and cancel) in the same environment.
+        Assert.Equal(4, handler.Hosts.Count);
         Assert.Contains("sandbox", handler.Hosts[1]);
+        Assert.Contains("sandbox", handler.Hosts[3]);
     }
 
     [Fact]
