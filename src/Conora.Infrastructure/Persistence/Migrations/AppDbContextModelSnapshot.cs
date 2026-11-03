@@ -1783,12 +1783,31 @@ namespace Conora.Infrastructure.Persistence.Migrations
                         .HasMaxLength(100)
                         .HasColumnType("character varying(100)");
 
+                    b.Property<string>("HomeJourneyDisplay")
+                        .IsRequired()
+                        .ValueGeneratedOnAdd()
+                        .HasMaxLength(16)
+                        .HasColumnType("character varying(16)")
+                        .HasDefaultValue("shown");
+
                     b.Property<bool>("HomeJourneyTimelineEnabled")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("boolean")
                         .HasDefaultValue(true);
 
                     b.Property<bool>("IncludeAbsoluteValuesInRetrospective")
+                        .HasColumnType("boolean");
+
+                    b.Property<bool?>("JornadaDivida")
+                        .HasColumnType("boolean");
+
+                    b.Property<bool?>("JornadaPatrimonio")
+                        .HasColumnType("boolean");
+
+                    b.Property<bool?>("JornadaProjetoVida")
+                        .HasColumnType("boolean");
+
+                    b.Property<bool?>("JornadaRendaFixa")
                         .HasColumnType("boolean");
 
                     b.Property<bool>("IsTrainingStudent")

@@ -34,6 +34,11 @@ public class UserConfiguration : IEntityTypeConfiguration<User>
         builder.Property(u => u.BudgetAlertPercent).IsRequired().HasDefaultValue(70);
         builder.Property(u => u.PhotoEvolutionEnabled).IsRequired().HasDefaultValue(true);
         builder.Property(u => u.HomeJourneyTimelineEnabled).IsRequired().HasDefaultValue(true);
+        builder.Property(u => u.HomeJourneyDisplay).IsRequired().HasMaxLength(16).HasDefaultValue(User.HomeJourneyShown);
+        builder.Property(u => u.JornadaRendaFixa);
+        builder.Property(u => u.JornadaDivida);
+        builder.Property(u => u.JornadaPatrimonio);
+        builder.Property(u => u.JornadaProjetoVida);
         builder.Property(u => u.PhotoObjectKey).HasMaxLength(500);
         builder.Property(u => u.PhotoContentHash).HasMaxLength(64);
         builder.Property(u => u.PhotoContentType).HasMaxLength(100);

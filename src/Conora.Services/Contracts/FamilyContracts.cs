@@ -1,3 +1,4 @@
+using Conora.Domain.Entities;
 using Conora.Domain.Enums;
 
 namespace Conora.Services.Contracts;
@@ -71,6 +72,14 @@ public sealed record UpdatePreferencesRequest(
     bool PhotoEvolutionEnabled = true,
     bool HomeJourneyTimelineEnabled = true);
 
+public sealed record JornadaDiagnosticoResponse(
+    bool? RendaFixa,
+    bool? Divida,
+    bool? Patrimonio,
+    bool? ProjetoVida);
+
+public sealed record UpdateJornadaRequest(string? Display, JornadaDiagnosticoResponse? Answers);
+
 public sealed record ProfileResponse(
     Guid UsuarioId,
     string Name,
@@ -91,7 +100,9 @@ public sealed record ProfileResponse(
     string? Cep = null,
     DateTime? ContractAcknowledgedAt = null,
     bool HasPhoto = false,
-    string? PhotoContentHash = null);
+    string? PhotoContentHash = null,
+    string HomeJourneyDisplay = User.HomeJourneyShown,
+    JornadaDiagnosticoResponse? JornadaDiagnostico = null);
 
 public sealed record ProfilePhotoContent(byte[] Content, string ContentType, string ContentHash);
 

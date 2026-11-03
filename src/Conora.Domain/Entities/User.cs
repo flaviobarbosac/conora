@@ -40,8 +40,20 @@ public class User : ModelBase
     public int BudgetAlertPercent { get; private set; } = 70;
     /// <summary>When true, Ian and Clara portraits and voice bands follow milestone age. When false, both stay at age 30 / adult.</summary>
     public bool PhotoEvolutionEnabled { get; private set; } = true;
-    /// <summary>When true, the Raio-X journey timeline is shown on the home screen.</summary>
+    /// <summary>When true, the Raio-X journey is not closed. Hidden still counts as enabled.</summary>
     public bool HomeJourneyTimelineEnabled { get; private set; } = true;
+
+    /// <summary>shown, hidden (a reveal control stays) or closed (nothing on home).</summary>
+    public string HomeJourneyDisplay { get; private set; } = HomeJourneyShown;
+
+    public bool? JornadaRendaFixa { get; private set; }
+    public bool? JornadaDivida { get; private set; }
+    public bool? JornadaPatrimonio { get; private set; }
+    public bool? JornadaProjetoVida { get; private set; }
+
+    public const string HomeJourneyShown = "shown";
+    public const string HomeJourneyHidden = "hidden";
+    public const string HomeJourneyClosed = "closed";
 
     /// <summary>Object-store key for the profile photo (not the bytes).</summary>
     public string? PhotoObjectKey { get; private set; }
@@ -211,7 +223,34 @@ public class User : ModelBase
         VoiceEntryConfirm = voiceEntryConfirm;
         BudgetAlertPercent = budgetAlertPercent;
         PhotoEvolutionEnabled = photoEvolutionEnabled;
-        HomeJourneyTimelineEnabled = homeJourneyTimelineEnabled;
+        if (!homeJourneyTimelineEnabled)
+        {
+            HomeJourneyDisplay = HomeJourneyClosed;
+            HomeJourneyTimelineEnabled = false;
+            return;
+        }
+
+        HomeJourneyTimelineEnabled = true;
+        if (HomeJourneyDisplay == HomeJourneyClosed)
+            HomeJourneyDisplay = HomeJourneyShown;
+    }
+
+    public void SetHomeJourneyDisplay(string display)
+    {
+        var value = display.Trim().ToLowerInvariant();
+        if (value is not (HomeJourneyShown or HomeJourneyHidden or HomeJourneyClosed))
+            throw new ValidationException("display", "Estado da jornada inválido.");
+
+        HomeJourneyDisplay = value;
+        HomeJourneyTimelineEnabled = value != HomeJourneyClosed;
+    }
+
+    public void SetJornadaAnswers(bool? rendaFixa, bool? divida, bool? patrimonio, bool? projetoVida)
+    {
+        JornadaRendaFixa = rendaFixa;
+        JornadaDivida = divida;
+        JornadaPatrimonio = patrimonio;
+        JornadaProjetoVida = projetoVida;
     }
 
     public void RequestDeletion()

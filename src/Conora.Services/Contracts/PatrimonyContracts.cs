@@ -13,7 +13,8 @@ public sealed record PatrimonyItemResponse(
     string Name,
     CategorySection Section,
     string GroupName,
-    decimal Amount);
+    decimal Amount,
+    string? CategoryCode = null);
 
 public sealed record PatrimonyGroupTotal(string GroupName, CategorySection Section, decimal Amount);
 

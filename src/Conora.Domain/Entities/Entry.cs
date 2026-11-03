@@ -76,6 +76,8 @@ public class Entry : ModelBase, ITenantOwned
         string description)
         => Apply(amount, occurredAt, competenceYm, accountId, contraAccountId, categoryId, incomeSourceId, memberId, description);
 
+    public void LinkLifeProject(Guid? lifeProjectId) => LifeProjectId = lifeProjectId;
+
     /// <summary>Signed balance effects of this entry on accounts. Transfers net to zero across accounts.</summary>
     public IEnumerable<(Guid AccountId, decimal Delta)> BalanceEffects()
     {

@@ -91,6 +91,8 @@ public sealed partial class BudgetService
                 continue;
             if (await HasLifeProjectAsync(line.CategoryId, ct))
                 continue;
+            var account = await _categories.RequireAnalyticalAsync(line.CategoryId, ct);
+            await EnsureManualPlanAllowedAsync(line.CategoryId, account, ct);
             await SetLineAsync(budget, line.CategoryId, line.PlannedAmount, ct, line.ExpenseDay, updateDay: true);
         }
 
@@ -268,16 +270,9 @@ public sealed partial class BudgetService
             var months = Competence.RangeInclusive(project.ContributionStartYm, Competence.From(project.DueDate));
             if (!months.Contains(ym, StringComparer.Ordinal))
                 continue;
-            var parcel = decimal.Round(project.GoalAmount / months.Count, 2);
-            var allocated = 0m;
-            for (var i = 0; i < months.Count; i++)
-            {
-                var value = i == months.Count - 1 ? project.GoalAmount - allocated : parcel;
-                allocated += value;
-                if (months[i] != ym)
-                    continue;
-                byAccount[accountId] = byAccount.GetValueOrDefault(accountId) + value;
-            }
+            if (!LifeProjectService.BuildParcelSchedule(project.GoalAmount, months).TryGetValue(ym, out var value))
+                continue;
+            byAccount[accountId] = byAccount.GetValueOrDefault(accountId) + value;
         }
 
         foreach (var (accountId, amount) in byAccount)

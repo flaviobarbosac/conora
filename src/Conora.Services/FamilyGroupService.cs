@@ -279,7 +279,13 @@ public sealed partial class FamilyGroupService
             user.Cep,
             user.ContractAcknowledgedAt,
             !string.IsNullOrEmpty(user.PhotoObjectKey),
-            user.PhotoContentHash);
+            user.PhotoContentHash,
+            string.IsNullOrWhiteSpace(user.HomeJourneyDisplay) ? User.HomeJourneyShown : user.HomeJourneyDisplay,
+            new JornadaDiagnosticoResponse(
+                user.JornadaRendaFixa,
+                user.JornadaDivida,
+                user.JornadaPatrimonio,
+                user.JornadaProjetoVida));
 
     private static FamilyInviteResponse ToInvite(FamilyInvite i)
         => new(i.Id, i.Email, i.ExpiresAt, i.AcceptedAt, i.CancelledAt, i.IsOpen);

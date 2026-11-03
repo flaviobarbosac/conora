@@ -205,7 +205,7 @@ public sealed class HelpService
             ]),
 
         new("projetos", "Projetos de vida",
-            "Metas com prazo, início do rateio e conta do plano. Pessoal ou do grupo familiar. O pagamento entra como receita na categoria do projeto.",
+            "Metas com prazo, início do rateio e conta do plano. Pessoal ou do grupo familiar. A receita nessa conta exige o projeto vinculado. O rateio é gravado no orçamento na criação.",
             [
                 new("Dashboard", "Barras por horizonte: verde curto, amarelo médio, azul longo. Acima da meta fica vermelho, com o texto Acima da meta. Clique no card abre o detalhe."),
                 new("Nome", "Nome do objetivo."),
@@ -215,13 +215,13 @@ public sealed class HelpService
                 new("Prazo", "Competência alvo. Obrigatório e não pode ser antes do início do rateio."),
                 new("Início do rateio", "Primeiro mês no orçamento. Padrão: mês seguinte. Faixa: mês atual até o prazo."),
                 new("Parcela sugerida", "Preview só leitura: meta ÷ meses (início até o prazo, inclusive)."),
-                new("Orçamento gerado", "Ao criar ou alterar, o Conora grava essa parcela em cada mês do intervalo. Excluir o projeto remove essas linhas."),
+                new("Orçamento gerado", "Ao criar o projeto, o Conora grava a parcela em cada mês do intervalo. Família e vários meses leem essas linhas. Excluir sem lançamento remove as parcelas. Com lançamento, a exclusão é bloqueada."),
                 new("Valor original", "Meta usada no rateio do orçamento. Não muda com os lançamentos."),
                 new("Valor atualizado", "Valor original menos os lançamentos de receita na categoria do projeto."),
                 new("Filtro da lista", "Na própria tela: Todos, Curto, Médio e Longo. Na Home, as barras abrem o filtro correspondente."),
                 new("Escopo pessoal", "Só você vê e edita."),
                 new("Escopo do grupo", "Aparece para os dois; só o dono edita ou apaga. Exige grupo ativo."),
-                new("Lançamento", "Receita na categoria do projeto reduz o valor atualizado. Não existe cadastro separado.")
+                new("Lançamento", "Receita nesta conta exige vínculo com o projeto. Se a conta tem um projeto só, o Conora preenche. Se tem mais de um, é preciso escolher antes de salvar. Aporte continua ligado ao projeto e não muda.")
             ]),
 
         new("patrimonio", "Patrimônio",

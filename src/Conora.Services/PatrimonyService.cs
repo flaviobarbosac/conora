@@ -201,6 +201,7 @@ public sealed class PatrimonyService
             item.Name,
             account?.Section ?? CategorySection.Asset,
             group,
-            item.Amount);
+            item.Amount,
+            account?.Code);
     }
 }

@@ -348,6 +348,9 @@ public sealed class ReceiptIntakeService
             decimal? amount = extracted.Amount is > 0 and <= 99_999_999.99m
                 ? decimal.Round(extracted.Amount.Value, 2)
                 : null;
+            var fromDigits = BoletoAmountParser.TryParse(extracted.RawText);
+            if (fromDigits is > 0 and <= 99_999_999.99m)
+                amount = fromDigits;
             DateTime? occurredAt = extracted.OccurredAt;
 
             Guid? supplierId = null;
@@ -508,6 +511,9 @@ public sealed class ReceiptIntakeService
 
     private async Task TryAutoPersistAsync(ReceiptIntake intake, CancellationToken ct)
     {
+        // App and share must show the amount field before saving. WhatsApp still confirms alone.
+        if (intake.Channel is ReceiptChannel.App or ReceiptChannel.ShareTarget)
+            return;
         if (intake.Status != ReceiptIntakeStatus.Ready)
             return;
         if (string.IsNullOrWhiteSpace(intake.ProposedCategoryCode))
@@ -645,7 +651,8 @@ public sealed class ReceiptIntakeService
             "hasPaidAmount=null só se for impossível decidir. " +
             "Se hasPaidAmount=false (boleto), date é a data de VENCIMENTO. " +
             "Se hasPaidAmount=true (cupom), date é a data da compra/emissão. " +
-            "amount é o valor numérico do documento. Se não houver CNPJ, cnpj=null.";
+            "amount é o valor numérico do documento. Se não houver CNPJ, cnpj=null. " +
+            "rawText deve incluir a linha digitável ou o código de barras inteiro, com os dígitos, quando o documento tiver.";
 
         var raw = await _gemini.GenerateJsonFromImageAsync(system, "Há valor pago? Extraia os dados.", bytes, mime, ct);
         if (raw is null)
