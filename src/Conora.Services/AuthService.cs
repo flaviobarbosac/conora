@@ -38,6 +38,7 @@ public sealed class AuthService
     private readonly IHostEnvironment _env;
     private readonly IHotmartCourseStore _hotmart;
     private readonly HotmartOptions _hotmartOptions;
+    private readonly RegistrationAccessOptions _access;
     private readonly ILogger<AuthService> _logger;
 
     public AuthService(
@@ -57,6 +58,7 @@ public sealed class AuthService
         IHostEnvironment env,
         IHotmartCourseStore hotmart,
         IOptions<HotmartOptions> hotmartOptions,
+        IOptions<RegistrationAccessOptions> access,
         ILogger<AuthService> logger)
     {
         _users = users;
@@ -75,6 +77,7 @@ public sealed class AuthService
         _env = env;
         _hotmart = hotmart;
         _hotmartOptions = hotmartOptions.Value;
+        _access = access.Value;
         _logger = logger;
     }
 
@@ -87,6 +90,7 @@ public sealed class AuthService
             throw new ValidationException("cpf", "Informe um CPF válido.");
 
         var email = request.Email.Trim().ToLowerInvariant();
+        EnsureCanAccess(email);
         if (await _users.FindByEmailAsync(email, ct) is not null)
             throw new DuplicateEmailException(email);
         if (await _users.FindByCpfAsync(cpf, ct) is not null)
@@ -122,9 +126,16 @@ public sealed class AuthService
 
     public async Task<AuthResponse> LoginAsync(LoginRequest request, CancellationToken ct)
     {
-        var user = await FindByLoginIdentifierAsync(request.Usuario ?? request.Email, ct);
+        var loginId = request.Usuario ?? request.Email;
+        var user = await FindByLoginIdentifierAsync(loginId, ct);
         if (user is null)
+        {
+            if (LoginIdentifier.IsEmail(loginId ?? ""))
+                EnsureCanAccess(loginId);
             throw new AccountNotFoundException();
+        }
+
+        EnsureCanAccess(user.Email);
 
         if (string.IsNullOrEmpty(user.PasswordHash))
         {
@@ -153,6 +164,7 @@ public sealed class AuthService
                 throw new SocialAccountExistsException("Google");
 
             var email = identity.Email.Trim().ToLowerInvariant();
+            EnsureCanAccess(email);
             if (await _users.FindByEmailAsync(email, ct) is not null)
                 throw new DuplicateEmailException(email);
 
@@ -184,7 +196,10 @@ public sealed class AuthService
         }
 
         if (user is null)
+        {
+            EnsureCanAccess(identity.Email);
             throw new AccountNotFoundException();
+        }
 
         return await IssueForExistingUserAsync(user, "UserGoogleLoggedIn", ct);
     }
@@ -211,6 +226,7 @@ public sealed class AuthService
                 throw new ValidationException("email", "Não foi possível obter o e-mail da Apple. Autorize o compartilhamento de e-mail.");
 
             email = email.Trim().ToLowerInvariant();
+            EnsureCanAccess(email);
             if (await _users.FindByEmailAsync(email, ct) is not null)
                 throw new DuplicateEmailException(email);
 
@@ -244,7 +260,11 @@ public sealed class AuthService
         }
 
         if (user is null)
+        {
+            if (!string.IsNullOrWhiteSpace(email))
+                EnsureCanAccess(email);
             throw new AccountNotFoundException();
+        }
 
         return await IssueForExistingUserAsync(user, "UserAppleLoggedIn", ct);
     }
@@ -279,6 +299,7 @@ public sealed class AuthService
         stored.Revoke();
         _tenant.Set(stored.UsuarioId);
         var user = await _users.GetByIdAsync(stored.UsuarioId, ct) ?? throw new InvalidTokenException();
+        EnsureCanAccess(user.Email);
         if (!user.EmailVerified)
             throw new ValidationException(
                 "email",
@@ -349,6 +370,8 @@ public sealed class AuthService
         if (user is null)
             return;
 
+        EnsureCanAccess(user.Email);
+
         if (user.PasswordResetExpiresAtUtc is DateTime expiresAt)
         {
             var issuedAt = expiresAt - PasswordResetTokenTtl;
@@ -416,6 +439,7 @@ public sealed class AuthService
         if (user is null || !user.PasswordResetIsActive(tokenHash))
             throw new ValidationException("token", "Link inválido ou expirado. Peça outro em Esqueci a senha.");
 
+        EnsureCanAccess(user.Email);
         user.ApplyPassword(_passwords.Hash(request.Password));
         _tenant.Set(user.Id);
         await _refreshTokens.RevokeAllForUserAsync(ct);
@@ -471,8 +495,16 @@ public sealed class AuthService
             await _uow.SaveChangesAsync(ct);
     }
 
+    private void EnsureCanAccess(string? email)
+    {
+        if (_access.Allows(email))
+            return;
+        throw new ValidationException("email", RegistrationAccessOptions.ClosedMessage);
+    }
+
     private async Task<AuthResponse> PromotePreRegistrationAsync(PreRegistration pending, CancellationToken ct)
     {
+        EnsureCanAccess(pending.Email);
         // Race: another device already promoted this e-mail — log in if still inside the reuse window.
         var existing = await _users.FindByEmailAsync(pending.Email, ct);
         if (existing is not null)
@@ -538,6 +570,7 @@ public sealed class AuthService
         bool notifyWelcome,
         CancellationToken ct)
     {
+        EnsureCanAccess(user.Email);
         user.MarkEmailVerified();
         _users.Add(user);
         _tenant.Set(user.Id);
@@ -568,6 +601,7 @@ public sealed class AuthService
 
     private Task<AuthResponse> IssueForExistingUserAsync(User user, string action, CancellationToken ct)
     {
+        EnsureCanAccess(user.Email);
         _tenant.Set(user.Id);
         if (!user.EmailVerified)
         {
@@ -620,6 +654,7 @@ public sealed class AuthService
 
     private async Task<AuthResponse> PersistSessionAsync(User user, string action, bool notifyWelcome, CancellationToken ct)
     {
+        EnsureCanAccess(user.Email);
         var pair = _tokens.Issue(user.Id, user.Email);
         _refreshTokens.Add(RefreshToken.Create(_tokens.HashRefreshToken(pair.RefreshToken), DateTime.UtcNow.AddDays(14)));
         AuditRecorder.Record(_audits, _correlation, "User", user.Id, action, new { user.Email, ip = _correlation.ClientIp });

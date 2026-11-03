@@ -49,7 +49,7 @@ builder.Services.AddScoped<ICorrelationContext, HttpCorrelationContext>();
 
 builder.Services.AddInfrastructure(builder.Configuration);
 builder.Services.AddRepositories();
-builder.Services.AddServices();
+builder.Services.AddServices(builder.Configuration);
 
 builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
     .AddJwtBearer();
