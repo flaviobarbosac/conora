@@ -59,6 +59,18 @@ public sealed class StoreNotificationReader : IStoreNotificationReader
         {
             throw new StoreNotificationRejectedException(ex.Message);
         }
+
+        var signedRenewal = StoreReceiptValidator.GetString(data, "signedRenewalInfo");
+        if (!string.IsNullOrWhiteSpace(signedRenewal))
+        {
+            using var renewalDoc = _apple.Verify(signedRenewal);
+            var renewal = renewalDoc.RootElement;
+            receipt = StoreReceiptValidator.ApplyAppleRenewal(
+                receipt,
+                status: null,
+                StoreReceiptValidator.ReadAutoRenewStatus(renewal),
+                StoreReceiptValidator.GetString(renewal, "autoRenewProductId"));
+        }
         return new StoreNoticeCommand(StoreBillingChannel.Apple, type, receipt);
     }
 
@@ -121,6 +133,7 @@ public sealed class StoreNotificationReader : IStoreNotificationReader
         "SUBSCRIBED",
         "DID_RENEW",
         "DID_CHANGE_RENEWAL_PREF",
+        "DID_CHANGE_RENEWAL_STATUS",
         "EXPIRED",
         "GRACE_PERIOD_EXPIRED",
         "REFUND",

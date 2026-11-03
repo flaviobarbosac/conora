@@ -56,20 +56,53 @@ public sealed class StoreBillingTests : IClassFixture<ApiFactory>
     }
 
     [Fact]
-    public async Task Plan_follows_the_product_confirmed_by_the_store()
+    public async Task Store_refuses_a_different_product_than_the_one_purchased()
     {
         var user = await RegisterAsync();
         _store.Receipt = new StoreReceipt(
             "conora.family.monthly", "tx-2", $"orig-{Guid.NewGuid():N}", DateTime.UtcNow.AddMonths(1),
             Entitled: true, InTrial: false, user.UserId);
 
-        // The app asked for Individual, but the Apple ID already holds Família in the same group.
+        // The app asked for Individual, but the Apple ID still holds Família and did not schedule Individual.
         var confirm = await PostAsync(user, "/plan/store/confirm", new { channel = 2, productId = "conora.individual.monthly", transactionId = "tx-2" });
+        Assert.Equal(HttpStatusCode.BadRequest, confirm.StatusCode);
+        Assert.NotEqual("Subscribed", (await GetPlanAsync(user)).Phase);
+    }
+
+    [Fact]
+    public async Task Scheduled_renewal_product_is_the_plan_that_was_purchased()
+    {
+        var user = await RegisterAsync();
+        _store.Receipt = new StoreReceipt(
+            "conora.family.monthly", "tx-r", $"orig-{Guid.NewGuid():N}", DateTime.UtcNow.AddMonths(1),
+            Entitled: true, InTrial: false, user.UserId,
+            RenewalProductId: "conora.individual.monthly", WillRenew: true);
+
+        var confirm = await PostAsync(user, "/plan/store/confirm", new { channel = 2, productId = "conora.individual.monthly", transactionId = "tx-r" });
         Assert.True(confirm.IsSuccessStatusCode, await confirm.Content.ReadAsStringAsync());
         var plan = await confirm.Content.ReadFromJsonAsync<PlanDto>(JsonOptions);
         Assert.Equal("Subscribed", plan!.Phase);
-        Assert.Equal("FamilyPlus", plan.Tier);
+        Assert.Equal("Individual", plan.Tier);
         Assert.False(plan.Yearly);
+    }
+
+    [Fact]
+    public async Task Cancelled_store_subscription_ends_the_plan()
+    {
+        var user = await RegisterAsync();
+        var original = $"orig-{Guid.NewGuid():N}";
+        _store.Receipt = new StoreReceipt(
+            "conora.individual.monthly", "tx-c", original, DateTime.UtcNow.AddMonths(1),
+            Entitled: true, InTrial: false, user.UserId, WillRenew: true);
+        var confirm = await PostAsync(user, "/plan/store/confirm", new { channel = 2, productId = "conora.individual.monthly", transactionId = "tx-c" });
+        Assert.True(confirm.IsSuccessStatusCode, await confirm.Content.ReadAsStringAsync());
+
+        _store.Receipt = new StoreReceipt(
+            "conora.individual.monthly", "tx-c", original, DateTime.UtcNow.AddDays(1),
+            Entitled: false, InTrial: false, user.UserId, WillRenew: false);
+        var cancelled = await PostAsync(user, "/plan/store/confirm", new { channel = 2, productId = "conora.individual.monthly", transactionId = "tx-c" });
+        Assert.True(cancelled.IsSuccessStatusCode, await cancelled.Content.ReadAsStringAsync());
+        Assert.Equal("Expired", (await GetPlanAsync(user)).Phase);
     }
 
     [Fact]
@@ -217,6 +250,9 @@ public sealed class StoreBillingTests : IClassFixture<ApiFactory>
 
         public Task<StoreReceipt> FetchGoogleSubscriptionAsync(string purchaseToken, CancellationToken ct = default)
             => Task.FromResult(Receipt ?? throw new InvalidOperationException("A Google Play não confirmou esta compra."));
+
+        public Task<StoreReceipt> FetchAppleSubscriptionAsync(string originalTransactionId, CancellationToken ct = default)
+            => Task.FromResult(Receipt ?? throw new InvalidOperationException("A App Store não confirmou esta compra."));
     }
 
     private sealed record AuthDto(Guid UserId, string Email, string AccessToken);

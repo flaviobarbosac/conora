@@ -181,7 +181,10 @@ public sealed class StoreReceiptValidator : IStoreReceiptValidator
             && !string.Equals(AppleEnvironment(production.Payload), "Sandbox", StringComparison.OrdinalIgnoreCase))
         {
             using (production.Payload)
-                return ReadAppleTransaction(production.Payload.RootElement, _options.BundleId, "Production", DateTime.UtcNow);
+            {
+                var receipt = ReadAppleTransaction(production.Payload.RootElement, _options.BundleId, "Production", DateTime.UtcNow);
+                return await WithSubscriptionStatusAsync(receipt, jwt, ct);
+            }
         }
 
         production.Payload?.Dispose();
@@ -195,8 +198,135 @@ public sealed class StoreReceiptValidator : IStoreReceiptValidator
                     transactionId, (int)production.StatusCode, (int)sandbox.StatusCode);
                 throw new InvalidOperationException("A App Store não confirmou esta compra.");
             }
-            return ReadAppleTransaction(sandbox.Payload.RootElement, _options.BundleId, "Sandbox", DateTime.UtcNow);
+            var receipt = ReadAppleTransaction(sandbox.Payload.RootElement, _options.BundleId, "Sandbox", DateTime.UtcNow);
+            return await WithSubscriptionStatusAsync(receipt, jwt, ct);
         }
+    }
+
+    public async Task<StoreReceipt> FetchAppleSubscriptionAsync(string originalTransactionId, CancellationToken ct = default)
+    {
+        if (string.IsNullOrWhiteSpace(originalTransactionId))
+            throw new InvalidOperationException("Recibo da loja incompleto.");
+        if (string.IsNullOrWhiteSpace(_options.AppleIssuerId)
+            || string.IsNullOrWhiteSpace(_options.AppleKeyId)
+            || string.IsNullOrWhiteSpace(_options.ApplePrivateKeyPath)
+            || !File.Exists(_options.ApplePrivateKeyPath))
+            throw new InvalidOperationException("Validação da App Store não está configurada.");
+
+        var jwt = AppleStoreServerJwt.Create(_options.AppleIssuerId, _options.AppleKeyId, _options.ApplePrivateKeyPath, _options.BundleId);
+        var receipt = new StoreReceipt(originalTransactionId, originalTransactionId, originalTransactionId, null, false, false, null);
+        var refreshed = await WithSubscriptionStatusAsync(receipt, jwt, ct);
+        if (refreshed.ProductId == originalTransactionId)
+            throw new InvalidOperationException("A App Store não confirmou esta compra.");
+        return refreshed;
+    }
+
+    /// <summary>
+    /// A cancelled subscription (auto-renew off) is not an active Conora plan, even while Apple
+    /// still lists the current period. Status 2 and 5 are expired and revoked.
+    /// </summary>
+    public static StoreReceipt ApplyAppleRenewal(StoreReceipt receipt, int? status, int? autoRenewStatus, string? autoRenewProductId)
+    {
+        var willRenew = autoRenewStatus is null or not 0;
+        var entitled = receipt.Entitled && willRenew && status is null or 1 or 3 or 4;
+        if (status is 2 or 5)
+            entitled = false;
+        return receipt with
+        {
+            Entitled = entitled,
+            WillRenew = willRenew,
+            RenewalProductId = string.IsNullOrWhiteSpace(autoRenewProductId) ? receipt.RenewalProductId : autoRenewProductId
+        };
+    }
+
+    private async Task<StoreReceipt> WithSubscriptionStatusAsync(StoreReceipt receipt, string jwt, CancellationToken ct)
+    {
+        if (string.IsNullOrWhiteSpace(receipt.SubscriptionId))
+            return receipt;
+
+        var production = await GetAppleSubscriptionAsync(AppleProductionApi, jwt, receipt.SubscriptionId, ct);
+        var payload = production.Body;
+        var expectSandbox = false;
+        if (payload is null)
+        {
+            var sandbox = await GetAppleSubscriptionAsync(AppleSandboxApi, jwt, receipt.SubscriptionId, ct);
+            payload = sandbox.Body;
+            expectSandbox = true;
+        }
+        if (payload is null)
+            return receipt;
+
+        using (payload)
+            return ReadSubscriptionStatus(payload.RootElement, receipt, expectSandbox);
+    }
+
+    private StoreReceipt ReadSubscriptionStatus(JsonElement root, StoreReceipt fallback, bool expectSandbox)
+    {
+        StoreReceipt? best = null;
+        if (root.TryGetProperty("data", out var groups) && groups.ValueKind == JsonValueKind.Array)
+        {
+            foreach (var group in groups.EnumerateArray())
+            {
+                if (!group.TryGetProperty("lastTransactions", out var items) || items.ValueKind != JsonValueKind.Array)
+                    continue;
+                foreach (var item in items.EnumerateArray())
+                {
+                    var signed = GetString(item, "signedTransactionInfo");
+                    if (string.IsNullOrWhiteSpace(signed))
+                        continue;
+                    using var transaction = AppleStoreServerJwt.ReadPayload(signed);
+                    StoreReceipt receipt;
+                    try
+                    {
+                        receipt = ReadAppleTransaction(
+                            transaction.RootElement,
+                            _options.BundleId,
+                            expectSandbox ? "Sandbox" : null,
+                            DateTime.UtcNow);
+                    }
+                    catch (InvalidOperationException)
+                    {
+                        continue;
+                    }
+                    int? status = item.TryGetProperty("status", out var statusEl) && statusEl.TryGetInt32(out var statusValue)
+                        ? statusValue
+                        : null;
+                    int? autoRenew = null;
+                    string? renewProduct = null;
+                    var signedRenewal = GetString(item, "signedRenewalInfo");
+                    if (!string.IsNullOrWhiteSpace(signedRenewal))
+                    {
+                        using var renewal = AppleStoreServerJwt.ReadPayload(signedRenewal);
+                        autoRenew = ReadAutoRenewStatus(renewal.RootElement);
+                        renewProduct = GetString(renewal.RootElement, "autoRenewProductId");
+                    }
+                    receipt = ApplyAppleRenewal(receipt, status, autoRenew, renewProduct);
+                    if (best is null || receipt.ExpiresAt > best.ExpiresAt)
+                        best = receipt;
+                }
+            }
+        }
+        return best ?? fallback;
+    }
+
+    internal static int? ReadAutoRenewStatus(JsonElement renewal) =>
+        renewal.ValueKind == JsonValueKind.Object
+        && renewal.TryGetProperty("autoRenewStatus", out var value)
+        && value.TryGetInt32(out var status)
+            ? status
+            : null;
+
+    private async Task<AppleSubscriptionCall> GetAppleSubscriptionAsync(string host, string jwt, string originalTransactionId, CancellationToken ct)
+    {
+        var url = $"{host}/inApps/v1/subscriptions/{Uri.EscapeDataString(originalTransactionId)}";
+        using var request = new HttpRequestMessage(HttpMethod.Get, url);
+        request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", jwt);
+        using var response = await _http.SendAsync(request, ct);
+        if (!response.IsSuccessStatusCode)
+            return new AppleSubscriptionCall(response.StatusCode, null);
+
+        await using var stream = await response.Content.ReadAsStreamAsync(ct);
+        return new AppleSubscriptionCall(response.StatusCode, await JsonDocument.ParseAsync(stream, cancellationToken: ct));
     }
 
     private async Task<AppleTransactionCall> GetAppleTransactionAsync(string host, string jwt, string transactionId, CancellationToken ct)
@@ -262,4 +392,6 @@ public sealed class StoreReceiptValidator : IStoreReceiptValidator
             : null;
 
     private readonly record struct AppleTransactionCall(HttpStatusCode StatusCode, JsonDocument? Payload);
+
+    private readonly record struct AppleSubscriptionCall(HttpStatusCode StatusCode, JsonDocument? Body);
 }

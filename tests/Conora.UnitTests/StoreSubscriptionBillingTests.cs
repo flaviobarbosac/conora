@@ -76,4 +76,7 @@ internal sealed class FakeStoreReceiptValidator : IStoreReceiptValidator
 
     public Task<StoreReceipt> FetchGoogleSubscriptionAsync(string purchaseToken, CancellationToken ct = default)
         => Task.FromResult(Receipt ?? throw new InvalidOperationException("A Google Play não confirmou esta compra."));
+
+    public Task<StoreReceipt> FetchAppleSubscriptionAsync(string originalTransactionId, CancellationToken ct = default)
+        => Task.FromResult(Receipt ?? throw new InvalidOperationException("A App Store não confirmou esta compra."));
 }

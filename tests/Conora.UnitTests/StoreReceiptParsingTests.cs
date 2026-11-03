@@ -75,6 +75,19 @@ public class StoreReceiptParsingTests
     }
 
     [Fact]
+    public void Apple_cancel_turns_the_subscription_off_even_before_expiry()
+    {
+        var receipt = StoreReceiptValidator.ReadAppleTransaction(
+            AppleTransaction(expires: Now.AddDays(30)), "br.com.conora.app", "Sandbox", Now);
+
+        var cancelled = StoreReceiptValidator.ApplyAppleRenewal(receipt, status: 1, autoRenewStatus: 0, "conora.individual.monthly");
+
+        Assert.False(cancelled.Entitled);
+        Assert.False(cancelled.WillRenew);
+        Assert.Equal("conora.individual.monthly", cancelled.RenewalProductId);
+    }
+
+    [Fact]
     public void Apple_revoked_or_expired_transaction_is_not_entitled()
     {
         Assert.False(StoreReceiptValidator.ReadAppleTransaction(

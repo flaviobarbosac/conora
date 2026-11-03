@@ -39,6 +39,9 @@ public interface IStoreSubscriptionBilling
 {
     Task ConfirmAsync(StorePurchaseCommand command, CancellationToken ct = default);
 
+    /// <summary>Re-reads this login's App Store subscription and applies cancel, expiry or the current product.</summary>
+    Task RefreshAsync(Guid usuarioId, CancellationToken ct = default);
+
     Task ApplyNoticeAsync(StoreNoticeCommand command, CancellationToken ct = default);
 
     bool TryMapProduct(string productId, out PlanKind plan);

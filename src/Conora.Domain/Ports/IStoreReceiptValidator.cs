@@ -15,7 +15,9 @@ public sealed record StoreReceipt(
     bool Entitled,
     bool InTrial,
     Guid? AccountId,
-    bool Sandbox = false);
+    bool Sandbox = false,
+    string? RenewalProductId = null,
+    bool WillRenew = true);
 
 /// <summary>Confirms Play / App Store purchases against the store APIs. Missing credentials fail closed.</summary>
 public interface IStoreReceiptValidator
@@ -29,4 +31,7 @@ public interface IStoreReceiptValidator
 
     /// <summary>Reads the current Google Play subscription state by purchase token (used by RTDN).</summary>
     Task<StoreReceipt> FetchGoogleSubscriptionAsync(string purchaseToken, CancellationToken ct = default);
+
+    /// <summary>Reads the current App Store subscription by originalTransactionId, including cancel and the next product.</summary>
+    Task<StoreReceipt> FetchAppleSubscriptionAsync(string originalTransactionId, CancellationToken ct = default);
 }

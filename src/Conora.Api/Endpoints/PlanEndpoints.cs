@@ -50,6 +50,17 @@ public static class PlanEndpoints
             return Results.Ok(await service.GetAsync(ct));
         });
 
+        group.MapPost("/store/refresh", async (
+            IStoreSubscriptionBilling billing,
+            ITenantContext tenant,
+            PlanService service,
+            CancellationToken ct) =>
+        {
+            var usuarioId = tenant.UsuarioId ?? throw new ForbiddenException("Usuário não autenticado.");
+            await billing.RefreshAsync(usuarioId, ct);
+            return Results.Ok(await service.GetAsync(ct));
+        });
+
         return app;
     }
 }
