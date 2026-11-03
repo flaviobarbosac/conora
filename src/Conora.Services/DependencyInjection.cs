@@ -1,14 +1,16 @@
 using Conora.Domain.Ports;
 using Conora.Services.Billing;
 using Conora.Services.CategoryAccess;
+using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 
 namespace Conora.Services;
 
 public static class DependencyInjection
 {
-    public static IServiceCollection AddServices(this IServiceCollection services)
+    public static IServiceCollection AddServices(this IServiceCollection services, IConfiguration configuration)
     {
+        services.Configure<RegistrationAccessOptions>(configuration.GetSection(RegistrationAccessOptions.SectionName));
         services.AddScoped<UserService>();
         services.AddScoped<AuditService>();
         services.AddScoped<ConsoleService>();

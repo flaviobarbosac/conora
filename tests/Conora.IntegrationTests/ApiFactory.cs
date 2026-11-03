@@ -28,7 +28,8 @@ public sealed class ApiFactory : WebApplicationFactory<Program>, IAsyncLifetime
                 ["Jwt:Issuer"] = "conora-api",
                 ["Jwt:Audience"] = "conora-app",
                 ["Cors:Origins:0"] = "http://localhost:5173",
-                ["Email:SmtpHost"] = ""
+                ["Email:SmtpHost"] = "",
+                ["RegistrationAccess:Closed"] = "false"
             });
         });
     }

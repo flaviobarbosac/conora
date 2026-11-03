@@ -7,7 +7,7 @@ var builder = Host.CreateApplicationBuilder(args);
 
 builder.Services.AddInfrastructure(builder.Configuration);
 builder.Services.AddRepositories();
-builder.Services.AddServices();
+builder.Services.AddServices(builder.Configuration);
 builder.Services.AddHostedService<LgpdRetentionWorker>();
 builder.Services.AddHostedService<LgpdExportNightlyWorker>();
 builder.Services.AddHostedService<LgpdExportPurgeWorker>();
