@@ -22,6 +22,9 @@ public static class FamilyEndpoints
         group.MapPut("/preferences", async (UpdatePreferencesRequest request, FamilyGroupService service, CancellationToken ct) =>
             Results.Ok(await service.UpdatePreferencesAsync(request, ct)));
 
+        group.MapPut("/profile/jornada", async (UpdateJornadaRequest request, FamilyGroupService service, CancellationToken ct) =>
+            Results.Ok(await service.UpdateJornadaAsync(request, ct)));
+
         group.MapPost("/onboarding/complete", async (FamilyGroupService service, CancellationToken ct) =>
             Results.Ok(await service.CompleteOnboardingAsync(ct)));
 

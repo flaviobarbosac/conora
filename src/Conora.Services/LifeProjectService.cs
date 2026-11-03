@@ -140,8 +140,9 @@ public sealed class LifeProjectService
                       ?? throw new NotFoundException("Projeto de vida", id);
         if (project.UsuarioId != self)
             throw new ForbiddenException("Só o dono pode excluir o projeto.");
-        if (await _repo.AnyAsync<Entry>(e => e.LifeProjectId == id, ct))
-            throw new ValidationException("id", "Projeto com lançamentos não pode ser excluído.");
+        var blocked = DeleteBlockedByEntries(await _repo.AnyAsync<Entry>(e => e.LifeProjectId == id, ct));
+        if (blocked is not null)
+            throw new ValidationException("id", blocked);
 
         var accountId = project.CategoryId;
         var months = MonthsOf(project);
@@ -260,6 +261,34 @@ public sealed class LifeProjectService
         Competence.RangeInclusive(startYm, Competence.From(dueDate));
     }
 
+    internal const string DeleteBlockedMessage = "Projeto com lançamentos não pode ser excluído.";
+
+    internal static string? DeleteBlockedByEntries(bool hasLinkedEntries)
+        => hasLinkedEntries ? DeleteBlockedMessage : null;
+
+    /// <summary>
+    /// Monthly parcels for one project. The last month absorbs rounding so the sum equals the goal.
+    /// Written to the budget when the project is created.
+    /// </summary>
+    internal static Dictionary<string, decimal> BuildParcelSchedule(decimal goalAmount, IReadOnlyList<string> months)
+    {
+        var planned = new Dictionary<string, decimal>(StringComparer.Ordinal);
+        if (months.Count == 0 || goalAmount <= 0)
+            return planned;
+
+        var parcel = decimal.Round(goalAmount / months.Count, 2);
+        var allocated = 0m;
+        for (var i = 0; i < months.Count; i++)
+        {
+            var value = i == months.Count - 1 ? decimal.Round(goalAmount - allocated, 2) : parcel;
+            allocated += value;
+            if (value > 0)
+                planned[months[i]] = value;
+        }
+
+        return planned;
+    }
+
     private static IReadOnlyList<string> MonthsOf(LifeProject project)
         => Competence.RangeInclusive(project.ContributionStartYm, Competence.From(project.DueDate));
 
@@ -278,19 +307,8 @@ public sealed class LifeProjectService
         var plannedByMonth = new Dictionary<string, decimal>(StringComparer.Ordinal);
         foreach (var item in projects)
         {
-            var months = MonthsOf(item);
-            if (months.Count == 0)
-                continue;
-            var parcel = decimal.Round(item.GoalAmount / months.Count, 2);
-            var allocated = 0m;
-            for (var i = 0; i < months.Count; i++)
-            {
-                var value = i == months.Count - 1
-                    ? item.GoalAmount - allocated
-                    : parcel;
-                allocated += value;
-                plannedByMonth[months[i]] = plannedByMonth.GetValueOrDefault(months[i]) + value;
-            }
+            foreach (var (ym, value) in BuildParcelSchedule(item.GoalAmount, MonthsOf(item)))
+                plannedByMonth[ym] = plannedByMonth.GetValueOrDefault(ym) + value;
         }
 
         var allMonths = (seedMonths ?? []).Concat(plannedByMonth.Keys).Distinct().OrderBy(m => m).ToList();

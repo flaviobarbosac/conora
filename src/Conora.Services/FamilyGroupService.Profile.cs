@@ -64,6 +64,20 @@ public sealed partial class FamilyGroupService
         return ToProfile(user);
     }
 
+    public async Task<ProfileResponse> UpdateJornadaAsync(UpdateJornadaRequest request, CancellationToken ct)
+    {
+        var user = await RequireUserAsync(ct, track: true);
+        if (!string.IsNullOrWhiteSpace(request.Display))
+            user.SetHomeJourneyDisplay(request.Display);
+        if (request.Answers is { } answers)
+        {
+            user.SetJornadaAnswers(answers.RendaFixa, answers.Divida, answers.Patrimonio, answers.ProjetoVida);
+        }
+
+        await _uow.SaveChangesAsync(ct);
+        return ToProfile(user);
+    }
+
     public async Task<ProfileResponse> CompleteOnboardingAsync(CancellationToken ct)
     {
         var user = await RequireUserAsync(ct, track: true);

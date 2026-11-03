@@ -30,20 +30,14 @@ public async Task<Dictionary<Guid, decimal>> GetActualsAsync(
         var entries = multi
             ? await _repo.QueryForUsuariosAsync<Entry, AccountSum>(userIds, q => q
                 .Where(e => e.CompetenceYm == ym
-                            && (e.Type == EntryType.Income
-                                || e.Type == EntryType.Expense
-                                || e.Type == EntryType.Contribution
-                                || e.Type == EntryType.ProjectContribution)
+                            && BudgetActualEntryTypes.Contains(e.Type)
                             && e.CategoryId != null
                             && allowedCategoryIds.Contains(e.CategoryId.Value))
                 .GroupBy(e => e.CategoryId!.Value)
                 .Select(g => new AccountSum(g.Key, g.Sum(x => x.Amount))), ct)
             : await _repo.QueryAsync<Entry, AccountSum>(q => q
                 .Where(e => e.CompetenceYm == ym
-                            && (e.Type == EntryType.Income
-                                || e.Type == EntryType.Expense
-                                || e.Type == EntryType.Contribution
-                                || e.Type == EntryType.ProjectContribution)
+                            && BudgetActualEntryTypes.Contains(e.Type)
                             && e.CategoryId != null
                             && allowedCategoryIds.Contains(e.CategoryId.Value))
                 .GroupBy(e => e.CategoryId!.Value)
@@ -64,6 +58,29 @@ public async Task<Dictionary<Guid, decimal>> GetActualsAsync(
 
         return totals;
     }
+
+/// <summary>
+/// A viewer's own category keeps its id. A family peer line folds onto the local
+/// category only when code, level and section all match. Display name is never a key.
+/// </summary>
+private async Task<Guid> ResolveLocalCategoryIdAsync(
+    Guid categoryId,
+    Dictionary<Guid, CategoryResponse> accounts,
+    IReadOnlyList<Guid> userIds,
+    bool multi,
+    CancellationToken ct)
+{
+    if (accounts.ContainsKey(categoryId) || !multi)
+        return categoryId;
+
+    var remote = await _repo.FirstOrDefaultForUsuariosAsync<Category>(userIds, c => c.Id == categoryId, ct);
+    if (remote?.Code is null)
+        return categoryId;
+
+    var local = accounts.Values.FirstOrDefault(c =>
+        c.Code == remote.Code && c.Level == remote.Level && c.Section == remote.Section);
+    return local?.Id ?? categoryId;
+}
 
 public async Task<BudgetResponse> GetAsync(string competenceYm, CancellationToken ct, SharingScope? sharingScope = null)
     {
@@ -92,31 +109,17 @@ public async Task<BudgetResponse> GetAsync(string competenceYm, CancellationToke
                 : await _repo.ListAsync<BudgetLine>(l => budgetIds.Contains(l.BudgetId), ct);
 
         var accounts = (await _categories.ListAsync(null, true, false, ct)).ToDictionary(c => c.Id);
-        var plannedByCode = new Dictionary<string, decimal>(StringComparer.OrdinalIgnoreCase);
-        var dayByCode = new Dictionary<string, int?>(StringComparer.OrdinalIgnoreCase);
-        var accountIdByCode = new Dictionary<string, Guid>(StringComparer.OrdinalIgnoreCase);
+        var plannedById = new Dictionary<Guid, decimal>();
+        var dayById = new Dictionary<Guid, int?>();
 
         foreach (var line in lines)
         {
-            CategoryResponse? account = accounts.GetValueOrDefault(line.CategoryId);
-            if (account is null && multi)
-            {
-                var remote = await _repo.FirstOrDefaultForUsuariosAsync<Category>(userIds, c => c.Id == line.CategoryId, ct);
-                if (remote is not null)
-                    account = ToResponse(remote);
-            }
-
-            var key = account?.Code ?? account?.Name ?? line.CategoryId.ToString();
-            plannedByCode[key] = plannedByCode.GetValueOrDefault(key) + line.PlannedAmount;
+            // Keep the category that owns the line. A shared display name
+            // (group vs leaf, debt vs liability) must not move the amount.
+            var targetId = await ResolveLocalCategoryIdAsync(line.CategoryId, accounts, userIds, multi, ct);
+            plannedById[targetId] = plannedById.GetValueOrDefault(targetId) + line.PlannedAmount;
             if (line.ExpenseDay is int expenseDay)
-                dayByCode[key] = expenseDay;
-            if (account is not null)
-            {
-                var local = accounts.Values.FirstOrDefault(c =>
-                    (account.Code is not null && c.Code == account.Code) || c.Name == account.Name);
-                if (local is not null)
-                    accountIdByCode[key] = local.Id;
-            }
+                dayById[targetId] = expenseDay;
         }
 
         var actuals = await GetActualsAsync(ym, ct, scope);
@@ -143,13 +146,9 @@ public async Task<BudgetResponse> GetAsync(string competenceYm, CancellationToke
             }
         }
 
-        var plannedPairs = plannedByCode.Select(kv =>
-        {
-            var id = accountIdByCode.GetValueOrDefault(kv.Key);
-            if (id == Guid.Empty && Guid.TryParse(kv.Key, out var fromKey))
-                id = fromKey;
-            return (CategoryId: id == Guid.Empty ? Guid.NewGuid() : id, Planned: kv.Value, ExpenseDay: dayByCode.GetValueOrDefault(kv.Key));
-        }).ToList();
+        var plannedPairs = plannedById
+            .Select(kv => (CategoryId: kv.Key, Planned: kv.Value, ExpenseDay: dayById.GetValueOrDefault(kv.Key)))
+            .ToList();
 
         foreach (var pair in plannedPairs.Where(p => !accounts.ContainsKey(p.CategoryId)))
         {
@@ -224,10 +223,7 @@ public async Task<CategoryMemberBreakdownResponse> GetCategoryBreakdownAsync(
             e => e.CompetenceYm == ym
                  && e.CategoryId != null
                  && categoryIds.Contains(e.CategoryId.Value)
-                 && (e.Type == EntryType.Income
-                     || e.Type == EntryType.Expense
-                     || e.Type == EntryType.Contribution
-                     || e.Type == EntryType.ProjectContribution),
+                 && BudgetActualEntryTypes.Contains(e.Type),
             ct);
         var purchases = await ListPurchasesTouchingAsync(ym, categoryIds, userIds, userIds.Count > 1, ct);
 

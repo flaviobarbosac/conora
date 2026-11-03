@@ -60,13 +60,6 @@ public sealed partial class BudgetService
                         localId = match.Id;
                 }
 
-                // Skip lines that belong to the other sharing scope.
-                var lineScope = accounts.TryGetValue(localId, out var localCat)
-                    ? localCat.SharingScope
-                    : remote?.SharingScope;
-                if (lineScope is SharingScope ls && ls != scope)
-                    continue;
-
                 planned[localId] = planned.GetValueOrDefault(localId) + line.PlannedAmount;
             }
 

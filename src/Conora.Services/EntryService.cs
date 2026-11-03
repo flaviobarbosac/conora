@@ -219,6 +219,7 @@ public sealed class EntryService
         await _months.EnsureOpenAsync(competences, ct);
         await ValidateReferencesAsync(
             request.Type, request.AccountId, request.ContraAccountId, categoryId, request.MemberId, request.LifeProjectId, ct);
+        await EnsureIncomeLifeProjectAsync(request.Type, categoryId, request.LifeProjectId, ct);
         await ValidateIncomeLinkAsync(request.Type, request.IncomeSourceId, request.Amount, competences[0], count, null, ct);
         await ValidateContributionDuplicateAsync(request.Type, request.Amount, competences[0], request.ConfirmDuplicate, null, ct);
 
@@ -271,8 +272,9 @@ public sealed class EntryService
 
         var categoryId = await ResolveCategoryAsync(entry.Type, request.CategoryId, ct);
         await EnsureFreeTierCategoryAsync(entry.Type, categoryId, ct);
+        var lifeProjectId = await ResolveIncomeLifeProjectIdAsync(entry.Type, categoryId, request.LifeProjectId ?? entry.LifeProjectId, ct);
         await ValidateReferencesAsync(
-            entry.Type, request.AccountId, request.ContraAccountId, categoryId, request.MemberId, entry.LifeProjectId, ct);
+            entry.Type, request.AccountId, request.ContraAccountId, categoryId, request.MemberId, lifeProjectId, ct);
         await ValidateIncomeLinkAsync(entry.Type, request.IncomeSourceId, request.Amount, newYm, 1, entry.Id, ct);
         await ValidateContributionDuplicateAsync(entry.Type, request.Amount, newYm, request.ConfirmDuplicate, entry.Id, ct);
 
@@ -283,6 +285,8 @@ public sealed class EntryService
         await ApplyPatrimonyAsync(entry, -1, ct);
         entry.Update(request.Amount, newDate, newYm, request.AccountId, request.ContraAccountId,
             categoryId, request.IncomeSourceId, request.MemberId, request.Description);
+        if (entry.Type == EntryType.Income)
+            entry.LinkLifeProject(lifeProjectId);
         await EntryLedger.ApplyAsync(_repo, entry, 1, ct);
         await ApplyProjectAsync(entry, 1, ct);
         await ApplyPatrimonyAsync(entry, 1, ct);
@@ -537,6 +541,43 @@ public sealed class EntryService
             throw new ValidationException("confirmDuplicate", "Já existe uma contribuição de mesmo valor nesta competência. Confirme para lançar outra.");
     }
 
+    internal const string IncomeRequiresProjectMessage =
+        "Receita em conta de projeto de vida exige o projeto.";
+
+    internal static string? IncomeLifeProjectRefusal(bool isLifeProjectSection, bool hasProjectId)
+    {
+        if (!isLifeProjectSection || hasProjectId)
+            return null;
+        return IncomeRequiresProjectMessage;
+    }
+
+    private async Task EnsureIncomeLifeProjectAsync(
+        EntryType type, Guid? categoryId, Guid? lifeProjectId, CancellationToken ct)
+    {
+        await ResolveIncomeLifeProjectIdAsync(type, categoryId, lifeProjectId, ct);
+    }
+
+    private async Task<Guid?> ResolveIncomeLifeProjectIdAsync(
+        EntryType type, Guid? categoryId, Guid? lifeProjectId, CancellationToken ct)
+    {
+        if (type != EntryType.Income || categoryId is not Guid cid)
+            return lifeProjectId;
+
+        var category = await _categories.RequireAnalyticalAsync(cid, ct);
+        var message = IncomeLifeProjectRefusal(category.Section == CategorySection.LifeProject, lifeProjectId is Guid);
+        if (message is not null)
+            throw new ValidationException("lifeProjectId", message);
+        if (category.Section != CategorySection.LifeProject || lifeProjectId is not Guid pid)
+            return null;
+
+        var peers = await _family.GetReadableUsuarioIdsAsync(ct);
+        var matches = await _repo.ListForUsuariosAsync<LifeProject>(
+            peers, p => p.Id == pid && p.CategoryId == cid, ct);
+        if (matches.Count == 0)
+            throw new ValidationException("lifeProjectId", "O projeto não pertence a esta conta de projeto de vida.");
+        return pid;
+    }
+
     private async Task ApplyProjectAsync(Entry entry, int sign, CancellationToken ct)
     {
         if (entry.Type == EntryType.ProjectContribution && entry.LifeProjectId is Guid pid)
@@ -564,7 +605,7 @@ public sealed class EntryService
     /// <summary>Income raises the patrimony item; expense lowers it. One item in the category, or the one named in the description.</summary>
     private async Task ApplyPatrimonyAsync(Entry entry, int sign, CancellationToken ct)
     {
-        if (entry.Type is not (EntryType.Income or EntryType.Expense) || entry.CategoryId is not Guid categoryId)
+        if (!BudgetService.PatrimonyLaunchCountsInBudget(entry.Type) || entry.CategoryId is not Guid categoryId)
             return;
 
         var category = await _repo.FirstOrDefaultAsync<Category>(c => c.Id == categoryId, ct, track: false);

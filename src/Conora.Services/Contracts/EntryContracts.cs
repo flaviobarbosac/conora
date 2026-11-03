@@ -31,6 +31,7 @@ public sealed record UpdateEntryRequest(
     Guid? ContraAccountId = null,
     Guid? CategoryId = null,
     Guid? IncomeSourceId = null,
+    Guid? LifeProjectId = null,
     Guid? MemberId = null,
     bool ConfirmDuplicate = false);
 

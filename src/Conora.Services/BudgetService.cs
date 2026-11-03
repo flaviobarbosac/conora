@@ -13,6 +13,28 @@ public sealed partial class BudgetService
 {
     private sealed record AccountSum(Guid CategoryId, decimal Amount);
 
+    /// <summary>
+    /// Entry types that land on the budget line as realizado.
+    /// Life-project income and aporte are included.
+    /// Patrimony income and expense are included; they also move the item.
+    /// </summary>
+    internal static readonly EntryType[] BudgetActualEntryTypes =
+    [
+        EntryType.Income,
+        EntryType.Expense,
+        EntryType.Contribution,
+        EntryType.ProjectContribution
+    ];
+
+    internal static bool CountsInBudgetActual(EntryType type) => BudgetActualEntryTypes.Contains(type);
+
+    /// <summary>
+    /// A patrimony launch is income (raises the item) or expense (lowers it).
+    /// Both count on the month budget. Aporte and contribution stay on life-project rules.
+    /// </summary>
+    internal static bool PatrimonyLaunchCountsInBudget(EntryType type) =>
+        type is EntryType.Income or EntryType.Expense && CountsInBudgetActual(type);
+
     private static readonly CategorySection[] ExpenseSections =
     [
         CategorySection.Discount,
@@ -330,14 +352,32 @@ public sealed partial class BudgetService
     private Task<bool> HasLifeProjectAsync(Guid categoryId, CancellationToken ct)
         => _repo.AnyAsync<LifeProject>(p => p.CategoryId == categoryId, ct);
 
+    private const string LinkedLifeProjectPlanMessage =
+        "O previsto desta conta vem do projeto de vida. Crie o projeto pela conta ou apague o projeto para liberar o valor.";
+
+    private const string UnlinkedLifeProjectPlanMessage =
+        "Conta de projeto de vida não aceita previsto manual. Crie o projeto para gerar o rateio.";
+
+    /// <summary>
+    /// Life-project chart accounts never take a hand-typed plan.
+    /// A linked project keeps the existing message. An empty account is refused too.
+    /// System rateio writes through <c>UpsertPlannedForAccountAsync</c> and does not call this.
+    /// </summary>
     private async Task EnsureManualPlanAllowedAsync(Guid categoryId, Category account, CancellationToken ct)
     {
-        if (account.Section != CategorySection.LifeProject)
+        var message = ManualLifeProjectPlanRefusal(
+            account.Section == CategorySection.LifeProject,
+            await HasLifeProjectAsync(categoryId, ct));
+        if (message is null)
             return;
-        if (await HasLifeProjectAsync(categoryId, ct))
-            throw new ValidationException(
-                "categoryId",
-                "O previsto desta conta vem do projeto de vida. Crie o projeto pela conta ou apague o projeto para liberar o valor.");
+        throw new ValidationException("categoryId", message);
+    }
+
+    internal static string? ManualLifeProjectPlanRefusal(bool isLifeProjectSection, bool hasLinkedProject)
+    {
+        if (!isLifeProjectSection)
+            return null;
+        return hasLinkedProject ? LinkedLifeProjectPlanMessage : UnlinkedLifeProjectPlanMessage;
     }
 
     private static CategoryResponse ToResponse(Category c)
