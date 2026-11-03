@@ -69,22 +69,48 @@ public sealed class StoreSubscriptionBilling : IStoreSubscriptionBilling
             throw new ValidationException("store", ex.Message);
         }
 
-        // The store is the source of truth: when the account already has another Conora plan in the
-        // subscription group (upgrade pending, earlier test purchase), the store returns that one.
-        if (!string.Equals(receipt.ProductId, command.ProductId.Trim(), StringComparison.Ordinal))
+        var requested = command.ProductId.Trim();
+        var storeLabel = StoreLabel(command.Channel);
+        if (!string.Equals(receipt.ProductId, requested, StringComparison.Ordinal))
             _logger.LogInformation(
-                "Store returned product {StoreProductId} for requested {RequestedProductId} user={UserId}",
-                receipt.ProductId, command.ProductId, command.UsuarioId);
+                "Store returned product {StoreProductId} renewal {RenewalProductId} renewing {WillRenew} for requested {RequestedProductId} user={UserId}",
+                receipt.ProductId, receipt.RenewalProductId, receipt.WillRenew, requested, command.UsuarioId);
+
+        // A cancel (auto-renew off) or an expired period ends the plan already linked to this login.
+        // It must not activate a different product the Apple ID still has from an older purchase.
+        if (!receipt.Entitled)
+        {
+            var current = await _users.FindSubscriptionByStoreIdAsync(storeLabel, receipt.SubscriptionId, ct);
+            if (current is not null && (current.UsuarioId == command.UsuarioId || receipt.Sandbox))
+            {
+                if (current.UsuarioId != command.UsuarioId)
+                    await _users.ReleaseStoreSubscriptionAsync(current.UsuarioId, storeLabel, receipt.SubscriptionId, DateTime.UtcNow, ct);
+                if (current.UsuarioId == command.UsuarioId)
+                {
+                    var endingProduct = current.StoreProductId ?? receipt.ProductId;
+                    if (!TryMapProduct(endingProduct, out var ending))
+                        ending = current.Plan;
+                    await _plans.ApplyStoreConfirmationAsync(ToConfirmation(command.UsuarioId, ending, storeLabel, receipt), ct);
+                }
+            }
+            else if (current is null)
+                throw new ValidationException("store", "A loja ainda não confirmou o pagamento desta assinatura.");
+            return;
+        }
+
+        var granted = GrantedProduct(receipt, requested);
+        if (!string.Equals(granted, requested, StringComparison.Ordinal))
+            throw new ValidationException(
+                "store",
+                "A App Store ainda tem outro plano nesta conta da Apple. Cancele essa assinatura na loja antes de assinar este.");
+        if (!TryMapProduct(granted, out var plan))
+            throw new ValidationException("productId", "Produto da loja não reconhecido.");
+
         // Real purchases stay bound to the first login. Test purchases (TestFlight, App Review, license
         // testers) share one store account across many logins, so they move to whoever confirms last.
         if (!receipt.Sandbox && receipt.AccountId.HasValue && receipt.AccountId.Value != command.UsuarioId)
             throw new ValidationException("store", "Esta compra está presa a outro login.");
-        if (!TryMapProduct(receipt.ProductId, out var plan))
-            throw new ValidationException("productId", "Produto da loja não reconhecido.");
-        if (!receipt.Entitled)
-            throw new ValidationException("store", "A loja ainda não confirmou o pagamento desta assinatura.");
 
-        var storeLabel = StoreLabel(command.Channel);
         var linked = await _users.FindSubscriptionByStoreIdAsync(storeLabel, receipt.SubscriptionId, ct);
         if (linked is not null && linked.UsuarioId != command.UsuarioId)
         {
@@ -96,7 +122,7 @@ public sealed class StoreSubscriptionBilling : IStoreSubscriptionBilling
                 linked.UsuarioId, command.UsuarioId, command.Channel);
         }
 
-        await _plans.ApplyStoreConfirmationAsync(ToConfirmation(command.UsuarioId, plan, storeLabel, receipt), ct);
+        await _plans.ApplyStoreConfirmationAsync(ToConfirmation(command.UsuarioId, plan, storeLabel, receipt with { ProductId = granted }), ct);
         _logger.LogInformation(
             "Store purchase confirmed user={UserId} product={ProductId} plan={Plan} channel={Channel} ref={Ref} expires={ExpiresAt}",
             command.UsuarioId,
@@ -107,15 +133,47 @@ public sealed class StoreSubscriptionBilling : IStoreSubscriptionBilling
             receipt.ExpiresAt);
     }
 
+    public async Task RefreshAsync(Guid usuarioId, CancellationToken ct = default)
+    {
+        var sub = await _users.FindSubscriptionAsync(usuarioId, ct);
+        if (sub is null || sub.DeletedAt is not null)
+            return;
+        if (!string.Equals(sub.Store, "app-store", StringComparison.Ordinal) || string.IsNullOrWhiteSpace(sub.StoreSubscriptionId))
+            return;
+
+        StoreReceipt receipt;
+        try
+        {
+            receipt = await _receipts.FetchAppleSubscriptionAsync(sub.StoreSubscriptionId, ct);
+        }
+        catch (InvalidOperationException ex)
+        {
+            _logger.LogWarning(ex, "App Store refresh failed user={UserId}", usuarioId);
+            return;
+        }
+
+        var product = receipt.Entitled ? GrantedProduct(receipt, receipt.RenewalProductId ?? receipt.ProductId) : (sub.StoreProductId ?? receipt.ProductId);
+        if (!TryMapProduct(product, out var plan))
+            plan = sub.Plan;
+        await _plans.ApplyStoreConfirmationAsync(
+            ToConfirmation(usuarioId, plan, "app-store", receipt with { ProductId = product }), ct);
+        if (!receipt.Entitled)
+            await _succession.MoveBudgetsOnStoreCancellationAsync(usuarioId, ct);
+    }
+
     public async Task ApplyNoticeAsync(StoreNoticeCommand command, CancellationToken ct = default)
     {
         var receipt = command.Receipt;
         var storeLabel = StoreLabel(command.Channel);
-        if (!TryMapProduct(receipt.ProductId, out var plan))
+        var product = receipt.Entitled
+            ? GrantedProduct(receipt, receipt.RenewalProductId ?? receipt.ProductId)
+            : receipt.ProductId;
+        if (!TryMapProduct(product, out var plan))
         {
-            _logger.LogWarning("Store notice {Event} ignored: unknown product {ProductId}", command.Evento, receipt.ProductId);
+            _logger.LogWarning("Store notice {Event} ignored: unknown product {ProductId}", command.Evento, product);
             return;
         }
+        receipt = receipt with { ProductId = product };
 
         // The store subscription id wins over the account token: renewals keep the original owner.
         var linked = await _users.FindSubscriptionByStoreIdAsync(storeLabel, receipt.SubscriptionId, ct);
@@ -177,6 +235,18 @@ public sealed class StoreSubscriptionBilling : IStoreSubscriptionBilling
             return reference;
         var hash = Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(transactionId)));
         return $"loja:{(int)channel}:sha256:{hash}";
+    }
+
+    /// <summary>
+    /// The product the user just chose wins when Apple scheduled it as the next renewal.
+    /// Otherwise the current store product is used, and a mismatch is refused by the caller.
+    /// </summary>
+    private static string GrantedProduct(StoreReceipt receipt, string requested)
+    {
+        if (!string.IsNullOrWhiteSpace(receipt.RenewalProductId)
+            && string.Equals(receipt.RenewalProductId, requested, StringComparison.Ordinal))
+            return receipt.RenewalProductId;
+        return receipt.ProductId;
     }
 
     private static StorePurchaseConfirmation ToConfirmation(Guid usuarioId, PlanKind plan, string store, StoreReceipt receipt) =>
