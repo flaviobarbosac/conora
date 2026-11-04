@@ -142,7 +142,7 @@ public sealed class LgpdService
 
         var user = await RequireUserAsync(ct);
         var sheets = await _exportData.LoadAsync(user.Id, user.Email, ct);
-        var logo = LoadLogoBytes();
+        var logo = LgpdExportWorkbookBuilder.LoadLogo();
         var bytes = LgpdExportWorkbookBuilder.Build(sheets, logo);
 
         await using var stream = new MemoryStream(bytes);
@@ -324,19 +324,6 @@ public sealed class LgpdService
     {
         var hash = SHA256.HashData(Encoding.UTF8.GetBytes(rawToken));
         return Convert.ToHexString(hash).ToLowerInvariant();
-    }
-
-    private static byte[]? LoadLogoBytes()
-    {
-        var asm = typeof(LgpdService).Assembly;
-        var name = asm.GetManifestResourceNames()
-            .FirstOrDefault(n => n.EndsWith("conora-logo.png", StringComparison.OrdinalIgnoreCase));
-        if (name is null) return null;
-        using var stream = asm.GetManifestResourceStream(name);
-        if (stream is null) return null;
-        using var ms = new MemoryStream();
-        stream.CopyTo(ms);
-        return ms.ToArray();
     }
 
     private async Task<User> RequireUserAsync(CancellationToken ct)

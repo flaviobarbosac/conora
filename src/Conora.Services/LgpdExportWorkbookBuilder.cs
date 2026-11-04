@@ -149,6 +149,19 @@ public static class LgpdExportWorkbookBuilder
     private static bool LooksLikeMoney(string name)
         => MoneyHints.Any(h => name.Contains(h, StringComparison.OrdinalIgnoreCase));
 
+    internal static byte[]? LoadLogo()
+    {
+        var asm = typeof(LgpdExportWorkbookBuilder).Assembly;
+        var name = asm.GetManifestResourceNames()
+            .FirstOrDefault(n => n.EndsWith("conora-logo.png", StringComparison.OrdinalIgnoreCase));
+        if (name is null) return null;
+        using var stream = asm.GetManifestResourceStream(name);
+        if (stream is null) return null;
+        using var ms = new MemoryStream();
+        stream.CopyTo(ms);
+        return ms.ToArray();
+    }
+
     private static void PlaceLogo(IXLWorksheet ws, byte[]? logoPng)
     {
         ws.Cell(1, 1).Value = "Conora";

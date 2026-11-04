@@ -32,8 +32,8 @@ public sealed partial class BudgetService
         foreach (var input in request.Lines.GroupBy(l => l.CategoryId).Select(g => g.Last()))
         {
             var account = await _categories.RequireAnalyticalAsync(input.CategoryId, ct);
-            if (!BudgetSections.Contains(account.Section))
-                throw new ValidationException("lines", $"A conta '{account.Name}' não aceita orçamento (somente receita e despesa).");
+            if (!AcceptsBudgetPlan(account.Section))
+                throw new ValidationException("lines", $"A conta '{account.Name}' não aceita orçamento (somente receita, despesa e patrimônio).");
             if (!accessPolicy.CanWriteAnalytical(account.Code, account.Section))
                 await _plan.EnsureCategoryWritableAsync(account.Code, ct);
             await EnsureManualPlanAllowedAsync(input.CategoryId, account, ct);
@@ -108,8 +108,8 @@ public sealed partial class BudgetService
             throw new ValidationException("monthCount", "Informe entre 2 e 120 meses.");
 
         var account = await _categories.RequireAnalyticalAsync(request.CategoryId, ct);
-        if (!BudgetSections.Contains(account.Section))
-            throw new ValidationException("categoryId", $"A conta '{account.Name}' não aceita orçamento.");
+        if (!AcceptsBudgetPlan(account.Section))
+            throw new ValidationException("categoryId", $"A conta '{account.Name}' não aceita orçamento (somente receita, despesa e patrimônio).");
         await EnsureManualPlanAllowedAsync(request.CategoryId, account, ct);
 
         await _months.EnsureOpenAsync(startYm, ct);
@@ -153,8 +153,8 @@ public sealed partial class BudgetService
             throw new ValidationException("totalAmount", "Informe um valor total maior que zero.");
 
         var account = await _categories.RequireAnalyticalAsync(request.CategoryId, ct);
-        if (!BudgetSections.Contains(account.Section))
-            throw new ValidationException("categoryId", $"A conta '{account.Name}' não aceita orçamento.");
+        if (!AcceptsBudgetPlan(account.Section))
+            throw new ValidationException("categoryId", $"A conta '{account.Name}' não aceita orçamento (somente receita, despesa e patrimônio).");
         await EnsureManualPlanAllowedAsync(request.CategoryId, account, ct);
 
         var total = decimal.Round(request.TotalAmount, 2);
