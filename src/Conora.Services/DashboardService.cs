@@ -163,6 +163,47 @@ public sealed class DashboardService
         return ToFile($"resumo-{ym}.csv", sb.ToString());
     }
 
+    public async Task<ExportFile> ExportReportXlsxAsync(string competenceYm, CancellationToken ct)
+    {
+        var ym = Competence.Require(competenceYm);
+        var report = await GetReportAsync(ym, ct);
+        var entries = await _repo.ListAsync<Entry>(e => e.CompetenceYm == ym, ct);
+        var categories = (await _categories.ListAsync(null, true, true, ct)).ToDictionary(c => c.Id, c => c.Name);
+        var accounts = (await _repo.ListAsync<Account>(null, ct)).ToDictionary(a => a.Id, a => a.Name);
+        var members = (await _repo.ListAsync<FamilyMember>(null, ct)).ToDictionary(m => m.Id, m => m.Name);
+
+        var rows = entries
+            .OrderBy(e => e.OccurredAt)
+            .Select(e => new ReportEntryRow(
+                e.OccurredAt,
+                e.CompetenceYm,
+                TypeLabel(e.Type),
+                e.Amount,
+                e.AccountId is Guid accountId ? accounts.GetValueOrDefault(accountId) : null,
+                e.ContraAccountId is Guid contraId ? accounts.GetValueOrDefault(contraId) : null,
+                e.CategoryId is Guid categoryId ? categories.GetValueOrDefault(categoryId) : null,
+                e.MemberId is Guid memberId ? members.GetValueOrDefault(memberId) : null,
+                e.Description))
+            .ToList();
+
+        var bytes = ReportWorkbookBuilder.Build(ym, report, rows, LgpdExportWorkbookBuilder.LoadLogo());
+        return new ExportFile(
+            $"relatorio-{ym}.xlsx",
+            "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+            bytes);
+    }
+
+    private static string TypeLabel(EntryType type) => type switch
+    {
+        EntryType.Income => "Receita",
+        EntryType.Expense => "Despesa",
+        EntryType.Transfer => "Transferência",
+        EntryType.Contribution => "Contribuição",
+        EntryType.CardPayment => "Pagamento de cartão",
+        EntryType.ProjectContribution => "Aporte em projeto",
+        _ => type.ToString()
+    };
+
     private async Task<IReadOnlyList<AlertResponse>> GetAlertsCoreAsync(string ym, CancellationToken ct)
     {
         var totals = await ComputeTotalsAsync(ym, ct);

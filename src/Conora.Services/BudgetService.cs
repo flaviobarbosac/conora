@@ -55,6 +55,14 @@ public sealed partial class BudgetService
         CategorySection.Social
     ];
 
+    /// <summary>
+    /// Planned amount is allowed on cash-flow accounts and on balance-sheet accounts (ativo e passivo).
+    /// Structural masters stay out. Income and expense sections are unchanged.
+    /// </summary>
+    internal static bool AcceptsBudgetPlan(CategorySection section) =>
+        BudgetSections.Contains(section)
+        || section is CategorySection.Asset or CategorySection.Liability;
+
     private readonly IFinanceRepository _repo;
     private readonly IUnitOfWork _uow;
     private readonly PlanService _plan;

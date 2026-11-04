@@ -16,6 +16,18 @@ public class PatrimonyBudgetReflectionTests
     }
 
     [Fact]
+    public void Patrimony_accounts_accept_a_planned_amount()
+    {
+        Assert.True(BudgetService.AcceptsBudgetPlan(CategorySection.Asset));
+        Assert.True(BudgetService.AcceptsBudgetPlan(CategorySection.Liability));
+        Assert.True(BudgetService.AcceptsBudgetPlan(CategorySection.Income));
+        Assert.True(BudgetService.AcceptsBudgetPlan(CategorySection.Essential));
+        Assert.False(BudgetService.AcceptsBudgetPlan(CategorySection.Budget));
+        Assert.False(BudgetService.AcceptsBudgetPlan(CategorySection.Expense));
+        Assert.False(BudgetService.AcceptsBudgetPlan(CategorySection.Patrimony));
+    }
+
+    [Fact]
     public void Life_project_aporte_and_transfers_do_not_move_patrimony()
     {
         Assert.False(BudgetService.PatrimonyLaunchCountsInBudget(EntryType.ProjectContribution));

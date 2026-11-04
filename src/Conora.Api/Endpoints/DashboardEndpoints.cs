@@ -40,6 +40,12 @@ public static class DashboardEndpoints
             return Results.File(file.Content, file.ContentType, file.FileName);
         });
 
+        export.MapGet("/report/{competenceYm}", async (string competenceYm, DashboardService service, CancellationToken ct) =>
+        {
+            var file = await service.ExportReportXlsxAsync(competenceYm, ct);
+            return Results.File(file.Content, file.ContentType, file.FileName);
+        });
+
         return app;
     }
 }
