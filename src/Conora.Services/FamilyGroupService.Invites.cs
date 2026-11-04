@@ -61,8 +61,8 @@ public sealed partial class FamilyGroupService
         var invite = FamilyInvite.Create(self, email, membership?.FamilyGroupId, InviteTtl);
         _family.AddInvite(invite);
 
-        // Invite opens the store/plans first; the token is kept so accept can cancel Individual.
-        var link = $"{PublicWebBase()}/app/planos?convite={Uri.EscapeDataString(invite.Token)}";
+        // Same screen the QR code already opens. The token stays in the path.
+        var link = $"{PublicWebBase()}/app/grupo/convite/{invite.Token}";
         try
         {
             await _email.SendAsync(
