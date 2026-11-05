@@ -8,7 +8,7 @@ using Microsoft.Extensions.Options;
 namespace Conora.Services;
 
 /// <summary>
-/// PURCHASE_COMPLETE schedules the 90-day student trial for the 8th day after the purchase.
+/// PURCHASE_COMPLETE schedules the 90-day student trial for 98 days after the purchase.
 /// PURCHASE_CANCELED and PURCHASE_PROTEST remove that access. The release e-mail goes out on day 8.
 /// </summary>
 public sealed class HotmartCourseService
@@ -82,7 +82,7 @@ public sealed class HotmartCourseService
         return true;
     }
 
-    /// <summary>Grants access and sends the store e-mail for purchases whose 8th day has arrived.</summary>
+    /// <summary>Grants access and sends the store e-mail once 98 days have passed since the purchase.</summary>
     public async Task<int> ReleaseDueAsync(CancellationToken ct)
     {
         var due = await _purchases.ListAwaitingReleaseAsync(DateTime.UtcNow, ct);
@@ -117,7 +117,7 @@ public sealed class HotmartCourseService
 
     private async Task<bool> ReleaseOneAsync(HotmartCoursePurchase purchase, CancellationToken ct)
     {
-        if (purchase.IsRevoked || purchase.UnlockAt is null || purchase.UnlockAt > DateTime.UtcNow)
+        if (purchase.IsRevoked || HotmartCoursePurchase.AccessAvailableAtUtc(purchase.AcquiredAt) > DateTime.UtcNow)
             return false;
 
         if (!purchase.Approved)
@@ -175,7 +175,7 @@ public sealed class HotmartCourseService
     private static EmailContent ReleaseEmail(string name) => new(
         $"{name}, o Conora está liberado para você.",
         [
-            "Oito dias depois da sua compra na Hotmart, o aplicativo está pronto para baixar.",
+            "Noventa e oito dias depois da sua compra na Hotmart, o aplicativo está pronto para baixar.",
             "Entre com o mesmo e-mail da compra. Sua conta de aluno abre com 90 dias no Conora.",
             "Vivendo bem o presente, planejando um futuro melhor."
         ])

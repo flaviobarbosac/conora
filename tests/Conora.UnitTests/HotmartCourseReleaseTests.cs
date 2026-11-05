@@ -6,15 +6,17 @@ namespace Conora.UnitTests;
 public class HotmartCourseReleaseTests
 {
     [Fact]
-    public void Eighth_day_is_nine_in_the_morning_in_Brazil_counting_the_purchase_day()
+    public void Access_opens_98_days_after_the_purchase_and_the_login_message_uses_brazil_time()
     {
         var acquired = new DateTime(2026, 11, 4, 22, 0, 0, DateTimeKind.Utc);
-        var release = HotmartCoursePurchase.EighthDayMorningUtc(acquired);
+        var release = HotmartCoursePurchase.AccessAvailableAtUtc(acquired);
+        var purchase = HotmartCoursePurchase.Schedule("aluno@example.com", "HP0", 1, acquired);
 
-        var tzId = OperatingSystem.IsWindows() ? "E. South America Standard Time" : "America/Sao_Paulo";
-        var tz = TimeZoneInfo.FindSystemTimeZoneById(tzId);
-        var local = TimeZoneInfo.ConvertTimeFromUtc(release, tz);
-        Assert.Equal(new DateTime(2026, 11, 11, 9, 0, 0), local);
+        Assert.Equal(acquired.AddDays(98), release);
+        Assert.Equal(release, purchase.UnlockAt);
+        Assert.Equal(
+            "Seu acesso fica disponível a partir de 10/02/2027 às 19:00.",
+            HotmartCoursePurchase.AccessAvailableMessage(release));
     }
 
     [Fact]

@@ -105,7 +105,7 @@ public sealed class PlanService
     }
 
     /// <summary>
-    /// Active grant: trial ends 90 days after the 8th-day unlock (itself derived from the purchase date).
+    /// Active grant: trial ends 90 days after the 98-day unlock (purchase date plus 98 days).
     /// Revoked grant: two-day export window, then no product access unless a paid plan covers the account.
     /// </summary>
     private async Task<HotmartAccess> ReadHotmartAccessAsync(string? email, CancellationToken ct)
@@ -114,15 +114,15 @@ public sealed class PlanService
             return HotmartAccess.None;
 
         var rows = await _hotmart.ListByEmailAsync(email.Trim().ToLowerInvariant(), _hotmartOptions.ProductId, ct);
-        var active = rows
-            .Where(p => p.Approved && !p.IsRevoked)
-            .OrderByDescending(p => p.UnlockAt ?? p.AcquiredAt)
+        var now = DateTime.UtcNow;
+        var unlock = rows
+            .Where(p => !p.IsRevoked)
+            .Select(p => HotmartCoursePurchase.AccessAvailableAtUtc(p.AcquiredAt))
+            .Where(at => at <= now)
+            .OrderByDescending(at => at)
             .FirstOrDefault();
-        if (active is not null)
-        {
-            var unlock = active.UnlockAt ?? HotmartCoursePurchase.EighthDayMorningUtc(active.AcquiredAt);
+        if (unlock != default)
             return HotmartAccess.Active(unlock.AddDays(AccessPolicy.StudentTrialDays));
-        }
 
         var revoked = rows
             .Where(p => p.Approved && p.RevokedAt is not null)

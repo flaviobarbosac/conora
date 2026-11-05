@@ -2,7 +2,7 @@ using Conora.Services;
 
 namespace Conora.Worker.Jobs;
 
-/// <summary>Releases Hotmart student access and sends the store e-mail once the 8th day arrives.</summary>
+/// <summary>Releases Hotmart student access and sends the store e-mail once 98 days have passed.</summary>
 public sealed class HotmartCourseReleaseWorker : BackgroundService
 {
     private static readonly TimeSpan Interval = TimeSpan.FromMinutes(10);

@@ -5,10 +5,10 @@ namespace Conora.Domain.Ports;
 public interface IHotmartCourseStore
 {
     Task<HotmartCoursePurchase?> FindByTransactionAsync(string transaction, CancellationToken ct = default);
-    /// <summary>True when this e-mail already has the 8th-day release for the product.</summary>
+    /// <summary>True when this e-mail already has the 98-day release for the product.</summary>
     Task<bool> HasApprovedAsync(string email, long productId, CancellationToken ct = default);
     Task<IReadOnlyList<HotmartCoursePurchase>> ListByEmailAsync(string email, long productId, CancellationToken ct = default);
-    /// <summary>Purchases whose 8th day has arrived and still need the grant or the release e-mail.</summary>
+    /// <summary>Purchases whose 98 days have passed and still need the grant or the release e-mail.</summary>
     Task<IReadOnlyList<HotmartCoursePurchase>> ListAwaitingReleaseAsync(DateTime utcNow, CancellationToken ct = default);
     Task AddAsync(HotmartCoursePurchase purchase, CancellationToken ct = default);
 

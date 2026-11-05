@@ -9,7 +9,7 @@ namespace Conora.Api.Endpoints;
 
 /// <summary>
 /// Hotmart webhook 2.0. Authenticated by the X-HOTMART-HOTTOK header (or body hottok).
-/// PURCHASE_COMPLETE schedules the 90-day release for the 8th day.
+/// PURCHASE_COMPLETE schedules the 90-day release for 98 days after the purchase.
 /// PURCHASE_CANCELED and PURCHASE_PROTEST remove that access.
 /// </summary>
 public static class HotmartWebhookEndpoints
