@@ -54,5 +54,7 @@ public sealed record PlanResponse(
     bool HasFullAccess,
     bool EverSubscribed,
     /// <summary>Commercial label from PlanKind, e.g. "Individual mensal". Null when not subscribed.</summary>
-    string? PlanLabel = null);
+    string? PlanLabel = null,
+    /// <summary>Hotmart cancel: until this instant the account can only export. Null otherwise.</summary>
+    DateTime? ExportOnlyUntil = null);
 
