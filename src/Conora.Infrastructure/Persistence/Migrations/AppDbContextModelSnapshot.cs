@@ -1361,6 +1361,9 @@ namespace Conora.Infrastructure.Persistence.Migrations
                         .HasMaxLength(100)
                         .HasColumnType("character varying(100)");
 
+                    b.Property<int>("ConfirmationCount")
+                        .HasColumnType("integer");
+
                     b.Property<string>("Cpf")
                         .HasMaxLength(11)
                         .HasColumnType("character varying(11)");
