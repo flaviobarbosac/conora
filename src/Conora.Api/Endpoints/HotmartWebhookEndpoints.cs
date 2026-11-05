@@ -9,7 +9,8 @@ namespace Conora.Api.Endpoints;
 
 /// <summary>
 /// Hotmart webhook 2.0. Authenticated by the X-HOTMART-HOTTOK header (or body hottok).
-/// PURCHASE_APPROVED and PURCHASE_COMPLETE mark the buyer as a training student.
+/// PURCHASE_COMPLETE schedules the 90-day release for the 8th day.
+/// PURCHASE_CANCELED and PURCHASE_PROTEST remove that access.
 /// </summary>
 public static class HotmartWebhookEndpoints
 {
@@ -46,6 +47,7 @@ public static class HotmartWebhookEndpoints
                 body?.Data?.Buyer?.Email,
                 body?.Data?.Purchase?.Transaction,
                 body?.Data?.Product?.Id,
+                body?.Data?.Purchase?.AcquiredAtUtc(),
                 ct);
             return Results.Ok(new { status = "accepted", processed });
         }).AllowAnonymous().WithTags("Hotmart");
@@ -89,5 +91,20 @@ public static class HotmartWebhookEndpoints
     private sealed class HotmartPurchase
     {
         public string? Transaction { get; set; }
+
+        [System.Text.Json.Serialization.JsonPropertyName("approved_date")]
+        public long? ApprovedDate { get; set; }
+
+        [System.Text.Json.Serialization.JsonPropertyName("order_date")]
+        public string? OrderDate { get; set; }
+
+        public DateTime? AcquiredAtUtc()
+        {
+            if (ApprovedDate is > 0)
+                return DateTimeOffset.FromUnixTimeMilliseconds(ApprovedDate.Value).UtcDateTime;
+            if (long.TryParse(OrderDate, out var orderMs) && orderMs > 1_000_000_000_000)
+                return DateTimeOffset.FromUnixTimeMilliseconds(orderMs).UtcDateTime;
+            return null;
+        }
     }
 }

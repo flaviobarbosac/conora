@@ -16,8 +16,10 @@ public class PreRegistration
     public bool IsTrainingStudent { get; private set; }
     public string TokenHash { get; private set; } = default!;
     public DateTime ExpiresAtUtc { get; private set; }
-    /// <summary>Set when the link first creates the user. Reuse is allowed for 1 minute after this.</summary>
+    /// <summary>Set when the link first creates the user.</summary>
     public DateTime? FirstConsumedAtUtc { get; private set; }
+    /// <summary>How many times this confirmation link has signed the person in. The sixth is refused.</summary>
+    public int ConfirmationCount { get; private set; }
     /// <summary>User created by the first successful confirmation of this link.</summary>
     public Guid? PromotedUserId { get; private set; }
     public DateTime CreatedAt { get; private set; } = DateTime.UtcNow;
@@ -131,6 +133,12 @@ public class PreRegistration
         PromotedUserId ??= userId;
     }
 
+    public void RecordConfirmation() => ConfirmationCount++;
+
+    public void MarkTrainingStudent() => IsTrainingStudent = true;
+
+    public void ClearTrainingStudent() => IsTrainingStudent = false;
+
     public void RefreshToken(string tokenHash, DateTime expiresAtUtc)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(tokenHash);
@@ -140,5 +148,6 @@ public class PreRegistration
         ExpiresAtUtc = expiresAtUtc;
         FirstConsumedAtUtc = null;
         PromotedUserId = null;
+        ConfirmationCount = 0;
     }
 }

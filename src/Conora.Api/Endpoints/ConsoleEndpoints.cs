@@ -19,6 +19,37 @@ public static class ConsoleEndpoints
             return Results.Ok(await service.GetAsync(ct));
         }).WithTags("Console").RequireAuthorization();
 
+        app.MapGet("/console/hotmart-students", async (
+            HttpContext http,
+            HotmartCourseService service,
+            string? email,
+            string? name,
+            string? status,
+            DateTime? acquiredFrom,
+            DateTime? acquiredTo,
+            DateTime? releasedFrom,
+            DateTime? releasedTo,
+            int? page,
+            int? pageSize,
+            CancellationToken ct) =>
+        {
+            if (!IsConsoleOperator(http))
+                return Forbidden();
+
+            var result = await service.ListStudentsAsync(
+                email,
+                name,
+                status,
+                NormalizeFrom(acquiredFrom),
+                NormalizeTo(acquiredTo),
+                NormalizeFrom(releasedFrom),
+                NormalizeTo(releasedTo),
+                page ?? 1,
+                pageSize ?? 20,
+                ct);
+            return Results.Ok(result);
+        }).WithTags("Console").RequireAuthorization();
+
         app.MapGet("/console/abandonment", async (HttpContext http, ConsoleService service, CancellationToken ct) =>
         {
             if (!IsConsoleOperator(http))

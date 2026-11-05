@@ -14,6 +14,10 @@ public class HotmartCoursePurchaseConfiguration : IEntityTypeConfiguration<Hotma
         builder.Property(p => p.Transaction).IsRequired().HasMaxLength(64);
         builder.Property(p => p.Approved).IsRequired();
         builder.Property(p => p.ReceivedAt).IsRequired();
+        builder.Property(p => p.AcquiredAt).IsRequired();
+        builder.Property(p => p.UnlockAt);
+        builder.Property(p => p.RevokedAt);
+        builder.Property(p => p.ReleaseEmailSentAt);
 
         builder.HasIndex(p => p.Transaction)
             .IsUnique()

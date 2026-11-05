@@ -15,6 +15,7 @@ builder.Services.AddHostedService<PreRegistrationPurgeWorker>();
 builder.Services.AddHostedService<ReceiptOcrWorker>();
 builder.Services.AddHostedService<ReceiptImagePurgeWorker>();
 builder.Services.AddHostedService<MilestoneNightlyWorker>();
+builder.Services.AddHostedService<HotmartCourseReleaseWorker>();
 
 var host = builder.Build();
 await host.RunAsync();

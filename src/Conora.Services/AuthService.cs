@@ -17,8 +17,7 @@ namespace Conora.Services;
 public sealed class AuthService
 {
     private static readonly TimeSpan PreRegistrationTtl = TimeSpan.FromMinutes(10);
-    /** After the first successful confirmation, the same link can open the session again for this long (capped by the 10-minute TTL). */
-    private static readonly TimeSpan PreRegistrationReuseWindow = TimeSpan.FromMinutes(1);
+    private const int MaxConfirmationClicks = 5;
     private static readonly TimeSpan PasswordResetTokenTtl = TimeSpan.FromMinutes(30);
     private static readonly TimeSpan PasswordResetCoolDown = TimeSpan.FromMinutes(15);
 
@@ -286,6 +285,28 @@ public sealed class AuthService
     private static string PreRegistrationEmailSentMessage(string email)
         => $"Enviamos um e-mail de validação para {email}. Abra a mensagem e clique no link em até 10 minutos para criar sua conta.";
 
+    private async Task<AuthResponse> ReuseConfirmedAccountAsync(
+        PreRegistration pending,
+        User? user,
+        CancellationToken ct)
+    {
+        if (user is null)
+            throw new ValidationException("token", "Link inválido ou expirado. Cadastre-se de novo para receber outro.");
+
+        if (pending.ConfirmationCount >= MaxConfirmationClicks)
+            throw new ValidationException("token", AlreadyUsedLinkMessage(pending));
+
+        pending.MarkConsumed(user.Id, DateTime.UtcNow);
+        pending.RecordConfirmation();
+        await _uow.SaveChangesAsync(ct);
+        return await PersistSessionAsync(user, "EmailVerifiedReuse", notifyWelcome: false, ct);
+    }
+
+    private static string AlreadyUsedLinkMessage(PreRegistration pending)
+        => string.IsNullOrEmpty(pending.GoogleId)
+            ? "Este link já foi usado. Entre com seu e-mail e senha."
+            : "Este link já foi usado. Entre com o Google.";
+
     private static bool IsRegisterIntent(string? intent)
         => string.Equals(intent?.Trim(), "register", StringComparison.OrdinalIgnoreCase);
 
@@ -313,27 +334,15 @@ public sealed class AuthService
             throw new ValidationException("token", "Link inválido ou expirado. Cadastre-se de novo para receber outro.");
 
         var tokenHash = _tokens.HashRefreshToken(request.Token.Trim());
-        var now = DateTime.UtcNow;
 
         var pending = await _preRegistrations.FindByTokenHashAsync(tokenHash, ct);
         if (pending is not null)
         {
-            // Already promoted: reuse window (1 minute, still inside the 10-minute TTL).
             if (pending.PromotedUserId is Guid promotedId)
             {
-                if (pending.CanReuse(tokenHash, now, PreRegistrationReuseWindow))
-                {
-                    var promoted = await _users.GetByIdAsync(promotedId, ct);
-                    if (promoted is not null)
-                        return await PersistSessionAsync(promoted, "EmailVerifiedReuse", notifyWelcome: false, ct);
-                }
-
-                _preRegistrations.Remove(pending);
-                await _uow.SaveChangesAsync(ct);
-                // Account already exists — send the person to login instead of re-register.
-                throw new ValidationException(
-                    "token",
-                    "Este link já foi usado. Entre com seu e-mail e senha.");
+                var promoted = await _users.GetByIdAsync(promotedId, ct)
+                    ?? await _users.FindByEmailAsync(pending.Email, ct);
+                return await ReuseConfirmedAccountAsync(pending, promoted, ct);
             }
 
             if (!pending.IsActive(tokenHash))
@@ -505,18 +514,10 @@ public sealed class AuthService
     private async Task<AuthResponse> PromotePreRegistrationAsync(PreRegistration pending, CancellationToken ct)
     {
         EnsureCanAccess(pending.Email);
-        // Race: another device already promoted this e-mail — log in if still inside the reuse window.
+        // Race: another device already created this e-mail — sign in without a second account.
         var existing = await _users.FindByEmailAsync(pending.Email, ct);
         if (existing is not null)
-        {
-            pending.MarkConsumed(existing.Id, DateTime.UtcNow);
-            await _uow.SaveChangesAsync(ct);
-            if (pending.CanReuse(pending.TokenHash, DateTime.UtcNow, PreRegistrationReuseWindow))
-                return await PersistSessionAsync(existing, "EmailVerifiedReuse", notifyWelcome: false, ct);
-            _preRegistrations.Remove(pending);
-            await _uow.SaveChangesAsync(ct);
-            throw new ValidationException("token", "Este link já foi usado. Entre com seu e-mail e senha.");
-        }
+            return await ReuseConfirmedAccountAsync(pending, existing, ct);
 
         if (!string.IsNullOrEmpty(pending.GoogleId)
             && await _users.FindByGoogleIdAsync(pending.GoogleId, ct) is not null)
@@ -557,9 +558,9 @@ public sealed class AuthService
             : !string.IsNullOrEmpty(pending.AppleId) ? "UserAppleRegistered"
             : "UserRegistered";
 
-        // Keep the pre-registration row for the 1-minute reuse window (browser + app).
         var auth = await CreateVerifiedUserAsync(user, action, notifyWelcome: true, ct);
         pending.MarkConsumed(user.Id, DateTime.UtcNow);
+        pending.RecordConfirmation();
         await _uow.SaveChangesAsync(ct);
         return auth;
     }
