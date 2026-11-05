@@ -96,17 +96,17 @@ public sealed class LgpdService
         await RequireUserAsync(ct);
         var pending = await _requests.FindPendingExportAsync(ct);
         var ready = await _requests.FindReadyExportAsync(ct);
-        var canDelete = ready is not null && ready.IsExportReadyOnStorage;
+        var exportReady = ready is not null && ready.IsExportReadyOnStorage;
         return new LgpdExportStatusResponse(
             ExportPending: pending is not null,
-            ExportReady: canDelete,
-            CanDeleteAccount: canDelete,
+            ExportReady: exportReady,
+            CanDeleteAccount: true,
             ExpiresAtUtc: ready?.ExpiresAtUtc,
-            Message: canDelete
-                ? "Exportação disponível. Você já pode excluir a conta se quiser."
+            Message: exportReady
+                ? "Exportação disponível."
                 : pending is not null
-                    ? "Aguarde a exportação dos seus dados ficar disponível antes de excluir a conta."
-                    : "Exporte seus dados e aguarde o arquivo ficar disponível antes de excluir a conta.");
+                    ? "A exportação será agendada e estará disponível pra você daqui a 24 horas."
+                    : "");
     }
 
     public async Task<int> ProcessPendingExportsAsync(CancellationToken ct)
@@ -214,14 +214,6 @@ public sealed class LgpdService
     public async Task DeleteAsync(DeleteAccountRequest? body, CancellationToken ct)
     {
         var user = await RequireUserAsync(ct);
-        var ready = await _requests.FindReadyExportAsync(ct);
-        if (ready is null || !ready.IsExportReadyOnStorage)
-        {
-            throw new ValidationException(
-                "account",
-                "Aguarde a exportação dos seus dados ficar disponível antes de excluir a conta.");
-        }
-
         if (await _family.IsBudgetOwnerWithPeersAsync(ct))
             throw new ValidationException(
                 "account",

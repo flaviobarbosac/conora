@@ -2,7 +2,9 @@ namespace Conora.Domain.Entities;
 
 /// <summary>
 /// Hotmart purchase of the training product. Access (90-day trial) starts on the 8th day
-/// after the purchase, and only for PURCHASE_COMPLETE. Cancel and refund request revoke it.
+/// after the purchase, and only for PURCHASE_COMPLETE. Cancel and refund request set
+/// <see cref="RevokedAt"/>. There is no status column: revoked, pending, active and expired
+/// are derived from <see cref="Approved"/>, <see cref="RevokedAt"/> and <see cref="UnlockAt"/>.
 /// </summary>
 public class HotmartCoursePurchase
 {
@@ -19,7 +21,13 @@ public class HotmartCoursePurchase
     public DateTime? RevokedAt { get; set; }
     public DateTime? ReleaseEmailSentAt { get; set; }
 
+    public const int ExportGraceDays = 2;
+
     public bool IsRevoked => RevokedAt is not null;
+
+    /// <summary>Two days after a granted purchase is cancelled. Only export is allowed in this window.</summary>
+    public DateTime? ExportUntilUtc =>
+        Approved && RevokedAt is DateTime revoked ? revoked.AddDays(ExportGraceDays) : null;
 
     public static bool CompletesPurchase(string? eventName) => eventName == "PURCHASE_COMPLETE";
 
@@ -66,7 +74,8 @@ public class HotmartCoursePurchase
 
     public void Revoke()
     {
-        Approved = false;
+        // Keep Approved so a grant that already happened stays distinguishable from a cancel
+        // before the 8th day. Access checks always require RevokedAt == null.
         RevokedAt ??= DateTime.UtcNow;
     }
 

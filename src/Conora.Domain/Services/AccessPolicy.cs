@@ -46,12 +46,13 @@ public static class AccessPolicy
         DateTime accountCreatedAt,
         WorkspaceSubscription? subscription,
         DateTime now,
-        bool isTrainingStudent = true)
+        bool isTrainingStudent = true,
+        DateTime? trialEndsAt = null)
     {
         var start = TrialStart(accountCreatedAt);
         var trialDays = TrialDaysFor(isTrainingStudent);
-        var trialEnds = start.AddDays(trialDays);
-        var blockAt = start.AddDays(trialDays + GraceDaysAfterTrial);
+        var trialEnds = trialEndsAt ?? start.AddDays(trialDays);
+        var blockAt = trialEnds.AddDays(GraceDaysAfterTrial);
 
         if (subscription is not null)
         {

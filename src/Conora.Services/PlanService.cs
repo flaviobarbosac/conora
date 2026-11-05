@@ -4,9 +4,11 @@ using Conora.Domain.Enums;
 using Conora.Domain.Exceptions;
 using Conora.Domain.Ports;
 using Conora.Domain.Services;
+using Conora.Infrastructure.Billing;
 using Conora.Repository.Interface;
 using Conora.Services.Common;
 using Conora.Services.Contracts;
+using Microsoft.Extensions.Options;
 
 namespace Conora.Services;
 
@@ -18,6 +20,8 @@ public sealed class PlanService
     private readonly IAuditEventRepository _audits;
     private readonly IUnitOfWork _uow;
     private readonly ICorrelationContext _correlation;
+    private readonly IHotmartCourseStore _hotmart;
+    private readonly HotmartOptions _hotmartOptions;
 
     // Scoped service: the middleware and the write guards share one evaluation per request.
     private AccessSnapshot? _snapshot;
@@ -28,7 +32,9 @@ public sealed class PlanService
         ITenantContext tenant,
         IAuditEventRepository audits,
         IUnitOfWork uow,
-        ICorrelationContext correlation)
+        ICorrelationContext correlation,
+        IHotmartCourseStore hotmart,
+        IOptions<HotmartOptions> hotmartOptions)
     {
         _repo = repo;
         _family = family;
@@ -36,6 +42,8 @@ public sealed class PlanService
         _audits = audits;
         _uow = uow;
         _correlation = correlation;
+        _hotmart = hotmart;
+        _hotmartOptions = hotmartOptions.Value;
     }
 
     public async Task<PlanResponse> GetAsync(CancellationToken ct)
@@ -71,18 +79,67 @@ public sealed class PlanService
         covering ??= own;
 
         var user = await _family.FindUserByIdAsync(self, ct);
-        var isTrainingStudent = user?.IsTrainingStudent ?? false;
+        var hotmart = await ReadHotmartAccessAsync(user?.Email, ct);
+        var isTrainingStudent = hotmart.AccessEndsAt is not null || (user?.IsTrainingStudent ?? false);
         var state = AccessPolicy.Evaluate(
             user?.CreatedAt ?? now,
             covering,
             now,
-            isTrainingStudent);
+            isTrainingStudent,
+            isTrainingStudent ? hotmart.AccessEndsAt : null);
         if (familyMemberWithoutCover && state.Phase == AccessPhase.Trial)
             state = new AccessState(AccessPhase.Expired, state.TrialEndsAt, state.BlockAt);
 
+        DateTime? exportOnlyUntil = null;
+        if (state.Phase != AccessPhase.Subscribed && hotmart.ExportUntilUtc is DateTime exportUntil)
+        {
+            isTrainingStudent = false;
+            if (now < exportUntil)
+                exportOnlyUntil = exportUntil;
+            state = new AccessState(AccessPhase.Blocked, state.TrialEndsAt, exportUntil);
+        }
+
         var everSubscribed = own is not null || covering is not null;
-        _snapshot = new AccessSnapshot(state, covering, coveredByFamily, isTrainingStudent, everSubscribed);
+        _snapshot = new AccessSnapshot(state, covering, coveredByFamily, isTrainingStudent, everSubscribed, exportOnlyUntil);
         return _snapshot;
+    }
+
+    /// <summary>
+    /// Active grant: trial ends 90 days after the 8th-day unlock (itself derived from the purchase date).
+    /// Revoked grant: two-day export window, then no product access unless a paid plan covers the account.
+    /// </summary>
+    private async Task<HotmartAccess> ReadHotmartAccessAsync(string? email, CancellationToken ct)
+    {
+        if (string.IsNullOrWhiteSpace(email) || _hotmartOptions.ProductId <= 0)
+            return HotmartAccess.None;
+
+        var rows = await _hotmart.ListByEmailAsync(email.Trim().ToLowerInvariant(), _hotmartOptions.ProductId, ct);
+        var active = rows
+            .Where(p => p.Approved && !p.IsRevoked)
+            .OrderByDescending(p => p.UnlockAt ?? p.AcquiredAt)
+            .FirstOrDefault();
+        if (active is not null)
+        {
+            var unlock = active.UnlockAt ?? HotmartCoursePurchase.EighthDayMorningUtc(active.AcquiredAt);
+            return HotmartAccess.Active(unlock.AddDays(AccessPolicy.StudentTrialDays));
+        }
+
+        var revoked = rows
+            .Where(p => p.Approved && p.RevokedAt is not null)
+            .OrderByDescending(p => p.RevokedAt)
+            .FirstOrDefault();
+        return revoked?.ExportUntilUtc is DateTime until
+            ? HotmartAccess.Revoked(until)
+            : HotmartAccess.None;
+    }
+
+    private sealed record HotmartAccess(DateTime? AccessEndsAt, DateTime? ExportUntilUtc)
+    {
+        public static readonly HotmartAccess None = new(null, null);
+
+        public static HotmartAccess Active(DateTime accessEndsAt) => new(accessEndsAt, null);
+
+        public static HotmartAccess Revoked(DateTime exportUntilUtc) => new(null, exportUntilUtc);
     }
 
     /// <summary>True when the workspace has the full product (student trial or paid plan).</summary>
@@ -293,7 +350,8 @@ public sealed class PlanService
             access.IsTrainingStudent,
             full,
             access.EverSubscribed,
-            planLabel);
+            planLabel,
+            access.ExportOnlyUntil);
     }
 }
 
@@ -302,4 +360,5 @@ public sealed record AccessSnapshot(
     WorkspaceSubscription? Subscription,
     bool CoveredByFamily,
     bool IsTrainingStudent,
-    bool EverSubscribed);
+    bool EverSubscribed,
+    DateTime? ExportOnlyUntil = null);
