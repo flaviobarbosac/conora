@@ -20,6 +20,9 @@ public sealed record EmailContent(string Title, IReadOnlyList<string> Paragraphs
 
     public IReadOnlyList<EmailStep> Steps { get; init; } = [];
 
+    /// <summary>Extra buttons, used when the message has more than one destination.</summary>
+    public IReadOnlyList<EmailLink> Links { get; init; } = [];
+
     public string? ActionLabel { get; init; }
 
     public string? ActionUrl { get; init; }
@@ -32,5 +35,7 @@ public sealed record EmailContent(string Title, IReadOnlyList<string> Paragraphs
 }
 
 public sealed record EmailStep(string Title, string Description);
+
+public sealed record EmailLink(string Label, string Url);
 
 public sealed record EmailAttachment(string FileName, string ContentType, byte[] Content);

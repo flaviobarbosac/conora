@@ -93,6 +93,21 @@ public sealed class EmailLayoutRenderer
         }
         sb.Append("</td></tr>");
 
+        if (content.Links.Count > 0)
+        {
+            sb.Append("""<tr><td class="px" align="left" style="padding:8px 48px 8px 48px;">""");
+            foreach (var link in content.Links)
+            {
+                sb.Append($"""
+                    <table role="presentation" cellpadding="0" cellspacing="0" border="0" style="margin:0 0 12px 0;"><tr>
+                    <td align="center" bgcolor="#172638" style="border-radius:999px;">
+                    <a href="{E(link.Url)}" target="_blank" style="display:inline-block; padding:14px 28px; font-family:{FontStack}; font-size:15px; font-weight:700; color:#ffffff; text-decoration:none; border-radius:999px;">{E(link.Label)}</a>
+                    </td></tr></table>
+                    """);
+            }
+            sb.Append("</td></tr>");
+        }
+
         if (!string.IsNullOrWhiteSpace(content.ActionLabel) && !string.IsNullOrWhiteSpace(content.ActionUrl))
         {
             sb.Append($"""
@@ -157,6 +172,11 @@ public sealed class EmailLayoutRenderer
         for (var i = 0; i < content.Steps.Count; i++)
             sb.AppendLine($"{i + 1}. {content.Steps[i].Title} — {content.Steps[i].Description}");
         if (content.Steps.Count > 0)
+            sb.AppendLine();
+
+        foreach (var link in content.Links)
+            sb.AppendLine($"{link.Label}: {link.Url}");
+        if (content.Links.Count > 0)
             sb.AppendLine();
 
         if (!string.IsNullOrWhiteSpace(content.ActionUrl))

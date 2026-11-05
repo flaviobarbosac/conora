@@ -131,6 +131,10 @@ public class PreRegistration
         PromotedUserId ??= userId;
     }
 
+    public void MarkTrainingStudent() => IsTrainingStudent = true;
+
+    public void ClearTrainingStudent() => IsTrainingStudent = false;
+
     public void RefreshToken(string tokenHash, DateTime expiresAtUtc)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(tokenHash);
