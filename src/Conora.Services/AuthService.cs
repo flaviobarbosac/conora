@@ -286,6 +286,11 @@ public sealed class AuthService
     private static string PreRegistrationEmailSentMessage(string email)
         => $"Enviamos um e-mail de validação para {email}. Abra a mensagem e clique no link em até 10 minutos para criar sua conta.";
 
+    private static string AlreadyUsedLinkMessage(PreRegistration pending)
+        => string.IsNullOrEmpty(pending.GoogleId)
+            ? "Este link já foi usado. Entre com seu e-mail e senha."
+            : "Este link já foi usado. Entre com o Google.";
+
     private static bool IsRegisterIntent(string? intent)
         => string.Equals(intent?.Trim(), "register", StringComparison.OrdinalIgnoreCase);
 
@@ -331,9 +336,7 @@ public sealed class AuthService
                 _preRegistrations.Remove(pending);
                 await _uow.SaveChangesAsync(ct);
                 // Account already exists — send the person to login instead of re-register.
-                throw new ValidationException(
-                    "token",
-                    "Este link já foi usado. Entre com seu e-mail e senha.");
+                throw new ValidationException("token", AlreadyUsedLinkMessage(pending));
             }
 
             if (!pending.IsActive(tokenHash))
@@ -515,7 +518,7 @@ public sealed class AuthService
                 return await PersistSessionAsync(existing, "EmailVerifiedReuse", notifyWelcome: false, ct);
             _preRegistrations.Remove(pending);
             await _uow.SaveChangesAsync(ct);
-            throw new ValidationException("token", "Este link já foi usado. Entre com seu e-mail e senha.");
+            throw new ValidationException("token", AlreadyUsedLinkMessage(pending));
         }
 
         if (!string.IsNullOrEmpty(pending.GoogleId)
