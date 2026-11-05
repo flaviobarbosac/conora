@@ -27,12 +27,14 @@ public sealed class EfHotmartCourseStore : IHotmartCourseStore
             .ToListAsync(ct);
 
     public async Task<IReadOnlyList<HotmartCoursePurchase>> ListAwaitingReleaseAsync(DateTime utcNow, CancellationToken ct = default)
-        => await _db.HotmartCoursePurchases
+    {
+        var dueSince = utcNow.AddDays(-HotmartCoursePurchase.AccessWaitingDays);
+        return await _db.HotmartCoursePurchases
             .Where(p => p.RevokedAt == null
-                && p.UnlockAt != null
-                && p.UnlockAt <= utcNow
+                && p.AcquiredAt <= dueSince
                 && (!p.Approved || p.ReleaseEmailSentAt == null))
             .ToListAsync(ct);
+    }
 
     public async Task AddAsync(HotmartCoursePurchase purchase, CancellationToken ct = default)
         => await _db.HotmartCoursePurchases.AddAsync(purchase, ct);

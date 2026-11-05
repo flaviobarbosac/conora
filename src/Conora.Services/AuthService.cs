@@ -130,11 +130,15 @@ public sealed class AuthService
         if (user is null)
         {
             if (LoginIdentifier.IsEmail(loginId ?? ""))
+            {
                 EnsureCanAccess(loginId);
+                await EnsureHotmartCarenciaAsync(loginId, ct);
+            }
             throw new AccountNotFoundException();
         }
 
         EnsureCanAccess(user.Email);
+        await EnsureHotmartCarenciaAsync(user.Email, ct);
 
         if (string.IsNullOrEmpty(user.PasswordHash))
         {
@@ -197,6 +201,7 @@ public sealed class AuthService
         if (user is null)
         {
             EnsureCanAccess(identity.Email);
+            await EnsureHotmartCarenciaAsync(identity.Email, ct);
             throw new AccountNotFoundException();
         }
 
@@ -261,7 +266,10 @@ public sealed class AuthService
         if (user is null)
         {
             if (!string.IsNullOrWhiteSpace(email))
+            {
                 EnsureCanAccess(email);
+                await EnsureHotmartCarenciaAsync(email, ct);
+            }
             throw new AccountNotFoundException();
         }
 
@@ -511,6 +519,33 @@ public sealed class AuthService
         throw new ValidationException("email", RegistrationAccessOptions.ClosedMessage);
     }
 
+    /// <summary>
+    /// Hotmart students cannot sign in until 98 days after the purchase.
+    /// A non-revoked purchase already past that date allows login.
+    /// </summary>
+    private async Task EnsureHotmartCarenciaAsync(string? email, CancellationToken ct)
+    {
+        if (string.IsNullOrWhiteSpace(email) || _hotmartOptions.ProductId <= 0)
+            return;
+
+        var rows = await _hotmart.ListByEmailAsync(
+            email.Trim().ToLowerInvariant(),
+            _hotmartOptions.ProductId,
+            ct);
+        var active = rows.Where(p => !p.IsRevoked).ToList();
+        if (active.Count == 0)
+            return;
+
+        var now = DateTime.UtcNow;
+        var openings = active
+            .Select(p => HotmartCoursePurchase.AccessAvailableAtUtc(p.AcquiredAt))
+            .ToList();
+        if (openings.Any(at => at <= now))
+            return;
+
+        throw new ValidationException("email", HotmartCoursePurchase.AccessAvailableMessage(openings.Min()));
+    }
+
     private async Task<AuthResponse> PromotePreRegistrationAsync(PreRegistration pending, CancellationToken ct)
     {
         EnsureCanAccess(pending.Email);
@@ -656,6 +691,7 @@ public sealed class AuthService
     private async Task<AuthResponse> PersistSessionAsync(User user, string action, bool notifyWelcome, CancellationToken ct)
     {
         EnsureCanAccess(user.Email);
+        await EnsureHotmartCarenciaAsync(user.Email, ct);
         var pair = _tokens.Issue(user.Id, user.Email);
         _refreshTokens.Add(RefreshToken.Create(_tokens.HashRefreshToken(pair.RefreshToken), DateTime.UtcNow.AddDays(14)));
         AuditRecorder.Record(_audits, _correlation, "User", user.Id, action, new { user.Email, ip = _correlation.ClientIp });

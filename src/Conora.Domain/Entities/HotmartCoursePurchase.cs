@@ -1,10 +1,11 @@
 namespace Conora.Domain.Entities;
 
 /// <summary>
-/// Hotmart purchase of the training product. Access (90-day trial) starts on the 8th day
-/// after the purchase, and only for PURCHASE_COMPLETE. Cancel and refund request set
-/// <see cref="RevokedAt"/>. There is no status column: revoked, pending, active and expired
-/// are derived from <see cref="Approved"/>, <see cref="RevokedAt"/> and <see cref="UnlockAt"/>.
+/// Hotmart purchase of the training product. Login stays closed for 98 days after
+/// <see cref="AcquiredAt"/>. The 90-day student trial starts when that date arrives,
+/// and only for PURCHASE_COMPLETE. Cancel and refund request set <see cref="RevokedAt"/>.
+/// There is no status column: revoked, pending, active and expired are derived from
+/// <see cref="Approved"/>, <see cref="RevokedAt"/> and <see cref="UnlockAt"/>.
 /// </summary>
 public class HotmartCoursePurchase
 {
@@ -12,16 +13,19 @@ public class HotmartCoursePurchase
     public string Email { get; set; } = default!;
     public string Transaction { get; set; } = default!;
     public long? ProductId { get; set; }
-    /// <summary>True only after the 8th-day release. Registration reads this flag.</summary>
+    /// <summary>True only after the 98-day release. Registration reads this flag.</summary>
     public bool Approved { get; set; }
     public DateTime ReceivedAt { get; set; }
     public DateTime AcquiredAt { get; set; }
-    /// <summary>Morning of the 8th day in Brazil, counting the purchase day as day 1.</summary>
+    /// <summary>Instant the student may sign in: <see cref="AcquiredAt"/> plus <see cref="AccessWaitingDays"/>.</summary>
     public DateTime? UnlockAt { get; set; }
     public DateTime? RevokedAt { get; set; }
     public DateTime? ReleaseEmailSentAt { get; set; }
 
     public const int ExportGraceDays = 2;
+
+    /// <summary>Days after the Hotmart purchase before the student can sign in.</summary>
+    public const int AccessWaitingDays = 98;
 
     public bool IsRevoked => RevokedAt is not null;
 
@@ -34,14 +38,17 @@ public class HotmartCoursePurchase
     public static bool RevokesAccess(string? eventName) =>
         eventName is "PURCHASE_CANCELED" or "PURCHASE_PROTEST";
 
-    /// <summary>Day 1 is the purchase calendar day in Brazil. Release is 09:00 on day 8.</summary>
-    public static DateTime EighthDayMorningUtc(DateTime acquiredUtc)
+    /// <summary>Exact instant access opens: the purchase timestamp plus 98 days.</summary>
+    public static DateTime AccessAvailableAtUtc(DateTime acquiredUtc)
+        => DateTime.SpecifyKind(acquiredUtc, DateTimeKind.Utc).AddDays(AccessWaitingDays);
+
+    /// <summary>Login message with the Brazil-local date and time access opens.</summary>
+    public static string AccessAvailableMessage(DateTime availableUtc)
     {
-        var tz = BrazilTimeZone();
-        var acquired = DateTime.SpecifyKind(acquiredUtc, DateTimeKind.Utc);
-        var local = TimeZoneInfo.ConvertTimeFromUtc(acquired, tz);
-        var eighthMorning = local.Date.AddDays(7).AddHours(9);
-        return TimeZoneInfo.ConvertTimeToUtc(DateTime.SpecifyKind(eighthMorning, DateTimeKind.Unspecified), tz);
+        var local = TimeZoneInfo.ConvertTimeFromUtc(
+            DateTime.SpecifyKind(availableUtc, DateTimeKind.Utc),
+            BrazilTimeZone());
+        return $"Seu acesso fica disponível a partir de {local:dd/MM/yyyy} às {local:HH:mm}.";
     }
 
     public static HotmartCoursePurchase Schedule(string email, string transaction, long? productId, DateTime acquiredUtc)
@@ -61,7 +68,7 @@ public class HotmartCoursePurchase
             Approved = false,
             ReceivedAt = DateTime.UtcNow,
             AcquiredAt = acquired,
-            UnlockAt = EighthDayMorningUtc(acquired)
+            UnlockAt = AccessAvailableAtUtc(acquired)
         };
     }
 
@@ -75,7 +82,7 @@ public class HotmartCoursePurchase
     public void Revoke()
     {
         // Keep Approved so a grant that already happened stays distinguishable from a cancel
-        // before the 8th day. Access checks always require RevokedAt == null.
+        // before the 98 days. Access checks always require RevokedAt == null.
         RevokedAt ??= DateTime.UtcNow;
     }
 
