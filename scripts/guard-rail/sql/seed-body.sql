@@ -1,0 +1,15 @@
+\ir guard.sql
+\ir reset-data.sql
+\ir ../fixture/categories.sql
+\ir ../fixture/accounts.sql
+\ir ../fixture/income_sources.sql
+\ir ../fixture/credit_cards.sql
+\ir ../fixture/life_projects.sql
+\ir ../fixture/patrimony_items.sql
+\ir ../fixture/workspace_subscriptions.sql
+\ir ../fixture/budgets.sql
+\ir ../fixture/budget_lines.sql
+\ir ../fixture/card_invoices.sql
+\ir ../fixture/card_purchases.sql
+\ir ../fixture/entries.sql
+\ir shift.sql
