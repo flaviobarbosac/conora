@@ -42,6 +42,8 @@ public static class DependencyInjection
         services.AddScoped<VoiceCommandService>();
         services.AddScoped<WhatsAppService>();
         services.AddScoped<ReceiptIntakeService>();
+        services.Configure<SesFeedbackOptions>(configuration.GetSection(SesFeedbackOptions.SectionName));
+        services.AddSingleton<SnsMessageVerifier>();
         services.AddScoped<SesFeedbackService>();
         services.AddScoped<FeedbackService>();
         services.AddSingleton<HelpService>();

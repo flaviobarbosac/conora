@@ -8,50 +8,53 @@ public sealed class SesFeedbackService
 {
     private readonly IEmailSuppressionStore _suppressions;
     private readonly IHttpClientFactory _httpClientFactory;
+    private readonly SnsMessageVerifier _verifier;
     private readonly ILogger<SesFeedbackService> _logger;
 
     public SesFeedbackService(
         IEmailSuppressionStore suppressions,
         IHttpClientFactory httpClientFactory,
+        SnsMessageVerifier verifier,
         ILogger<SesFeedbackService> logger)
     {
         _suppressions = suppressions;
         _httpClientFactory = httpClientFactory;
+        _verifier = verifier;
         _logger = logger;
     }
 
-    public async Task HandleSnsPayloadAsync(string body, CancellationToken ct)
+    /// <summary>Returns false when the message is not an authentic SNS message from our topic.</summary>
+    public async Task<bool> HandleSnsPayloadAsync(string body, CancellationToken ct)
     {
         using var doc = JsonDocument.Parse(body);
         var root = doc.RootElement;
-        var type = root.TryGetProperty("Type", out var typeEl) ? typeEl.GetString() : null;
+        if (!await _verifier.IsAuthenticAsync(root, ct))
+            return false;
 
-        if (string.Equals(type, "SubscriptionConfirmation", StringComparison.OrdinalIgnoreCase)
-            || string.Equals(type, "UnsubscribeConfirmation", StringComparison.OrdinalIgnoreCase))
+        var type = root.GetProperty("Type").GetString();
+
+        if (type is "SubscriptionConfirmation" or "UnsubscribeConfirmation")
         {
-            if (root.TryGetProperty("SubscribeURL", out var urlEl)
-                && urlEl.GetString() is { Length: > 0 } subscribeUrl
-                && subscribeUrl.StartsWith("https://", StringComparison.OrdinalIgnoreCase))
+            var subscribeUrl = root.GetProperty("SubscribeURL").GetString();
+            if (SnsMessageVerifier.IsSnsUrl(subscribeUrl))
             {
                 var client = _httpClientFactory.CreateClient("ses-sns");
                 using var response = await client.GetAsync(subscribeUrl, ct);
                 _logger.LogInformation("SNS subscription confirmation HTTP {Status}", (int)response.StatusCode);
             }
+            else
+            {
+                _logger.LogWarning("SNS subscription confirmation ignored: URL is not an SNS endpoint");
+            }
 
-            return;
+            return true;
         }
 
-        if (!string.Equals(type, "Notification", StringComparison.OrdinalIgnoreCase))
-        {
-            _logger.LogInformation("SNS message ignored. Type={Type}", type);
-            return;
-        }
+        var messageJson = root.GetProperty("Message").GetString();
+        if (!string.IsNullOrWhiteSpace(messageJson))
+            await ApplySesNotificationAsync(messageJson, ct);
 
-        var messageJson = root.TryGetProperty("Message", out var msgEl) ? msgEl.GetString() : null;
-        if (string.IsNullOrWhiteSpace(messageJson))
-            return;
-
-        await ApplySesNotificationAsync(messageJson, ct);
+        return true;
     }
 
     private async Task ApplySesNotificationAsync(string messageJson, CancellationToken ct)
