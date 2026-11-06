@@ -20,6 +20,10 @@ public sealed class AuthService
     private const int MaxConfirmationClicks = 5;
     private static readonly TimeSpan PasswordResetTokenTtl = TimeSpan.FromMinutes(30);
     private static readonly TimeSpan PasswordResetCoolDown = TimeSpan.FromMinutes(15);
+    private const string GoogleAccountUsesPasswordMessage =
+        "Esta conta já tem senha. Entre com o e-mail e a senha, ou escolha outra conta Google.";
+    private const string GoogleAccountAlreadyExistsMessage =
+        "Essa conta já existe. Escolha outra conta Google.";
 
     private readonly IUserRepository _users;
     private readonly IPreRegistrationRepository _preRegistrations;
@@ -164,12 +168,12 @@ public sealed class AuthService
         if (register)
         {
             if (user is not null)
-                throw new SocialAccountExistsException("Google");
+                throw new ValidationException("email", GoogleAccountAlreadyExistsMessage);
 
             var email = identity.Email.Trim().ToLowerInvariant();
             EnsureCanAccess(email);
             if (await _users.FindByEmailAsync(email, ct) is not null)
-                throw new DuplicateEmailException(email);
+                throw new ValidationException("email", GoogleAccountAlreadyExistsMessage);
 
             if (_env.IsEnvironment("Testing"))
             {
@@ -200,6 +204,15 @@ public sealed class AuthService
 
         if (user is null)
         {
+            var byEmail = await _users.FindByEmailAsync(identity.Email, ct);
+            if (byEmail is not null)
+            {
+                if (!string.IsNullOrWhiteSpace(byEmail.PasswordHash))
+                    throw new ValidationException("email", GoogleAccountUsesPasswordMessage);
+
+                throw new ValidationException("email", GoogleAccountAlreadyExistsMessage);
+            }
+
             EnsureCanAccess(identity.Email);
             await EnsureHotmartCarenciaAsync(identity.Email, ct);
             throw new AccountNotFoundException();
