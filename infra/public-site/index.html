@@ -410,6 +410,48 @@
       .card { transition: none; }
       .card:hover { transform: none; }
     }
+    /* Hero 3D carousel */
+    .hero3d { position: relative; overflow: hidden; background: #0e1826; color: #ffffff; margin-top: 8px; }
+    .hero3d::before { content: ""; position: absolute; top: -220px; right: -140px; width: 720px; height: 720px; border-radius: 50%; background: radial-gradient(circle, rgba(106,172,255,0.22) 0%, rgba(14,24,38,0) 65%); pointer-events: none; }
+    .hero3d-inner { position: relative; padding-top: 48px; padding-bottom: 40px; }
+    .hero3d-stage { display: grid; }
+    .hero3d-slide { grid-area: 1 / 1; display: grid; gap: 32px; align-items: center; opacity: 0; transform: translateY(16px); visibility: hidden; transition: opacity .7s ease, transform .7s ease, visibility 0s linear .7s; }
+    .hero3d-slide.is-active { opacity: 1; transform: none; visibility: visible; transition: opacity .7s ease, transform .7s ease; }
+    .hero3d-copy { display: flex; flex-direction: column; gap: 20px; }
+    .hero3d-kicker { margin: 0; align-self: flex-start; font-size: 13px; font-weight: 600; letter-spacing: .12em; text-transform: uppercase; color: #6aacff; background: rgba(106,172,255,.1); border: 1px solid rgba(106,172,255,.3); border-radius: 999px; padding: 8px 16px; }
+    .hero3d-title { margin: 0; font-size: clamp(2.5rem, 5.2vw, 4.5rem); line-height: 1.02; font-weight: 600; letter-spacing: -0.035em; color: #ffffff; }
+    .hero3d-title span { color: #6aacff; }
+    .hero3d-lead { margin: 0; font-size: 18px; line-height: 1.6; color: #a9b6c7; max-width: 32rem; }
+    .hero3d-img { width: 100%; max-width: 520px; height: auto; aspect-ratio: 1; border-radius: 32px; justify-self: center; animation: hero3d-float 7s ease-in-out infinite; }
+    @keyframes hero3d-float { 0%, 100% { transform: translateY(0) rotate(0deg); } 50% { transform: translateY(-18px) rotate(1.5deg); } }
+    .hero3d-controls { display: flex; flex-wrap: wrap; gap: 24px; align-items: center; justify-content: space-between; margin-top: 16px; }
+    .hero3d-actions { flex: 1 1 320px; max-width: 460px; }
+    .hero3d-cta { background: #6aacff; color: #0e1826; border-color: #6aacff; }
+    .hero3d-cta:hover { color: #0e1826; }
+    .hero3d-ghost { color: #ffffff; background: rgba(255,255,255,.06); border-color: rgba(255,255,255,.25); font-weight: 500; }
+    .hero3d-ghost:hover { color: #ffffff; border-color: #6aacff; }
+    .hero3d-nav { display: flex; align-items: center; gap: 16px; }
+    .hero3d-arrow { width: 48px; height: 48px; border-radius: 999px; border: 1px solid rgba(255,255,255,.25); background: rgba(255,255,255,.06); color: #ffffff; display: inline-flex; align-items: center; justify-content: center; cursor: pointer; }
+    .hero3d-arrow:hover { border-color: #6aacff; }
+    .hero3d-arrow svg { fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+    .hero3d-dots { display: flex; gap: 8px; }
+    .hero3d-dot { width: 24px; height: 44px; padding: 0; border: 0; background: none; cursor: pointer; display: flex; align-items: center; transition: width .4s ease; }
+    .hero3d-dot span { display: block; width: 100%; height: 6px; border-radius: 999px; background: rgba(255,255,255,.22); overflow: hidden; position: relative; }
+    .hero3d-dot.is-active { width: 56px; }
+    .hero3d-dot.is-active span::after { content: ""; position: absolute; inset: 0; width: 0; background: #6aacff; border-radius: 999px; animation: hero3d-progress 10s linear forwards; }
+    .hero3d.is-paused .hero3d-dot.is-active span::after { animation-play-state: paused; }
+    @keyframes hero3d-progress { to { width: 100%; } }
+    .hero3d-facts { list-style: none; margin: 32px 0 0; padding: 28px 0 0; border-top: 1px solid rgba(255,255,255,.1); display: flex; flex-wrap: wrap; gap: 12px; }
+    .hero3d-facts li { font-size: 14px; color: #a9b6c7; border: 1px solid rgba(255,255,255,.14); border-radius: 999px; padding: 8px 16px; }
+    @media (min-width: 900px) {
+      .hero3d-inner { padding-top: 56px; }
+      .hero3d-slide { grid-template-columns: 1.05fr 1fr; gap: 48px; min-height: 560px; }
+    }
+    @media (prefers-reduced-motion: reduce) {
+      .hero3d-img { animation: none; }
+      .hero3d-slide, .hero3d-slide.is-active { transition: none; }
+      .hero3d-dot.is-active span::after { animation: none; width: 100%; }
+    }
   </style>
 </head>
 <body>
@@ -449,64 +491,70 @@
   </header>
 
   <main>
-    <section class="container hero">
-      <div class="hero-copy">
-        <p class="kicker">Finanças da família</p>
-        <h1>Todo o dinheiro da casa, <span>num só lugar</span>.</h1>
-        <p class="lead">
-          O Conora aplica o método Raio X da Vida Financeira: orçamento, lançamentos, patrimônio e projetos de vida
-          organizados num plano de contas que a família inteira entende e acompanha mês a mês.
-        </p>
-        <div class="actions">
-          <a class="btn btn-primary" href="/app/register">Começar agora</a>
-          <a class="btn btn-secondary" href="/app/login">Já tenho conta</a>
-        </div>
-        <ul class="facts">
-          <li><strong>10</strong> módulos integrados</li>
-          <li><strong>Web</strong>, Android e iOS</li>
-          <li><strong>Família</strong> no mesmo orçamento</li>
-        </ul>
-      </div>
-
-      <div class="hero-visual" aria-hidden="true">
-        <div class="glow"></div>
-        <div class="phone">
-          <div class="phone-notch"></div>
-          <div class="phone-screen">
-            <p class="phone-hello">Olá, família Souza</p>
-            <div class="balance">
-              <small>Saldo do mês</small>
-              <strong>R$ 4.267,45</strong>
-              <span class="balance-row">
-                <span><svg class="icon icon-16"><use href="#i-income"/></svg> R$ 18.420</span>
-                <span><svg class="icon icon-16"><use href="#i-expense"/></svg> R$ 14.152</span>
-              </span>
+    <section class="hero3d" id="topo" aria-roledescription="carrossel" aria-label="Conheça o Conora">
+      <div class="container hero3d-inner">
+        <div class="hero3d-stage">
+          <div class="hero3d-slide is-active" role="group" aria-roledescription="slide" aria-label="1 de 4">
+            <div class="hero3d-copy">
+              <p class="hero3d-kicker">Finanças da família</p>
+              <h1 class="hero3d-title">Todo o dinheiro da casa, <span>num só lugar.</span></h1>
+              <p class="hero3d-lead">O Conora é a aplicação do método Raio X da Vida Financeira: orçamento, lançamentos, patrimônio e projetos de vida que a família acompanha mês a mês.</p>
             </div>
-            <div class="mini-card">
-              <div class="mini-head"><span>Previsto × realizado</span><span class="tag">Out/2026</span></div>
-              <ul class="bars">
-                <li><span class="label">Moradia</span><span class="track"><span class="fill" style="width:92%"></span></span><span class="value">92%</span></li>
-                <li><span class="label">Mercado</span><span class="track"><span class="fill over" style="width:100%"></span></span><span class="value over-text">108%</span></li>
-                <li><span class="label">Educação</span><span class="track"><span class="fill" style="width:74%"></span></span><span class="value">74%</span></li>
-                <li><span class="label">Lazer</span><span class="track"><span class="fill" style="width:55%"></span></span><span class="value">55%</span></li>
-              </ul>
+            <img class="hero3d-img" src="/img/hero-3d-anel.webp" width="880" height="880" alt="Símbolo do Conora em vidro 3D, cercado de moedas flutuando" loading="eager" fetchpriority="high" decoding="async" />
+          </div>
+          <div class="hero3d-slide" role="group" aria-roledescription="slide" aria-label="2 de 4" aria-hidden="true">
+            <div class="hero3d-copy">
+              <p class="hero3d-kicker">Orçamento</p>
+              <h2 class="hero3d-title">Veja onde passou <span>antes do mês acabar.</span></h2>
+              <p class="hero3d-lead">Previsto × realizado por categoria. E o Raio X em árvore leva do total até o lançamento que explica a diferença.</p>
             </div>
-            <div class="phone-nav">
-              <span class="active"><svg class="icon icon-20"><use href="#i-home"/></svg></span>
-              <span><svg class="icon icon-20"><use href="#i-list"/></svg></span>
-              <span><svg class="icon icon-20"><use href="#i-budget"/></svg></span>
-              <span><svg class="icon icon-20"><use href="#i-folder"/></svg></span>
-              <span><svg class="icon icon-20"><use href="#i-search"/></svg></span>
+            <img class="hero3d-img" src="/img/hero-3d-orcamento.webp" width="880" height="880" alt="Gráfico 3D de colunas de vidro comparando previsto e realizado" loading="lazy" decoding="async" />
+          </div>
+          <div class="hero3d-slide" role="group" aria-roledescription="slide" aria-label="3 de 4" aria-hidden="true">
+            <div class="hero3d-copy">
+              <p class="hero3d-kicker">Família</p>
+              <h2 class="hero3d-title">Cada um no seu celular. <span>Um só orçamento.</span></h2>
+              <p class="hero3d-lead">Convide quem divide a casa com você. Todos lançam e veem os mesmos números, e a conversa sobre dinheiro fica mais simples.</p>
             </div>
+            <img class="hero3d-img" src="/img/hero-3d-familia.webp" width="880" height="880" alt="Casa de vidro 3D conectada por linhas de luz a celulares em órbita" loading="lazy" decoding="async" />
+          </div>
+          <div class="hero3d-slide" role="group" aria-roledescription="slide" aria-label="4 de 4" aria-hidden="true">
+            <div class="hero3d-copy">
+              <p class="hero3d-kicker">Projetos de vida</p>
+              <h2 class="hero3d-title">O sonho ganha <span>valor, data e parcela.</span></h2>
+              <p class="hero3d-lead">Defina o objetivo e o prazo. O Conora sugere quanto separar por mês e mostra quanto já foi.</p>
+            </div>
+            <img class="hero3d-img" src="/img/hero-3d-objetivo.webp" width="880" height="880" alt="Alvo de vidro 3D com bandeira e degraus de moedas subindo até ele" loading="lazy" decoding="async" />
           </div>
         </div>
+        <div class="hero3d-controls">
+          <div class="actions hero3d-actions">
+            <a class="btn btn-primary hero3d-cta" href="/app/register">Começar agora</a>
+            <a class="btn hero3d-ghost" href="/app/login">Já tenho conta</a>
+          </div>
+          <div class="hero3d-nav">
+            <button type="button" class="hero3d-arrow" data-dir="-1" aria-label="Slide anterior"><svg class="icon icon-20" viewBox="0 0 24 24" aria-hidden="true"><path d="M15 6l-6 6 6 6"/></svg></button>
+            <div class="hero3d-dots" role="tablist" aria-label="Escolher slide">
+              <button type="button" class="hero3d-dot is-active" role="tab" aria-selected="true" aria-label="Num só lugar" data-go="0"><span></span></button>
+              <button type="button" class="hero3d-dot" role="tab" aria-selected="false" aria-label="Orçamento" data-go="1"><span></span></button>
+              <button type="button" class="hero3d-dot" role="tab" aria-selected="false" aria-label="Família" data-go="2"><span></span></button>
+              <button type="button" class="hero3d-dot" role="tab" aria-selected="false" aria-label="Projetos de vida" data-go="3"><span></span></button>
+            </div>
+            <button type="button" class="hero3d-arrow" data-dir="1" aria-label="Próximo slide"><svg class="icon icon-20" viewBox="0 0 24 24" aria-hidden="true"><path d="M9 6l6 6-6 6"/></svg></button>
+          </div>
+        </div>
+        <ul class="hero3d-facts">
+          <li>10 módulos integrados</li>
+          <li>Web, Android e iOS</li>
+          <li>Família no mesmo orçamento</li>
+        </ul>
       </div>
     </section>
 
     <section class="container" aria-labelledby="funcionalidades">
       <header class="section-head">
         <p class="kicker">O que você encontra</p>
-        <h2 class="section-title" id="funcionalidades">Cada parte da vida financeira, com o seu lugar</h2>
+        <h2 class="section-title" id="funcionalidades">Dez módulos que conversam entre si.</h2>
       </header>
       <ul class="grid">
         <li class="card">
@@ -565,7 +613,7 @@
     <section class="container" aria-labelledby="como-funciona">
       <header class="section-head">
         <p class="kicker">Como funciona</p>
-        <h2 class="section-title" id="como-funciona">Três passos para sair do achismo</h2>
+        <h2 class="section-title" id="como-funciona">Três passos para enxergar o mês.</h2>
       </header>
       <ol class="steps">
         <li>
@@ -615,6 +663,43 @@
         root.setAttribute('data-theme', next);
         try { localStorage.setItem('onra.theme', next); } catch (e) {}
       });
+    })();
+  </script>
+  <script>
+    (function () {
+      var hero = document.querySelector('.hero3d');
+      if (!hero) return;
+      var slides = hero.querySelectorAll('.hero3d-slide');
+      var dots = hero.querySelectorAll('.hero3d-dot');
+      var reduce = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+      var i = 0, timer = null, DELAY = 10000;
+      function show(n) {
+        i = (n + slides.length) % slides.length;
+        slides.forEach(function (el, k) {
+          var on = k === i;
+          el.classList.toggle('is-active', on);
+          if (on) { el.removeAttribute('aria-hidden'); } else { el.setAttribute('aria-hidden', 'true'); }
+        });
+        dots.forEach(function (d, k) {
+          var on = k === i;
+          d.classList.remove('is-active');
+          if (on) { void d.offsetWidth; d.classList.add('is-active'); }
+          d.setAttribute('aria-selected', on ? 'true' : 'false');
+        });
+      }
+      function play() { if (reduce) return; stop(); timer = setInterval(function () { show(i + 1); }, DELAY); }
+      function stop() { if (timer) { clearInterval(timer); timer = null; } }
+      hero.querySelectorAll('.hero3d-arrow').forEach(function (b) {
+        b.addEventListener('click', function () { show(i + Number(b.getAttribute('data-dir'))); play(); });
+      });
+      dots.forEach(function (d) {
+        d.addEventListener('click', function () { show(Number(d.getAttribute('data-go'))); play(); });
+      });
+      hero.addEventListener('mouseenter', function () { stop(); hero.classList.add('is-paused'); });
+      hero.addEventListener('mouseleave', function () { hero.classList.remove('is-paused'); play(); });
+      hero.addEventListener('focusin', function () { stop(); hero.classList.add('is-paused'); });
+      document.addEventListener('visibilitychange', function () { if (document.hidden) { stop(); } else { play(); } });
+      play();
     })();
   </script>
 </body>
