@@ -6,7 +6,8 @@ public static class ConsoleAccess
     private static readonly HashSet<string> Allowed = new(StringComparer.OrdinalIgnoreCase)
     {
         "flaviobarbosa.vix@gmail.com",
-        "lelcampos2009@gmail.com"
+        "lelcampos2009@gmail.com",
+        "lelcampos34@gmail.com"
     };
 
     public static bool IsAllowed(string? email)

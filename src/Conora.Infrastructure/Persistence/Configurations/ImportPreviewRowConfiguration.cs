@@ -15,6 +15,8 @@ public class ImportPreviewRowConfiguration : IEntityTypeConfiguration<ImportPrev
         builder.Property(e => e.MappedAmount).HasPrecision(18, 2);
         builder.Property(e => e.MappedDescription).IsRequired().HasMaxLength(250);
         builder.Property(e => e.ImportHash).IsRequired().HasMaxLength(64);
+        builder.Property(e => e.RowStatus).HasConversion<string>().HasMaxLength(20);
         builder.HasIndex(e => new { e.UsuarioId, e.BatchId });
+        builder.HasIndex(e => new { e.BatchId, e.RowStatus, e.SortIndex });
     }
 }

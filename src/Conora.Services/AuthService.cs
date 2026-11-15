@@ -477,6 +477,34 @@ public sealed class AuthService
         await _uow.SaveChangesAsync(ct);
     }
 
+    public async Task ChangePasswordAsync(ChangePasswordRequest request, CancellationToken ct)
+    {
+        if (_tenant.UsuarioId is not Guid userId)
+            throw new ValidationException("password", "Entre de novo para alterar a senha.");
+
+        if (string.IsNullOrWhiteSpace(request.Password) || request.Password.Length < 8)
+            throw new ValidationException("password", "Senha deve ter no mínimo 8 caracteres.");
+
+        var user = await _users.GetByIdAsync(userId, ct)
+            ?? throw new ValidationException("password", "Conta não encontrada.");
+
+        var hasPassword = !string.IsNullOrEmpty(user.PasswordHash);
+        if (hasPassword)
+        {
+            if (string.IsNullOrWhiteSpace(request.CurrentPassword))
+                throw new ValidationException("currentPassword", "Informe a senha atual.");
+            if (!_passwords.Verify(request.CurrentPassword, user.PasswordHash!))
+                throw new ValidationException("currentPassword", "Senha atual não confere.");
+            if (_passwords.Verify(request.Password, user.PasswordHash!))
+                throw new ValidationException("password", "Escolha uma senha diferente da atual.");
+        }
+
+        user.ApplyPassword(_passwords.Hash(request.Password));
+        await _refreshTokens.RevokeAllForUserAsync(ct);
+        AuditRecorder.Record(_audits, _correlation, "User", user.Id, "PasswordChanged", new { user.Email });
+        await _uow.SaveChangesAsync(ct);
+    }
+
     private async Task<User?> FindByLoginIdentifierAsync(string? rawValue, CancellationToken ct)
     {
         var raw = (rawValue ?? string.Empty).Trim();
