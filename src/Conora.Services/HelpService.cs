@@ -256,11 +256,12 @@ public sealed class HelpService
             ]),
 
         new("importar", "Importar extrato",
-            "Traz lançamentos de arquivo CSV ou OFX para revisão antes de gravar.",
+            "Traz o extrato em PDF, OFX ou CSV e classifica um lançamento por vez.",
             [
-                new("Arquivo", "CSV ou OFX do banco."),
-                new("Pré-visualização", "Linhas lidas para você conferir."),
-                new("Confirmar", "Grava os lançamentos escolhidos nas suas contas.")
+                new("Arquivo", "PDF, OFX ou CSV do banco, só com dias do mês aberto."),
+                new("Conta", "Confere banco e conta; cadastra se ainda não existir."),
+                new("Classificar", "Sugere a categoria, confirma e grava; dá para adiar ou ignorar."),
+                new("Relatório", "Mostra o que falta, o que já entrou e o que ficou para depois.")
             ]),
 
         new("mes", "Fechar mês",

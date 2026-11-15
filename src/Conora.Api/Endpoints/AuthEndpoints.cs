@@ -37,6 +37,12 @@ public static class AuthEndpoints
             return Results.NoContent();
         });
 
+        group.MapPost("/change-password", async (ChangePasswordRequest request, AuthService service, CancellationToken ct) =>
+        {
+            await service.ChangePasswordAsync(request, ct);
+            return Results.NoContent();
+        }).RequireAuthorization();
+
         group.MapPost("/verify-email", async (VerifyEmailRequest request, AuthService service, CancellationToken ct) =>
             Results.Ok(await service.VerifyEmailAsync(request, ct)));
 

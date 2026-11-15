@@ -14,6 +14,12 @@ public class ImportBatchConfiguration : IEntityTypeConfiguration<ImportBatch>
         builder.Property(e => e.FileName).IsRequired().HasMaxLength(250);
         builder.Property(e => e.Format).HasConversion<string>().HasMaxLength(10);
         builder.Property(e => e.Status).HasConversion<string>().HasMaxLength(20);
+        builder.Property(e => e.CompetenceYm).IsRequired().HasMaxLength(7);
+        builder.Property(e => e.DetectedBankCode).HasMaxLength(3);
+        builder.Property(e => e.DetectedAgency).HasMaxLength(20);
+        builder.Property(e => e.DetectedAccountNumber).HasMaxLength(20);
+        builder.Property(e => e.DetectedCheckDigit).HasMaxLength(3);
         builder.HasIndex(e => e.UsuarioId);
+        builder.HasIndex(e => new { e.UsuarioId, e.CompetenceYm, e.Status });
     }
 }

@@ -21,7 +21,14 @@ public static class SesWebhookEndpoints
 
             try
             {
-                await service.HandleSnsPayloadAsync(body, ct);
+                if (!await service.HandleSnsPayloadAsync(body, ct))
+                    return Results.StatusCode(StatusCodes.Status403Forbidden);
+            }
+            catch (HttpRequestException ex)
+            {
+                // Transient AWS download failure: let SNS retry instead of losing the event.
+                logger.LogWarning(ex, "Falha de rede ao processar webhook SES/SNS");
+                return Results.StatusCode(StatusCodes.Status503ServiceUnavailable);
             }
             catch (Exception ex) when (ex is not OperationCanceledException)
             {

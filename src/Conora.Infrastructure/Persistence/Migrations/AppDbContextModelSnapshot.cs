@@ -983,11 +983,35 @@ namespace Conora.Infrastructure.Persistence.Migrations
                         .ValueGeneratedOnAdd()
                         .HasColumnType("uuid");
 
+                    b.Property<Guid?>("AccountId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("CompetenceYm")
+                        .IsRequired()
+                        .HasMaxLength(7)
+                        .HasColumnType("character varying(7)");
+
                     b.Property<DateTime>("CreatedAt")
                         .HasColumnType("timestamp with time zone");
 
                     b.Property<DateTime?>("DeletedAt")
                         .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("DetectedAccountNumber")
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)");
+
+                    b.Property<string>("DetectedAgency")
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)");
+
+                    b.Property<string>("DetectedBankCode")
+                        .HasMaxLength(3)
+                        .HasColumnType("character varying(3)");
+
+                    b.Property<string>("DetectedCheckDigit")
+                        .HasMaxLength(3)
+                        .HasColumnType("character varying(3)");
 
                     b.Property<string>("FileName")
                         .IsRequired()
@@ -1020,6 +1044,8 @@ namespace Conora.Infrastructure.Persistence.Migrations
 
                     b.HasIndex("UsuarioId");
 
+                    b.HasIndex("UsuarioId", "CompetenceYm", "Status");
+
                     b.ToTable("import_batches", (string)null);
                 });
 
@@ -1037,6 +1063,9 @@ namespace Conora.Infrastructure.Persistence.Migrations
 
                     b.Property<DateTime?>("DeletedAt")
                         .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid?>("EntryId")
+                        .HasColumnType("uuid");
 
                     b.Property<string>("ImportHash")
                         .IsRequired()
@@ -1062,6 +1091,17 @@ namespace Conora.Infrastructure.Persistence.Migrations
                         .IsRequired()
                         .HasColumnType("text");
 
+                    b.Property<string>("RowStatus")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)");
+
+                    b.Property<int>("SortIndex")
+                        .HasColumnType("integer");
+
+                    b.Property<Guid?>("SuggestedCategoryId")
+                        .HasColumnType("uuid");
+
                     b.Property<DateTime>("UpdatedAt")
                         .HasColumnType("timestamp with time zone");
 
@@ -1075,6 +1115,8 @@ namespace Conora.Infrastructure.Persistence.Migrations
                         .HasColumnType("boolean");
 
                     b.HasKey("Id");
+
+                    b.HasIndex("BatchId", "RowStatus", "SortIndex");
 
                     b.HasIndex("UsuarioId", "BatchId");
 
