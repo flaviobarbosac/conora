@@ -1,0 +1,26 @@
+# Shared Segundo Cérebro on the Conora EC2 host. Separate compose project so the
+# Conora deploy (docker compose --remove-orphans in /opt/conora) never touches it.
+# Joins the Conora network so Caddy can reach it as brain-mcp:8080. No published ports.
+name: conora-brain
+
+services:
+  brain-mcp:
+    image: ${BRAIN_IMAGE:?BRAIN_IMAGE required}
+    container_name: brain-mcp
+    restart: unless-stopped
+    env_file: .env.brain
+    mem_limit: 256m
+    expose:
+      - "8080"
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+    networks:
+      - conora
+
+networks:
+  conora:
+    external: true
+    name: conora-aws_default
