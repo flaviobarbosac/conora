@@ -2,6 +2,7 @@ locals {
   ecr_repositories = {
     api    = "${local.name_prefix}-api"
     worker = "${local.name_prefix}-worker"
+    brain  = "${local.name_prefix}-brain"
   }
 }
 

@@ -1,0 +1,20 @@
+{
+  "name": "segundo-cerebro-shared",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Shared Segundo Cérebro: remote MCP server (Streamable HTTP) with per-person tokens",
+  "license": "UNLICENSED",
+  "main": "src/server.js",
+  "engines": {
+    "node": ">=22"
+  },
+  "scripts": {
+    "start": "node src/server.js",
+    "tokens": "node scripts/tokens.js",
+    "test": "node --test test/"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "1.29.0",
+    "pg": "^8.13.0"
+  }
+}

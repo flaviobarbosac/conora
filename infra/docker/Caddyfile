@@ -83,6 +83,13 @@ conora.com.br, www.conora.com.br {
 	}
 }
 
+# Shared Segundo Cérebro (remote MCP). Container brain-mcp comes from the separate
+# compose project conora-brain (brain/deploy). No access log: the token may be in the path.
+brain.conora.com.br {
+	encode zstd gzip
+	reverse_proxy brain-mcp:8080
+}
+
 # API: https://api.conora.com.br
 api.conora.com.br {
 	encode zstd gzip
