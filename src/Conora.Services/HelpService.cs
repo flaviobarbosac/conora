@@ -283,9 +283,10 @@ public sealed class HelpService
             ]),
 
         new("whatsapp", "WhatsApp",
-            "Funcionalidade futura — ainda não disponível nesta versão.",
+            "Lançamentos por mensagem, depois de vincular o número em Configurações.",
             [
-                new("Status", "Em breve: lançamentos por mensagem no WhatsApp."),
+                new("Vínculo", "Em Configurações, informe o telefone deste celular e abra a conversa no aparelho."),
+                new("Confirmação", "A mensagem vira rascunho. O lançamento só entra quando você confirma."),
             ]),
 
         new("ia", "Ian",
