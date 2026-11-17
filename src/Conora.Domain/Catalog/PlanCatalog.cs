@@ -19,11 +19,11 @@ public static class PlanCatalog
     public static readonly IReadOnlyList<PlanOfferDefinition> Offers =
     [
         Offer(PlanKind.IndividualMonthly, PlanTier.Individual, 29.90m, yearly: false),
-        Offer(PlanKind.IndividualYearly, PlanTier.Individual, 299.90m, yearly: true),
+        Offer(PlanKind.IndividualYearly, PlanTier.Individual, 299m, yearly: true),
         Offer(PlanKind.FamilyMonthly, PlanTier.Family, 39.90m, yearly: false),
-        Offer(PlanKind.FamilyYearly, PlanTier.Family, 399.90m, yearly: true),
+        Offer(PlanKind.FamilyYearly, PlanTier.Family, 399m, yearly: true),
         Offer(PlanKind.FamilyPlusMonthly, PlanTier.FamilyPlus, 49.90m, yearly: false),
-        Offer(PlanKind.FamilyPlusYearly, PlanTier.FamilyPlus, 499.90m, yearly: true)
+        Offer(PlanKind.FamilyPlusYearly, PlanTier.FamilyPlus, 499m, yearly: true)
     ];
 
     public static bool IsSellable(PlanKind kind) => Offers.Any(o => o.Kind == kind);

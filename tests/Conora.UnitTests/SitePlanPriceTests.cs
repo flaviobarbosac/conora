@@ -12,9 +12,9 @@ public class SitePlanPriceTests
         Assert.Contains("data-m=\"29,90\"", html);
         Assert.Contains("data-m=\"39,90\"", html);
         Assert.Contains("data-m=\"49,90\"", html);
-        Assert.Contains("R$ 299,90 por ano", html);
-        Assert.Contains("R$ 399,90 por ano", html);
-        Assert.Contains("R$ 499,90 por ano", html);
+        Assert.Contains("R$ 299 por ano", html);
+        Assert.Contains("R$ 399 por ano", html);
+        Assert.Contains("R$ 499 por ano", html);
     }
 
     private static string FindSite()
