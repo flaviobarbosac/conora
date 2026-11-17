@@ -3,7 +3,7 @@ using Conora.Domain.Services;
 
 namespace Conora.Domain.Entities;
 
-public class Budget : ModelBase, ITenantOwned
+public class Budget : ModelBase, ITenantOwned, ICompetenceScoped
 {
     public Guid UsuarioId { get; set; }
     public string CompetenceYm { get; private set; } = default!;

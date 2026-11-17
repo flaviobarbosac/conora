@@ -1,6 +1,7 @@
 using System.Linq.Expressions;
 using Conora.Domain.Entities;
 using Conora.Domain.Enums;
+using Conora.Domain.Ports;
 using Conora.Infrastructure.Persistence;
 using Conora.Repository.Interface;
 using Microsoft.EntityFrameworkCore;
@@ -10,10 +11,12 @@ namespace Conora.Repository;
 public sealed class FinanceRepository : IFinanceRepository
 {
     private readonly AppDbContext _context;
+    private readonly IConsultantScope _scope;
 
-    public FinanceRepository(AppDbContext context)
+    public FinanceRepository(AppDbContext context, IConsultantScope scope)
     {
         _context = context;
+        _scope = scope;
     }
 
     public Task<T?> GetAsync<T>(Guid id, CancellationToken ct = default) where T : ModelBase, ITenantOwned
@@ -263,6 +266,11 @@ public sealed class FinanceRepository : IFinanceRepository
         EnsureAllowList(allowedUsuarioIds);
         IQueryable<T> query = _context.Set<T>().IgnoreQueryFilters()
             .Where(e => e.DeletedAt == null && allowedUsuarioIds.Contains(e.UsuarioId));
+        if (_scope.IsActive && typeof(ICompetenceScoped).IsAssignableFrom(typeof(T)))
+        {
+            var ym = _scope.CompetenceYm!;
+            query = query.Where(e => EF.Property<string>(e, "CompetenceYm") == ym);
+        }
         if (!track)
             query = query.AsNoTracking();
         return query;

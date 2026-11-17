@@ -2,6 +2,7 @@ using Conora.Domain.Catalog;
 using Conora.Domain.Entities;
 using Conora.Domain.Enums;
 using Conora.Domain.Services;
+using Conora.Services;
 using Xunit;
 
 namespace Conora.UnitTests;
@@ -11,32 +12,54 @@ public class PlanAccessTests
     private static readonly DateTime Created = new(2026, 11, 1, 12, 0, 0, DateTimeKind.Utc);
 
     [Theory]
-    [InlineData(0, AccessPhase.Trial)]
-    [InlineData(89, AccessPhase.Trial)]
-    [InlineData(90, AccessPhase.Expired)]
-    [InlineData(99, AccessPhase.Expired)]
-    [InlineData(100, AccessPhase.Expired)]
-    [InlineData(150, AccessPhase.Expired)]
-    public void Student_trial_then_free_tier_without_plan(int days, AccessPhase expected)
+    [InlineData(0, AccessPhase.Trial, true)]
+    [InlineData(89, AccessPhase.Trial, true)]
+    [InlineData(90, AccessPhase.Blocked, false)]
+    [InlineData(99, AccessPhase.Blocked, false)]
+    [InlineData(100, AccessPhase.Blocked, false)]
+    [InlineData(150, AccessPhase.Blocked, false)]
+    public void Student_trial_then_plans_screen_without_plan(int days, AccessPhase expected, bool writable)
     {
         var state = AccessPolicy.Evaluate(Created, null, Created.AddDays(days), isTrainingStudent: true);
 
         Assert.Equal(expected, state.Phase);
-        Assert.True(state.IsWritable);
+        Assert.Equal(writable, state.IsWritable);
     }
 
     [Theory]
-    [InlineData(0, AccessPhase.Trial)]
-    [InlineData(29, AccessPhase.Trial)]
-    [InlineData(30, AccessPhase.Expired)]
-    [InlineData(40, AccessPhase.Expired)]
-    public void Standard_trial_is_30_days_then_free_tier(int days, AccessPhase expected)
+    [InlineData(0, AccessPhase.Trial, true)]
+    [InlineData(6, AccessPhase.Trial, true)]
+    [InlineData(7, AccessPhase.Blocked, false)]
+    [InlineData(40, AccessPhase.Blocked, false)]
+    public void Standard_trial_is_7_days_then_plans_screen(int days, AccessPhase expected, bool writable)
     {
         var state = AccessPolicy.Evaluate(Created, null, Created.AddDays(days), isTrainingStudent: false);
 
         Assert.Equal(expected, state.Phase);
-        Assert.Equal(Created.AddDays(30), state.TrialEndsAt);
-        Assert.True(state.IsWritable);
+        Assert.Equal(Created.AddDays(7), state.TrialEndsAt);
+        Assert.Equal(writable, state.IsWritable);
+    }
+
+    [Fact]
+    public void Console_can_move_the_tasting_end_and_grant_access()
+    {
+        var extended = AccessPolicy.Evaluate(
+            Created, null, Created.AddDays(20), isTrainingStudent: false, trialEndsAt: Created.AddDays(30));
+        Assert.Equal(AccessPhase.Trial, extended.Phase);
+
+        var open = AccessPolicy.Evaluate(
+            Created, null, Created.AddDays(20), isTrainingStudent: false, complimentaryIndefinite: true);
+        Assert.Equal(AccessPhase.Granted, open.Phase);
+        Assert.True(open.IsWritable);
+
+        var until = Created.AddDays(40);
+        var dated = AccessPolicy.Evaluate(
+            Created, null, Created.AddDays(20), isTrainingStudent: false, complimentaryUntil: until);
+        Assert.Equal(AccessPhase.Granted, dated.Phase);
+
+        var finished = AccessPolicy.Evaluate(
+            Created, null, until, isTrainingStudent: false, complimentaryUntil: until);
+        Assert.Equal(AccessPhase.Blocked, finished.Phase);
     }
 
     [Fact]
@@ -76,12 +99,12 @@ public class PlanAccessTests
     }
 
     [Theory]
-    [InlineData(PlanKind.IndividualMonthly, 49.90, PlanTier.Individual)]
-    [InlineData(PlanKind.IndividualYearly, 499.90, PlanTier.Individual)]
-    [InlineData(PlanKind.FamilyMonthly, 59.90, PlanTier.Family)]
-    [InlineData(PlanKind.FamilyYearly, 599.90, PlanTier.Family)]
-    [InlineData(PlanKind.FamilyPlusMonthly, 79.90, PlanTier.FamilyPlus)]
-    [InlineData(PlanKind.FamilyPlusYearly, 799.90, PlanTier.FamilyPlus)]
+    [InlineData(PlanKind.IndividualMonthly, 29.90, PlanTier.Individual)]
+    [InlineData(PlanKind.IndividualYearly, 299, PlanTier.Individual)]
+    [InlineData(PlanKind.FamilyMonthly, 39.90, PlanTier.Family)]
+    [InlineData(PlanKind.FamilyYearly, 399, PlanTier.Family)]
+    [InlineData(PlanKind.FamilyPlusMonthly, 49.90, PlanTier.FamilyPlus)]
+    [InlineData(PlanKind.FamilyPlusYearly, 499, PlanTier.FamilyPlus)]
     public void Catalog_prices_yearly_with_two_free_months(PlanKind kind, double price, PlanTier tier)
     {
         Assert.Equal((decimal)price, PlanCatalog.PriceOf(kind));
@@ -98,6 +121,18 @@ public class PlanAccessTests
         Assert.Equal(PlanTier.Individual, PlanCatalog.TierOf(PlanKind.Monthly1490));
         Assert.False(PlanCatalog.IsSellable(PlanKind.Yearly14990));
         Assert.Equal(0, PlanCatalog.MaxExtraMembers(PlanTier.Individual));
+        Assert.Equal(PlanTier.Individual, PlanService.FamilySeatTier(AccessPhase.Trial, PlanTier.FamilyPlus));
+        Assert.Equal(PlanTier.Individual, PlanService.FamilySeatTier(AccessPhase.Granted, PlanTier.Family));
+        Assert.Equal(PlanTier.Family, PlanService.FamilySeatTier(AccessPhase.Subscribed, PlanTier.Family));
+        Assert.True(PlanService.HasFullAccess(new AccessSnapshot(
+            AccessPolicy.Evaluate(Created, null, Created.AddDays(1), isTrainingStudent: false),
+            null, false, false, false)));
+        Assert.True(PlanService.HasFullAccess(new AccessSnapshot(
+            AccessPolicy.Evaluate(Created, null, Created.AddDays(40), isTrainingStudent: false, complimentaryIndefinite: true),
+            null, false, false, false)));
+        Assert.False(PlanService.HasFullAccess(new AccessSnapshot(
+            AccessPolicy.Evaluate(Created, null, Created.AddDays(8), isTrainingStudent: false),
+            null, false, false, false)));
         Assert.Equal(1, PlanCatalog.MaxExtraMembers(PlanTier.Family));
         Assert.Equal(5, PlanCatalog.MaxExtraMembers(PlanTier.FamilyPlus));
     }

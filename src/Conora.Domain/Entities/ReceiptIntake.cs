@@ -78,6 +78,32 @@ public class ReceiptIntake : ModelBase, ITenantOwned
             : WhatsAppReceiptAwaiting.None;
     }
 
+    public bool HasRequiredPhotoFields()
+        => !string.IsNullOrWhiteSpace(ExtractedCnpj)
+           && !string.IsNullOrWhiteSpace(ExtractedName)
+           && ExtractedAmount is > 0
+           && ExtractedOccurredAt is not null;
+
+    public void AskManualFill()
+    {
+        WhatsAppAwaiting = Channel == ReceiptChannel.WhatsApp
+            ? WhatsAppReceiptAwaiting.ManualChoice
+            : WhatsAppReceiptAwaiting.None;
+    }
+
+    public void AcceptManualFill()
+    {
+        if (Channel != ReceiptChannel.WhatsApp)
+        {
+            WhatsAppAwaiting = WhatsAppReceiptAwaiting.None;
+            return;
+        }
+
+        WhatsAppAwaiting = string.IsNullOrWhiteSpace(ProposedCategoryCode)
+            ? WhatsAppReceiptAwaiting.Classification
+            : WhatsAppReceiptAwaiting.Confirm;
+    }
+
     public void ApplyOcr(string? cnpj, string? name, decimal? amount, DateTime? occurredAt, Guid? supplierId, string? proposedCategoryCode)
     {
         ExtractedCnpj = cnpj;

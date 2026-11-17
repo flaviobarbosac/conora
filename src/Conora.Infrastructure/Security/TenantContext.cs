@@ -14,4 +14,12 @@ public sealed class TenantContext : ITenantContext
 
         UsuarioId = usuarioId;
     }
+
+    public void AdoptClient(Guid clientUsuarioId)
+    {
+        if (clientUsuarioId == Guid.Empty)
+            throw new InvalidOperationException("Cliente inválido.");
+
+        UsuarioId = clientUsuarioId;
+    }
 }

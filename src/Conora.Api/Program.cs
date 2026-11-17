@@ -148,6 +148,7 @@ app.UseRateLimiter();
 app.UseAuthentication();
 app.UseMiddleware<CorrelationIdMiddleware>();
 app.UseMiddleware<TenantMiddleware>();
+app.UseMiddleware<ConsultantMonthMiddleware>();
 app.UseAuthorization();
 app.UseMiddleware<PlanAccessMiddleware>();
 

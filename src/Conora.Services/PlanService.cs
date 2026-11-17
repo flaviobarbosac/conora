@@ -61,19 +61,13 @@ public sealed class PlanService
 
         WorkspaceSubscription? covering = own is not null && own.IsWritable(now) ? own : null;
         var coveredByFamily = false;
-        var familyMemberWithoutCover = false;
         if (covering is null)
         {
-            var (familyPlan, inGroupAsNonOwner) = await TryFamilyOwnerPlanAsync(self, now, ct);
+            var (familyPlan, _) = await TryFamilyOwnerPlanAsync(self, now, ct);
             if (familyPlan is not null)
             {
                 covering = familyPlan;
                 coveredByFamily = true;
-            }
-            else if (inGroupAsNonOwner)
-            {
-                // Owner stopped paying (or has no covering plan): whole group falls to free / read-only.
-                familyMemberWithoutCover = true;
             }
         }
         covering ??= own;
@@ -81,14 +75,15 @@ public sealed class PlanService
         var user = await _family.FindUserByIdAsync(self, ct);
         var hotmart = await ReadHotmartAccessAsync(user?.Email, ct);
         var isTrainingStudent = hotmart.AccessEndsAt is not null || (user?.IsTrainingStudent ?? false);
+        var trialOverride = user?.TrialEndsAtUtc ?? (isTrainingStudent ? hotmart.AccessEndsAt : null);
         var state = AccessPolicy.Evaluate(
             user?.CreatedAt ?? now,
             covering,
             now,
             isTrainingStudent,
-            isTrainingStudent ? hotmart.AccessEndsAt : null);
-        if (familyMemberWithoutCover && state.Phase == AccessPhase.Trial)
-            state = new AccessState(AccessPhase.Expired, state.TrialEndsAt, state.BlockAt);
+            trialOverride,
+            user?.ComplimentaryAccessIndefinite ?? false,
+            user?.ComplimentaryAccessUntilUtc);
 
         DateTime? exportOnlyUntil = null;
         if (state.Phase != AccessPhase.Subscribed && hotmart.ExportUntilUtc is DateTime exportUntil)
@@ -100,7 +95,9 @@ public sealed class PlanService
         }
 
         var everSubscribed = own is not null || covering is not null;
-        _snapshot = new AccessSnapshot(state, covering, coveredByFamily, isTrainingStudent, everSubscribed, exportOnlyUntil);
+        var grantIndefinite = state.Phase == AccessPhase.Granted && (user?.ComplimentaryAccessIndefinite ?? false);
+        _snapshot = new AccessSnapshot(
+            state, covering, coveredByFamily, isTrainingStudent, everSubscribed, exportOnlyUntil, grantIndefinite);
         return _snapshot;
     }
 
@@ -142,7 +139,7 @@ public sealed class PlanService
         public static HotmartAccess Revoked(DateTime exportUntilUtc) => new(null, exportUntilUtc);
     }
 
-    /// <summary>True when the workspace has the full product (student trial or paid plan).</summary>
+    /// <summary>True when the workspace has the full product (tasting, console grant or paid plan).</summary>
     public async Task<bool> HasFullAccessAsync(CancellationToken ct)
     {
         var access = await GetAccessAsync(ct);
@@ -150,8 +147,13 @@ public sealed class PlanService
     }
 
     public static bool HasFullAccess(AccessSnapshot access)
-        => access.State.Phase == AccessPhase.Subscribed
-           || (access.IsTrainingStudent && access.State.Phase == AccessPhase.Trial);
+        => access.State.Phase is AccessPhase.Subscribed or AccessPhase.Trial or AccessPhase.Granted;
+
+    /// <summary>Duo and Família seats exist only on an active paid plan. Trial and a console grant stay Individual.</summary>
+    public static PlanTier FamilySeatTier(AccessPhase phase, PlanTier? subscribedTier)
+        => phase == AccessPhase.Subscribed && subscribedTier is PlanTier tier
+            ? tier
+            : PlanTier.Individual;
 
     /// <summary>Blocks writes only when the account is blocked. Free tier still writes limited data.</summary>
     public async Task EnsureWritableAsync(CancellationToken ct)
@@ -190,9 +192,7 @@ public sealed class PlanService
     {
         await EnsureFullAccessAsync(ct);
         var access = await GetAccessAsync(ct);
-        var tier = access.State.Phase == AccessPhase.Subscribed && access.Subscription is not null
-            ? access.Subscription.Tier
-            : PlanTier.Individual;
+        var tier = FamilySeatTier(access.State.Phase, access.Subscription?.Tier);
         var max = PlanCatalog.MaxExtraMembers(tier) ?? 0;
         if (currentExtraMembers >= max)
             throw new ValidationException("email", PlanCatalog.FamilySeatMessage(tier));
@@ -323,6 +323,7 @@ public sealed class PlanService
         var daysLeft = phase switch
         {
             AccessPhase.Trial => AccessPolicy.DaysUntil(access.State.TrialEndsAt, now),
+            AccessPhase.Granted when !access.GrantIndefinite => AccessPolicy.DaysUntil(access.State.TrialEndsAt, now),
             AccessPhase.Grace => AccessPolicy.DaysUntil(access.State.BlockAt, now),
             AccessPhase.Subscribed when sub is not null => AccessPolicy.DaysUntil(sub.ExpiresAt, now),
             _ => 0
@@ -351,7 +352,8 @@ public sealed class PlanService
             full,
             access.EverSubscribed,
             planLabel,
-            access.ExportOnlyUntil);
+            access.ExportOnlyUntil,
+            access.GrantIndefinite);
     }
 }
 
@@ -361,4 +363,5 @@ public sealed record AccessSnapshot(
     bool CoveredByFamily,
     bool IsTrainingStudent,
     bool EverSubscribed,
-    DateTime? ExportOnlyUntil = null);
+    DateTime? ExportOnlyUntil = null,
+    bool GrantIndefinite = false);

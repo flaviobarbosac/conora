@@ -6,6 +6,8 @@ public sealed record LinkWhatsAppRequest(string Phone);
 
 public sealed record WhatsAppLinkResponse(string PhoneE164, DateTime LinkedAt);
 
+public sealed record WhatsAppPairingResponse(string Code, string Text);
+
 public sealed record WhatsAppDraftResponse(Guid Id, string PhoneE164, string PayloadJson, WhatsAppDraftStatus Status, DateTime CreatedAt);
 
 public sealed record ConfirmWhatsAppDraftRequest(Guid? AccountId = null, Guid? CategoryId = null);

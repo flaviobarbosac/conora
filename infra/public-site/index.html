@@ -195,8 +195,7 @@ nav a:hover{color:var(--tinta)}
 .rasc .acoes span{flex:1;text-align:center;border-radius:9px;padding:8px;font-size:13px;font-weight:600;background:#EEF1F5}
 .rasc .acoes span:last-child{background:var(--conora);color:#fff}
 .alerta-txt{margin-top:12px;font-size:13px;font-weight:600;color:var(--alerta)}
-.video{margin-top:48px;border:1.5px dashed rgba(169,204,242,.35);border-radius:20px;padding:26px;text-align:center;color:#9DB6D3;font-size:15px}
-.video b{color:#fff}
+.entrada-video{display:block;width:100%;max-width:880px;margin-top:28px;border:0;border-radius:20px;background:#0b1c33;aspect-ratio:16/9}
 @media(max-width:900px){.passos{grid-template-columns:1fr}}
 
 /* ============ MÓDULOS ============ */
@@ -379,8 +378,8 @@ footer nav{gap:20px;font-size:14px;color:#7E98B8}
     <div class="h-slide" role="group" aria-roledescription="slide" aria-label="4 de 5" aria-hidden="true">
       <div>
         <p class="h-kicker">Família</p>
-        <h2 class="h-title">Cada um no seu celular. <span>Um só orçamento.</span></h2>
-        <p class="lead">Convide quem divide a casa com você. Todos lançam e veem os mesmos números, e a conversa sobre dinheiro fica mais simples.</p>
+        <h2 class="h-title">Cada um no seu celular. <span>A soma da casa no Raio-X.</span></h2>
+        <p class="lead">Convide quem divide a casa. Cada um lança no próprio acesso. Quem convida vê a soma da casa no Raio-X. Contas e cartões continuam de cada um.</p>
       </div>
       <img class="h-img" src="/img/hero-3d-familia.webp" width="880" height="880" alt="Casa de vidro 3D conectada por linhas de luz a celulares em órbita" loading="lazy" decoding="async">
     </div>
@@ -414,8 +413,8 @@ footer nav{gap:20px;font-size:14px;color:#7E98B8}
     </div>
 
     <div class="h-facts">
-      <div class="garantias"><span>Sem cartão</span><span>Sem prazo para acabar</span><span>Web, Android e iOS</span></div>
-      <p class="preco-ancora">Planos a partir de <b>R$ 1,37 por dia</b>. No Família, você e mais 5 pessoas.</p>
+      <div class="garantias"><span>Sem cartão</span><span>90 dias com tudo</span><span>Web, Android e iOS</span></div>
+      <p class="preco-ancora">Planos a partir de <b>R$ 0,82 por dia</b>. No Família, você e mais 5 pessoas.</p>
     </div>
   </div>
 </section>
@@ -444,7 +443,8 @@ footer nav{gap:20px;font-size:14px;color:#7E98B8}
 <section class="band filme" id="como-funciona">
   <div class="wrap">
     <h2>Gastou, mandou, confirmou.</h2>
-    <p class="lead" style="margin-top:14px">Ninguém precisa abrir planilha. O gasto vai pelo WhatsApp e já aparece no Raio-X.</p>
+    <p class="lead" style="margin-top:14px">Ninguém precisa abrir planilha. O gasto vai pelo WhatsApp e chega como rascunho para você confirmar.</p>
+    <iframe class="entrada-video" src="https://www.youtube.com/embed/ljs3zGINCAs" title="Vídeo de entrada do Conora" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" allowfullscreen></iframe>
     <div class="passos">
       <div class="passo">
         <div class="tela">
@@ -452,7 +452,7 @@ footer nav{gap:20px;font-size:14px;color:#7E98B8}
           <div class="bolha in">Anotado. Chegou como rascunho no Conora para você confirmar.<small>18:42</small></div>
         </div>
         <h3>Manda no WhatsApp</h3>
-        <p>Qualquer pessoa da família manda o gasto por mensagem, do jeito que fala.</p>
+        <p>Quem vinculou o WhatsApp manda o gasto por mensagem. Ele chega como rascunho.</p>
       </div>
       <div class="passo">
         <div class="tela">
@@ -463,7 +463,7 @@ footer nav{gap:20px;font-size:14px;color:#7E98B8}
           </div>
         </div>
         <h3>Confirma com um toque</h3>
-        <p>O lançamento já chega classificado no plano de contas.</p>
+        <p>Você confere a conta e confirma. Aí o lançamento entra no Raio-X.</p>
       </div>
       <div class="passo">
         <div class="tela">
@@ -483,16 +483,16 @@ footer nav{gap:20px;font-size:14px;color:#7E98B8}
 <!-- MÓDULOS -->
 <section class="band">
   <div class="wrap">
-    <h2>Dez módulos, um só plano de contas.</h2>
+    <h2>O que o app entrega, num só plano de contas.</h2>
     <ul class="modulos">
       <li><b>Lançamentos</b><span>Receitas e despesas por conta e por cartão.</span></li>
       <li><b>Orçamento</b><span>O previsto e o realizado de cada conta do mês.</span></li>
       <li><b>Raio-X</b><span>O balancete em árvore, até o último lançamento.</span></li>
       <li><b>Patrimônio</b><span>Bens e dívidas num mesmo balanço.</span></li>
       <li><b>Projetos de vida</b><span>Você diz o valor e a data; ele calcula a parcela.</span></li>
-      <li><b>Família</b><span>Todos lançam e todos enxergam o mesmo orçamento.</span></li>
+      <li><b>Família</b><span>Cada um lança no próprio acesso. O dono do grupo vê a soma da casa.</span></li>
       <li><b>Importar extrato</b><span>Traz o extrato do banco e detecta duplicatas.</span></li>
-      <li><b>WhatsApp</b><span>O gasto mandado por mensagem vira rascunho.</span></li>
+      <li><b>WhatsApp</b><span>A mensagem vira rascunho. Você confirma antes de lançar.</span></li>
       <li><b>Pergunte à IA</b><span>“Quanto gastamos com mercado este mês?”</span></li>
       <li><b>Fechamento do mês</b><span>Congela os números; para reabrir, fica registrado o motivo.</span></li>
     </ul>
@@ -520,11 +520,11 @@ footer nav{gap:20px;font-size:14px;color:#7E98B8}
     <div class="planos-top">
       <div>
         <h2>Menos que um cafezinho por dia para a casa toda.</h2>
-        <p class="lead" style="margin-top:14px">Comece grátis. Assine quando quiser usar tudo.</p>
+        <p class="lead" style="margin-top:14px">Comece sem cartão. Por 90 dias o Conora fica inteiro. Depois, o grátis fica em salário, aluguel, luz, água e escola.</p>
       </div>
       <div class="toggle" role="group" aria-label="Período de cobrança">
         <button type="button" data-p="m" aria-pressed="false">Mensal</button>
-        <button type="button" data-p="a" aria-pressed="true">Anual <span class="eco">2 meses de economia</span></button>
+        <button type="button" data-p="a" aria-pressed="true">Anual <span class="eco">2 meses grátis</span></button>
       </div>
     </div>
 
@@ -532,26 +532,26 @@ footer nav{gap:20px;font-size:14px;color:#7E98B8}
       <div class="plano">
         <h3>Individual</h3>
         <p class="p-quem">Para quem cuida do próprio dinheiro</p>
-        <div class="valor"><span class="rs">R$</span><span class="num" data-m="49,90" data-a="41,66">41,66</span><span class="mes">/mês</span></div>
-        <p class="p-sub" data-m="Cobrado todo mês. R$ 1,66 por dia." data-a="R$ 499,90 por ano, <b>economia de R$ 98,90</b>. R$ 1,37 por dia."></p>
-        <ul><li>1 pessoa</li><li>Os 10 módulos</li><li>Lançamento pelo WhatsApp</li><li>Pergunte à IA</li></ul>
+        <div class="valor"><span class="rs">R$</span><span class="num" data-m="29,90" data-a="24,92">24,92</span><span class="mes">/mês</span></div>
+        <p class="p-sub" data-m="Cobrado todo mês. R$ 1,00 por dia." data-a="R$ 299 por ano, <b>economia de R$ 59,80</b>. R$ 0,82 por dia."></p>
+        <ul><li>1 pessoa</li><li>Tudo do Conora</li><li>Lançamento pelo WhatsApp</li><li>Pergunte à IA</li></ul>
         <a class="btn btn-sec" href="/app/register">Começar grátis</a>
       </div>
       <div class="plano">
         <h3>Duo</h3>
-        <p class="p-quem">Para o casal no mesmo orçamento</p>
-        <div class="valor"><span class="rs">R$</span><span class="num" data-m="59,90" data-a="49,99">49,99</span><span class="mes">/mês</span></div>
-        <p class="p-sub" data-m="Cobrado todo mês. R$ 2,00 por dia." data-a="R$ 599,90 por ano, <b>economia de R$ 118,90</b>. R$ 1,64 por dia."></p>
-        <ul><li>2 pessoas</li><li>Os 10 módulos</li><li>Os dois lançam, os dois enxergam</li><li>Projetos de vida do casal</li></ul>
+        <p class="p-quem">Para duas pessoas, cada uma no próprio acesso</p>
+        <div class="valor"><span class="rs">R$</span><span class="num" data-m="39,90" data-a="33,25">33,25</span><span class="mes">/mês</span></div>
+        <p class="p-sub" data-m="Cobrado todo mês. R$ 1,33 por dia." data-a="R$ 399 por ano, <b>economia de R$ 79,80</b>. R$ 1,09 por dia."></p>
+        <ul><li>2 pessoas</li><li>Tudo do Conora</li><li>Cada um no próprio acesso</li><li>Projetos de vida do casal</li></ul>
         <a class="btn btn-sec" href="/app/register">Começar grátis</a>
       </div>
       <div class="plano familia">
         <h3>Família</h3>
         <p class="p-quem">Para quem divide a casa</p>
         <div class="seis" aria-label="Você e mais 5 pessoas"><i></i><i></i><i></i><i></i><i></i><i></i></div>
-        <div class="valor"><span class="rs">R$</span><span class="num" data-m="79,90" data-a="66,66">66,66</span><span class="mes">/mês</span></div>
-        <p class="p-sub" data-m="Cobrado todo mês. R$ 2,66 por dia." data-a="R$ 799,90 por ano, <b>economia de R$ 158,90</b>. R$ 2,19 por dia."></p>
-        <ul><li>Você e mais 5 pessoas</li><li>Os 10 módulos</li><li>Cada um lança pelo WhatsApp</li><li>Um orçamento único para a família</li></ul>
+        <div class="valor"><span class="rs">R$</span><span class="num" data-m="49,90" data-a="41,58">41,58</span><span class="mes">/mês</span></div>
+        <p class="p-sub" data-m="Cobrado todo mês. R$ 1,66 por dia." data-a="R$ 499 por ano, <b>economia de R$ 99,80</b>. R$ 1,37 por dia."></p>
+        <ul><li>Você e mais 5 pessoas</li><li>Tudo do Conora</li><li>Cada um lança pelo WhatsApp</li><li>Um orçamento único para a família</li></ul>
         <a class="btn btn-luz" href="/app/register">Começar grátis</a>
       </div>
     </div>
@@ -559,7 +559,7 @@ footer nav{gap:20px;font-size:14px;color:#7E98B8}
     <div class="gratis">
       <div>
         <h3>Veja tudo antes de decidir</h3>
-        <p>Na conta grátis você entra, conhece todos os módulos e monta a base da sua família, sem prazo para acabar. Para usar todos os recursos, é só assinar. O cartão só é pedido na assinatura, e você cancela quando quiser.</p>
+        <p>Você entra sem cartão. Por 90 dias usa o Conora inteiro. Se não assinar, continua no grátis: salário, aluguel, luz, água e escola, numa conta. O restante fica para consulta. O cartão só é pedido na assinatura, e você cancela quando quiser.</p>
       </div>
       <a class="btn btn-pri" href="/app/register">Começar grátis</a>
     </div>
@@ -586,13 +586,13 @@ footer nav{gap:20px;font-size:14px;color:#7E98B8}
   <div class="wrap">
     <h2>Antes de começar</h2>
     <div class="faq">
-      <details open><summary>E se meu parceiro ou parceira não quiser usar o app?</summary><p>Não precisa abrir o app. Basta mandar o gasto pelo WhatsApp: ele chega como rascunho e você só confirma. E mesmo que só uma pessoa lance, todos enxergam o mesmo orçamento.</p></details>
+      <details open><summary>E se meu parceiro ou parceira não quiser usar o app?</summary><p>Quem vinculou o número manda o gasto pelo WhatsApp. Ele chega como rascunho e você confirma. Cada pessoa lança no próprio acesso. O dono do grupo vê a soma da casa no Raio-X.</p></details>
       <details><summary>Dá muito trabalho lançar tudo?</summary><p>Menos do que parece. Você começa com um modelo pronto de plano de contas, importa o extrato do banco (com detecção de duplicatas) e lança o dia a dia pelo WhatsApp.</p></details>
       <details><summary>Não sou bom com números. Vou entender?</summary><p>O Raio-X mostra em barras o que estava previsto e o que saiu. E você pode perguntar do seu jeito, como “quanto gastamos com mercado este mês?”, que a IA responde com os seus números.</p></details>
       <details><summary>Meus dados ficam seguros?</summary><p>Sim. Os dados são guardados conforme a LGPD e são exclusivos de quem é dono: não há acesso externo nem interno, nem mesmo da equipe do Conora. Dentro da família, só vê quem você convidar.</p></details>
-      <details><summary>Como funciona a conta grátis? Tem prazo?</summary><p>Não tem prazo e não pede cartão. Você vê todos os módulos e conhece o app por dentro; para usar todos os recursos, você assina. O cartão só é pedido na assinatura.</p></details>
+      <details><summary>Como funciona a conta grátis? Tem prazo?</summary><p>Por 90 dias você usa tudo, sem cartão. Depois continua no Conora grátis, lançando salário, aluguel, luz, água e escola. Patrimônio, membros, projeto de vida e marcos ficam para consulta até você assinar.</p></details>
       <details><summary>Posso cancelar a assinatura?</summary><p>Pode, a qualquer momento.</p></details>
-      <details><summary>Qual plano escolher?</summary><p>Individual para quem cuida sozinho do próprio dinheiro, Duo para o casal e Família para quem divide a casa: você e mais 5 pessoas. No anual, a economia equivale a cerca de 2 meses.</p></details>
+      <details><summary>Qual plano escolher?</summary><p>Individual para uma pessoa, Duo para duas e Família para você e mais 5. Cada pessoa entra com o próprio acesso. No anual, são 10 meses pagos e 2 grátis.</p></details>
     </div>
   </div>
 </section>
@@ -603,7 +603,7 @@ footer nav{gap:20px;font-size:14px;color:#7E98B8}
     <h2>Faça o primeiro Raio X da sua família.</h2>
     <p class="lead">Monte a base em minutos, lance pelo WhatsApp e veja para onde foi o dinheiro deste mês.</p>
     <a class="btn btn-luz" href="/app/register">Começar grátis</a>
-    <div class="garantias"><span>Sem cartão</span><span>Sem prazo</span><span>A partir de R$ 1,37 por dia</span></div>
+    <div class="garantias"><span>Sem cartão</span><span>90 dias com tudo</span><span>A partir de R$ 0,82 por dia</span></div>
   </div>
 </section>
 </main>

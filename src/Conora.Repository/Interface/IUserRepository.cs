@@ -12,6 +12,10 @@ public interface IUserRepository : IBaseRepository<User>
     Task<User?> FindByPasswordResetHashAsync(string tokenHash, CancellationToken ct = default);
     Task<User?> FindByEmailVerificationHashAsync(string tokenHash, CancellationToken ct = default);
     Task<IReadOnlyList<Guid>> ListActiveUserIdsAsync(CancellationToken ct = default);
+    Task<IReadOnlyList<User>> SearchActiveAsync(string term, int take, CancellationToken ct = default);
+    Task<User?> FindActiveByIdAsync(Guid id, CancellationToken ct = default);
     Task<IReadOnlyList<User>> ListExpiredDeletionsAsync(DateTime cutoffUtc, CancellationToken ct = default);
+    Task LockPasswordResetAsync(Guid userId, CancellationToken ct = default);
+    Task ReloadAsync(User user, CancellationToken ct = default);
     void Remove(User user);
 }

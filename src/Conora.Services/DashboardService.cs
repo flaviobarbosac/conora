@@ -21,6 +21,7 @@ public sealed class DashboardService
     private readonly FamilyGroupService _family;
     private readonly IUnitOfWork _uow;
     private readonly IWhatsAppMessenger _whatsApp;
+    private readonly IConsultantScope _scope;
 
     public DashboardService(
         IFinanceRepository repo,
@@ -29,7 +30,8 @@ public sealed class DashboardService
         CategoryService categories,
         FamilyGroupService family,
         IUnitOfWork uow,
-        IWhatsAppMessenger whatsApp)
+        IWhatsAppMessenger whatsApp,
+        IConsultantScope scope)
     {
         _repo = repo;
         _months = months;
@@ -38,11 +40,13 @@ public sealed class DashboardService
         _family = family;
         _uow = uow;
         _whatsApp = whatsApp;
+        _scope = scope;
     }
 
     public async Task<DashboardResponse> GetAsync(string competenceYm, CancellationToken ct)
     {
         var ym = Competence.Require(competenceYm);
+        _scope.Ensure(ym);
         var totals = await ComputeTotalsAsync(ym, ct);
         var month = await _months.GetAsync(ym, ct);
         var accounts = await _repo.ListAsync<Account>(a => !a.IsArchived, ct);
@@ -63,11 +67,16 @@ public sealed class DashboardService
     }
 
     public Task<IReadOnlyList<AlertResponse>> GetAlertsAsync(string competenceYm, CancellationToken ct)
-        => GetAlertsCoreAsync(Competence.Require(competenceYm), ct);
+    {
+        var ym = Competence.Require(competenceYm);
+        _scope.Ensure(ym);
+        return GetAlertsCoreAsync(ym, ct);
+    }
 
     public async Task MarkAlertsSeenAsync(MarkAlertsSeenRequest request, CancellationToken ct)
     {
         var ym = Competence.Require(request.CompetenceYm);
+        _scope.Ensure(ym);
         if (request.Items.Count == 0)
             return;
 
@@ -116,6 +125,8 @@ public sealed class DashboardService
     public async Task<ExportFile> ExportEntriesAsync(string? competenceYm, CancellationToken ct)
     {
         var ym = string.IsNullOrWhiteSpace(competenceYm) ? null : Competence.Require(competenceYm);
+        if (ym is not null)
+            _scope.Ensure(ym);
         var entries = await _repo.ListAsync<Entry>(e => ym == null || e.CompetenceYm == ym, ct);
         var categories = (await _categories.ListAsync(null, true, true, ct)).ToDictionary(c => c.Id, c => c.Name);
         var accounts = (await _repo.ListAsync<Account>(null, ct)).ToDictionary(a => a.Id, a => a.Name);

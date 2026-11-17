@@ -14,6 +14,7 @@ public class EntryConfiguration : IEntityTypeConfiguration<Entry>
         builder.Property(e => e.Type).HasConversion<string>().HasMaxLength(30);
         builder.Property(e => e.Amount).HasPrecision(18, 2);
         builder.Property(e => e.CompetenceYm).IsRequired().HasMaxLength(7);
+        builder.Property(e => e.ActorUsuarioId);
         builder.Property(e => e.Description).IsRequired().HasMaxLength(250);
         builder.Property(e => e.RecurrenceKey).HasMaxLength(60);
         builder.Property(e => e.ImportHash).HasMaxLength(64);

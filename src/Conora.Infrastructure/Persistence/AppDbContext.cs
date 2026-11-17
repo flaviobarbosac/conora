@@ -9,10 +9,15 @@ namespace Conora.Infrastructure.Persistence;
 public class AppDbContext : DbContext
 {
     private readonly ITenantContext? _tenant;
+    private readonly IConsultantScope? _scope;
 
-    public AppDbContext(DbContextOptions<AppDbContext> options, ITenantContext? tenant = null) : base(options)
+    public AppDbContext(
+        DbContextOptions<AppDbContext> options,
+        ITenantContext? tenant = null,
+        IConsultantScope? scope = null) : base(options)
     {
         _tenant = tenant;
+        _scope = scope;
     }
 
     public DbSet<User> Users => Set<User>();
@@ -36,6 +41,7 @@ public class AppDbContext : DbContext
     public DbSet<Budget> Budgets => Set<Budget>();
     public DbSet<BudgetLine> BudgetLines => Set<BudgetLine>();
     public DbSet<MonthLock> MonthLocks => Set<MonthLock>();
+    public DbSet<MonthShare> MonthShares => Set<MonthShare>();
     public DbSet<LifeProject> LifeProjects => Set<LifeProject>();
     public DbSet<PatrimonyItem> PatrimonyItems => Set<PatrimonyItem>();
     public DbSet<FamilyMember> FamilyMembers => Set<FamilyMember>();
@@ -66,30 +72,33 @@ public class AppDbContext : DbContext
         TenantFilter<RefreshToken>(modelBuilder);
         TenantFilter<LgpdRequest>(modelBuilder);
         TenantFilter<Category>(modelBuilder);
-        TenantFilter<IncomeSource>(modelBuilder);
+        MonthScopedFilter<IncomeSource>(modelBuilder);
         TenantFilter<Account>(modelBuilder);
         TenantFilter<CreditCard>(modelBuilder);
-        TenantFilter<CardPurchase>(modelBuilder);
-        TenantFilter<CardInvoice>(modelBuilder);
-        TenantFilter<Entry>(modelBuilder);
-        TenantFilter<Budget>(modelBuilder);
+        MonthScopedFilter<CardPurchase>(modelBuilder);
+        MonthScopedFilter<CardInvoice>(modelBuilder);
+        MonthScopedFilter<Entry>(modelBuilder);
+        MonthScopedFilter<Budget>(modelBuilder);
         TenantFilter<BudgetLine>(modelBuilder);
-        TenantFilter<MonthLock>(modelBuilder);
+        MonthScopedFilter<MonthLock>(modelBuilder);
         TenantFilter<LifeProject>(modelBuilder);
         TenantFilter<PatrimonyItem>(modelBuilder);
         TenantFilter<FamilyMember>(modelBuilder);
         TenantFilter<WorkspaceSubscription>(modelBuilder);
         TenantFilter<UserMilestone>(modelBuilder);
-        TenantFilter<ImportBatch>(modelBuilder);
+        MonthScopedFilter<ImportBatch>(modelBuilder);
         TenantFilter<ImportPreviewRow>(modelBuilder);
         TenantFilter<WhatsAppLink>(modelBuilder);
         TenantFilter<WhatsAppDraft>(modelBuilder);
         TenantFilter<ReceiptIntake>(modelBuilder);
         TenantFilter<UserFeedback>(modelBuilder);
+        MonthScopedFilter<AlertSeen>(modelBuilder);
     }
 
     public override async Task<int> SaveChangesAsync(CancellationToken cancellationToken = default)
     {
+        RejectOutsideSharedMonth();
+        await RejectBudgetLinesOutsideSharedMonthAsync(cancellationToken);
         StampTenant();
         StampAudit();
 
@@ -166,4 +175,43 @@ public class AppDbContext : DbContext
     private void TenantFilter<T>(ModelBuilder modelBuilder) where T : ModelBase, ITenantOwned
         => modelBuilder.Entity<T>()
             .HasQueryFilter(e => e.DeletedAt == null && e.UsuarioId == _tenant!.UsuarioId);
+
+    private void MonthScopedFilter<T>(ModelBuilder modelBuilder) where T : ModelBase, ITenantOwned, ICompetenceScoped
+        => modelBuilder.Entity<T>()
+            .HasQueryFilter(e => e.DeletedAt == null
+                && e.UsuarioId == _tenant!.UsuarioId
+                && (_scope == null || !_scope.IsActive || e.CompetenceYm == _scope.CompetenceYm));
+
+    private void RejectOutsideSharedMonth()
+    {
+        if (_scope is not { IsActive: true })
+            return;
+
+        foreach (var entry in ChangeTracker.Entries<ICompetenceScoped>())
+        {
+            if (entry.State is not (EntityState.Added or EntityState.Modified))
+                continue;
+            if (!string.Equals(entry.Entity.CompetenceYm, _scope.CompetenceYm, StringComparison.Ordinal))
+                throw new ForbiddenException("Fora do mês compartilhado.");
+        }
+    }
+
+    private async Task RejectBudgetLinesOutsideSharedMonthAsync(CancellationToken ct)
+    {
+        if (_scope is not { IsActive: true })
+            return;
+
+        foreach (var line in ChangeTracker.Entries<BudgetLine>())
+        {
+            if (line.State is not (EntityState.Added or EntityState.Modified))
+                continue;
+
+            var ym = await Set<Budget>().AsNoTracking()
+                .Where(b => b.Id == line.Entity.BudgetId)
+                .Select(b => b.CompetenceYm)
+                .FirstOrDefaultAsync(ct);
+            if (!string.Equals(ym, _scope.CompetenceYm, StringComparison.Ordinal))
+                throw new ForbiddenException("Fora do mês compartilhado.");
+        }
+    }
 }

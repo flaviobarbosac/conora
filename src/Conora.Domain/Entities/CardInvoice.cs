@@ -3,7 +3,7 @@ using Conora.Domain.Services;
 
 namespace Conora.Domain.Entities;
 
-public class CardInvoice : ModelBase, ITenantOwned
+public class CardInvoice : ModelBase, ITenantOwned, ICompetenceScoped
 {
     public Guid UsuarioId { get; set; }
     public Guid CreditCardId { get; private set; }

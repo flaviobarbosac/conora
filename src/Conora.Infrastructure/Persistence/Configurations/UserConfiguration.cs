@@ -24,6 +24,9 @@ public class UserConfiguration : IEntityTypeConfiguration<User>
         builder.Property(u => u.EmailVerified).IsRequired();
         builder.Property(u => u.OnboardingCompleted).IsRequired();
         builder.Property(u => u.IsTrainingStudent).IsRequired().HasDefaultValue(false);
+        builder.Property(u => u.TrialEndsAtUtc);
+        builder.Property(u => u.ComplimentaryAccessIndefinite).IsRequired().HasDefaultValue(false);
+        builder.Property(u => u.ComplimentaryAccessUntilUtc);
         builder.Property(u => u.ThemeId).IsRequired().HasMaxLength(40);
         builder.Property(u => u.QuietMode).IsRequired();
         builder.Property(u => u.EmailsEnabled).IsRequired().HasDefaultValue(true);

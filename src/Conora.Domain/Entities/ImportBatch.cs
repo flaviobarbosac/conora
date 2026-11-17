@@ -4,7 +4,7 @@ using Conora.Domain.Services;
 
 namespace Conora.Domain.Entities;
 
-public class ImportBatch : ModelBase, ITenantOwned
+public class ImportBatch : ModelBase, ITenantOwned, ICompetenceScoped
 {
     public Guid UsuarioId { get; set; }
     public string FileName { get; private set; } = default!;
