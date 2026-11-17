@@ -5,5 +5,6 @@ public enum WhatsAppReceiptAwaiting
 {
     None = 0,
     Classification = 1,
-    Confirm = 2
+    Confirm = 2,
+    ManualChoice = 3
 }

@@ -40,6 +40,28 @@ public class UserTests
     }
 
     [Fact]
+    public void Password_reset_cooldown_outlasts_the_token_for_operators()
+    {
+        var user = User.Create("Ana", "ana@example.com");
+        var ttl = TimeSpan.FromMinutes(30);
+        var issuedAt = DateTime.UtcNow;
+        user.IssuePasswordReset("hash", issuedAt.Add(ttl));
+        var twoHoursLater = issuedAt.AddHours(2);
+
+        Assert.False(user.IsPasswordResetCoolingDown(ttl, TimeSpan.FromMinutes(15), twoHoursLater));
+        Assert.True(user.IsPasswordResetCoolingDown(ttl, TimeSpan.FromHours(24), twoHoursLater));
+    }
+
+    [Fact]
+    public void Password_reset_cooldown_is_open_when_no_token_was_issued()
+    {
+        var user = User.Create("Ana", "ana@example.com");
+        var now = DateTime.UtcNow;
+
+        Assert.False(user.IsPasswordResetCoolingDown(TimeSpan.FromMinutes(30), TimeSpan.FromMinutes(15), now));
+    }
+
+    [Fact]
     public void MarkEmailVerified_keeps_hash_for_idempotent_link_replay()
     {
         var user = User.Create("Ana", "ana@example.com");

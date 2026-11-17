@@ -12,12 +12,12 @@ namespace Conora.UnitTests;
 public class StoreSubscriptionBillingTests
 {
     [Theory]
-    [InlineData(StoreProductIds.IndividualMonthly, PlanKind.IndividualMonthly, 49.90)]
-    [InlineData(StoreProductIds.IndividualYearly, PlanKind.IndividualYearly, 499.90)]
-    [InlineData(StoreProductIds.DuoMonthly, PlanKind.FamilyMonthly, 59.90)]
-    [InlineData(StoreProductIds.DuoYearly, PlanKind.FamilyYearly, 599.90)]
-    [InlineData(StoreProductIds.FamilyMonthly, PlanKind.FamilyPlusMonthly, 79.90)]
-    [InlineData(StoreProductIds.FamilyYearly, PlanKind.FamilyPlusYearly, 799.90)]
+    [InlineData(StoreProductIds.IndividualMonthly, PlanKind.IndividualMonthly, 29.90)]
+    [InlineData(StoreProductIds.IndividualYearly, PlanKind.IndividualYearly, 299.90)]
+    [InlineData(StoreProductIds.DuoMonthly, PlanKind.FamilyMonthly, 39.90)]
+    [InlineData(StoreProductIds.DuoYearly, PlanKind.FamilyYearly, 399.90)]
+    [InlineData(StoreProductIds.FamilyMonthly, PlanKind.FamilyPlusMonthly, 49.90)]
+    [InlineData(StoreProductIds.FamilyYearly, PlanKind.FamilyPlusYearly, 499.90)]
     public void TryMapProduct_maps_conora_skus(string productId, PlanKind expected, double price)
     {
         var sut = CreateSut();
@@ -37,7 +37,7 @@ public class StoreSubscriptionBillingTests
 
     [Theory]
     [InlineData(true, 90)]
-    [InlineData(false, 30)]
+    [InlineData(false, 7)]
     public void Trial_days_come_from_profile_not_store_product(bool student, int days)
     {
         Assert.Equal(days, AccessPolicy.TrialDaysFor(student));

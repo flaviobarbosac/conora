@@ -1,4 +1,5 @@
 using Conora.Domain.Ports;
+using Conora.Domain.Services;
 using Conora.Infrastructure.Billing;
 using Conora.Infrastructure.Email;
 using Conora.Infrastructure.Persistence;
@@ -16,6 +17,7 @@ public static class DependencyInjection
     public static IServiceCollection AddInfrastructure(this IServiceCollection services, IConfiguration configuration)
     {
         services.AddScoped<ITenantContext, TenantContext>();
+        services.AddScoped<IConsultantScope, ConsultantMonthScope>();
 
         services.AddDbContext<AppDbContext>((sp, options) =>
         {

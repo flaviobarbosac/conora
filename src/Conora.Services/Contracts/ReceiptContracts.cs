@@ -26,7 +26,8 @@ public sealed record ReceiptIntakeResponse(
     string? FailureReason,
     bool NeedsClassification,
     IReadOnlyList<SimilarSupplierResponse> SimilarSuppliers,
-    string? BudgetCompetenceYm = null);
+    string? BudgetCompetenceYm = null,
+    IReadOnlyList<string>? MissingRequired = null);
 
 public sealed record ClassifyReceiptRequest(string CategoryCode);
 

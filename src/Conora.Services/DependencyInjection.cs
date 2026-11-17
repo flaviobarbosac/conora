@@ -14,6 +14,7 @@ public static class DependencyInjection
         services.AddScoped<UserService>();
         services.AddScoped<AuditService>();
         services.AddScoped<ConsoleService>();
+        services.AddScoped<ConsoleAccessAdminService>();
         services.AddScoped<JourneyService>();
         services.AddScoped<AuthService>();
         services.AddScoped<LgpdService>();
@@ -23,6 +24,8 @@ public static class DependencyInjection
         services.AddScoped<HotmartCourseService>();
         services.AddScoped<IStoreSubscriptionBilling, StoreSubscriptionBilling>();
         services.AddScoped<MonthService>();
+        services.AddScoped<MonthShareService>();
+        services.AddScoped<ConsultantAccessService>();
         services.AddScoped<CategoryService>();
         services.AddSingleton<ICategoryAccessPolicyFactory, CategoryAccessPolicyFactory>();
         services.AddScoped<MemberService>();

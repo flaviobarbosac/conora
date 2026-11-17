@@ -23,10 +23,19 @@ public class User : ModelBase
     public bool OnboardingCompleted { get; private set; }
 
     /// <summary>
-    /// Training student (Leomar Campos course purchase): 90-day free trial (30 + 60).
-    /// Everyone else gets 30 days. Not a store SKU — AccessPolicy resolves length.
+    /// Training student (Leomar Campos course purchase): 90-day tasting.
+    /// Everyone else gets 7 days. Not a store SKU — AccessPolicy resolves length.
     /// </summary>
     public bool IsTrainingStudent { get; private set; }
+
+    /// <summary>Console override of the tasting end. Null keeps the profile length.</summary>
+    public DateTime? TrialEndsAtUtc { get; private set; }
+
+    /// <summary>Console grant with no end date. Duo and Família invites stay out.</summary>
+    public bool ComplimentaryAccessIndefinite { get; private set; }
+
+    /// <summary>Console grant that ends at this instant. Ignored when <see cref="ComplimentaryAccessIndefinite"/> is true.</summary>
+    public DateTime? ComplimentaryAccessUntilUtc { get; private set; }
     public string ThemeId { get; private set; } = ThemeCatalog.Clareza;
     public bool QuietMode { get; private set; }
     /// <summary>When false, Conora system e-mails are not sent (user opt-out).</summary>
@@ -113,6 +122,19 @@ public class User : ModelBase
            && string.Equals(PasswordResetTokenHash, tokenHash, StringComparison.Ordinal)
            && PasswordResetExpiresAtUtc > DateTime.UtcNow;
 
+    /// <summary>
+    /// True while a new reset e-mail must not be issued.
+    /// The window starts when the current token was issued, even after that token has expired.
+    /// </summary>
+    public bool IsPasswordResetCoolingDown(TimeSpan tokenTtl, TimeSpan cooldown, DateTime utcNow)
+    {
+        if (PasswordResetExpiresAtUtc is not DateTime expiresAt)
+            return false;
+
+        var issuedAt = expiresAt - tokenTtl;
+        return utcNow - issuedAt < cooldown;
+    }
+
     /// <summary>Clears any outstanding password-reset token (e.g. security incident).</summary>
     public void ClearPasswordReset()
     {
@@ -178,6 +200,14 @@ public class User : ModelBase
     public void CompleteOnboarding() => OnboardingCompleted = true;
 
     public void SetTrainingStudent(bool isTrainingStudent) => IsTrainingStudent = isTrainingStudent;
+
+    public void SetTrialEndsAt(DateTime endsAtUtc) => TrialEndsAtUtc = endsAtUtc;
+
+    public void SetComplimentaryAccess(bool indefinite, DateTime? untilUtc)
+    {
+        ComplimentaryAccessIndefinite = indefinite;
+        ComplimentaryAccessUntilUtc = indefinite ? null : untilUtc;
+    }
 
     public void AcknowledgeContract() => ContractAcknowledgedAt ??= DateTime.UtcNow;
 

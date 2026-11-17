@@ -86,6 +86,7 @@ public class UserFeedbackTests
         public Guid? UsuarioId => id;
         public bool IsAuthenticated => true;
         public void Set(Guid usuarioId) { }
+        public void AdoptClient(Guid clientUsuarioId) { }
     }
 
     private sealed class FakeUow : IUnitOfWork
@@ -118,8 +119,14 @@ public class UserFeedbackTests
         public Task<User?> FindByEmailVerificationHashAsync(string tokenHash, CancellationToken ct = default) => Task.FromResult<User?>(null);
         public Task<IReadOnlyList<Guid>> ListActiveUserIdsAsync(CancellationToken ct = default)
             => Task.FromResult<IReadOnlyList<Guid>>(new[] { id });
+        public Task<IReadOnlyList<User>> SearchActiveAsync(string term, int take, CancellationToken ct = default)
+            => Task.FromResult<IReadOnlyList<User>>(Array.Empty<User>());
+        public Task<User?> FindActiveByIdAsync(Guid userId, CancellationToken ct = default)
+            => Task.FromResult<User?>(null);
         public Task<IReadOnlyList<User>> ListExpiredDeletionsAsync(DateTime cutoffUtc, CancellationToken ct = default)
             => Task.FromResult<IReadOnlyList<User>>(Array.Empty<User>());
+        public Task LockPasswordResetAsync(Guid userId, CancellationToken ct = default) => Task.CompletedTask;
+        public Task ReloadAsync(User user, CancellationToken ct = default) => Task.CompletedTask;
         public void Remove(User user) { }
     }
 

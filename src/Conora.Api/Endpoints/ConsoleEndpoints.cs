@@ -50,6 +50,56 @@ public static class ConsoleEndpoints
             return Results.Ok(result);
         }).WithTags("Console").RequireAuthorization();
 
+        app.MapGet("/console/users", async (
+            HttpContext http,
+            ConsoleAccessAdminService service,
+            string? term,
+            CancellationToken ct) =>
+        {
+            if (!IsConsoleOperator(http))
+                return Forbidden();
+
+            return Results.Ok(await service.SearchAsync(term, ct));
+        }).WithTags("Console").RequireAuthorization();
+
+        app.MapPost("/console/users/{id:guid}/trial-end", async (
+            Guid id,
+            SetTrialEndRequest request,
+            HttpContext http,
+            ConsoleAccessAdminService service,
+            CancellationToken ct) =>
+        {
+            if (!IsConsoleOperator(http))
+                return Forbidden();
+
+            return Results.Ok(await service.SetTrialEndAsync(id, request.EndsOn, ct));
+        }).WithTags("Console").RequireAuthorization();
+
+        app.MapPost("/console/users/{id:guid}/grant", async (
+            Guid id,
+            SetAccessGrantRequest request,
+            HttpContext http,
+            ConsoleAccessAdminService service,
+            CancellationToken ct) =>
+        {
+            if (!IsConsoleOperator(http))
+                return Forbidden();
+
+            return Results.Ok(await service.SetGrantAsync(id, request.Indefinite, request.Until, ct));
+        }).WithTags("Console").RequireAuthorization();
+
+        app.MapDelete("/console/users/{id:guid}/grant", async (
+            Guid id,
+            HttpContext http,
+            ConsoleAccessAdminService service,
+            CancellationToken ct) =>
+        {
+            if (!IsConsoleOperator(http))
+                return Forbidden();
+
+            return Results.Ok(await service.ClearGrantAsync(id, ct));
+        }).WithTags("Console").RequireAuthorization();
+
         app.MapGet("/console/abandonment", async (HttpContext http, ConsoleService service, CancellationToken ct) =>
         {
             if (!IsConsoleOperator(http))

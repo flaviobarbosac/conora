@@ -12,6 +12,9 @@ public static class WhatsAppEndpoints
     {
         var group = app.MapGroup("/whatsapp").WithTags("WhatsApp").RequireAuthorization();
 
+        group.MapPost("/pairing-code", async (WhatsAppService service, CancellationToken ct) =>
+            Results.Ok(await service.IssuePairingCodeAsync(ct)));
+
         group.MapGet("/link", async (WhatsAppService service, CancellationToken ct) =>
             await service.GetLinkAsync(ct) is { } link ? Results.Ok(link) : Results.NoContent());
 

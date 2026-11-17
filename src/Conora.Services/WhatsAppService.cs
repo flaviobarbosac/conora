@@ -63,6 +63,13 @@ public sealed partial class WhatsAppService
         _receipts = receipts;
     }
 
+    public Task<WhatsAppPairingResponse> IssuePairingCodeAsync(CancellationToken ct)
+    {
+        var userId = _tenant.UsuarioId ?? throw new UnauthorizedAccessException("Tenant não autenticado.");
+        var code = WhatsAppPairingCodes.Issue(userId);
+        return Task.FromResult(new WhatsAppPairingResponse(code, $"CONORA {code}"));
+    }
+
     public async Task<WhatsAppLinkResponse?> GetLinkAsync(CancellationToken ct)
     {
         var link = await _repo.FirstOrDefaultAsync<WhatsAppLink>(_ => true, ct, track: false);
@@ -171,7 +178,7 @@ public sealed partial class WhatsAppService
         var phone = WhatsAppLink.NormalizePhone(fromDigits);
         var link = await _repo.FirstOrDefaultGlobalByKeyAsync<WhatsAppLink>(l => l.PhoneE164 == phone, ct);
         if (link is null)
-            return new WhatsAppReply(phone, "Este número ainda não está vinculado. Abra o Conora e vincule seu telefone para usar o WhatsApp.");
+            return new WhatsAppReply(phone, "Este número ainda não está vinculado. Abra o Conora, toque em Abrir WhatsApp e envie o código.");
 
         _tenant.Set(link.UsuarioId);
 
@@ -195,6 +202,9 @@ public sealed partial class WhatsAppService
 
             if (intake.Status == ReceiptIntakeStatus.Failed)
                 return new WhatsAppReply(phone, intake.FailureReason ?? "Não consegui ler o cupom.");
+
+            if (intake.MissingRequired is { Count: > 0 })
+                return new WhatsAppReply(phone, ReceiptPhotoCopy.ManualQuestion + "\n1 = Preencher agora\n2 = Enviar outra foto");
 
             if (intake.Status == ReceiptIntakeStatus.Confirmed)
                 return new WhatsAppReply(phone,
@@ -225,9 +235,25 @@ public sealed partial class WhatsAppService
             return null;
 
         var phone = WhatsAppLink.NormalizePhone(fromDigits);
+        var pairedUser = WhatsAppPairingCodes.TryConsume(text);
+        if (pairedUser is Guid userId)
+        {
+            _tenant.Set(userId);
+            try
+            {
+                await LinkAsync(new LinkWhatsAppRequest(phone), ct);
+                return new WhatsAppReply(phone, "Pronto. Este WhatsApp está conectado ao Conora. Pode mandar suas mensagens.");
+            }
+            catch (ValidationException ex)
+            {
+                var detail = ex.Errors.SelectMany(pair => pair.Value).FirstOrDefault() ?? ex.Message;
+                return new WhatsAppReply(phone, detail);
+            }
+        }
+
         var link = await _repo.FirstOrDefaultGlobalByKeyAsync<WhatsAppLink>(l => l.PhoneE164 == phone, ct);
         if (link is null)
-            return new WhatsAppReply(phone, "Este número ainda não está vinculado. Abra o Conora e vincule seu telefone para usar o WhatsApp.");
+            return new WhatsAppReply(phone, "Este número ainda não está vinculado. Abra o Conora, toque em Abrir WhatsApp e envie o código.");
 
         _tenant.Set(link.UsuarioId);
 
@@ -283,6 +309,28 @@ public sealed partial class WhatsAppService
     private async Task<WhatsAppReply?> HandleReceiptReplyAsync(ReceiptIntake intake, string text, CancellationToken ct)
     {
         var phone = intake.PhoneE164 ?? "";
+        if (intake.WhatsAppAwaiting == WhatsAppReceiptAwaiting.ManualChoice)
+        {
+            if (text is "1" or "sim" or "Sim" or "SIM")
+            {
+                var updated = await _receipts.AcceptManualFillAsync(intake.Id, ct);
+                if (updated.MissingRequired is { Count: > 0 })
+                    return new WhatsAppReply(phone,
+                        "Anotei o que deu para ler. Abra o Conora e complete o que ficou em branco, inclusive a conta e a categoria.");
+                if (updated.NeedsClassification || updated.Status == ReceiptIntakeStatus.NeedsClassification)
+                    return new WhatsAppReply(phone, await BuildClassificationListAsync(updated.ExtractedName, ct));
+                return new WhatsAppReply(phone, BuildConfirmPrompt(updated));
+            }
+
+            if (text is "2" or "não" or "nao" or "Não" or "Nao" or "NAO")
+            {
+                await _receipts.DeclineManualFillAsync(intake.Id, ct);
+                return new WhatsAppReply(phone, ReceiptPhotoCopy.ClearerPhoto);
+            }
+
+            return new WhatsAppReply(phone, ReceiptPhotoCopy.ManualQuestion + "\n1 = Preencher agora\n2 = Enviar outra foto");
+        }
+
         if (intake.WhatsAppAwaiting == WhatsAppReceiptAwaiting.Classification)
         {
             if (!int.TryParse(text, NumberStyles.Integer, CultureInfo.InvariantCulture, out var index) || index < 1)

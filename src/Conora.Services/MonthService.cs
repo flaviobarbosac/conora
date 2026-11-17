@@ -18,6 +18,7 @@ public sealed class MonthService
     private readonly ITenantContext _tenant;
     private readonly ICorrelationContext _correlation;
     private readonly PlanService _plan;
+    private readonly IConsultantScope _scope;
 
     public MonthService(
         IFinanceRepository repo,
@@ -27,7 +28,8 @@ public sealed class MonthService
         IUnitOfWork uow,
         ITenantContext tenant,
         ICorrelationContext correlation,
-        PlanService plan)
+        PlanService plan,
+        IConsultantScope scope)
     {
         _repo = repo;
         _family = family;
@@ -37,11 +39,13 @@ public sealed class MonthService
         _tenant = tenant;
         _correlation = correlation;
         _plan = plan;
+        _scope = scope;
     }
 
     public async Task EnsureOpenAsync(string competenceYm, CancellationToken ct)
     {
         Competence.Require(competenceYm);
+        _scope.Ensure(competenceYm);
         if (await _repo.AnyAsync<MonthLock>(m => m.CompetenceYm == competenceYm && m.IsClosed, ct))
             throw new MonthClosedException(competenceYm);
     }
@@ -55,6 +59,7 @@ public sealed class MonthService
     public async Task<MonthStatusResponse> GetAsync(string competenceYm, CancellationToken ct)
     {
         Competence.Require(competenceYm);
+        _scope.Ensure(competenceYm);
         var row = await _repo.FirstOrDefaultAsync<MonthLock>(m => m.CompetenceYm == competenceYm, ct, track: false);
         return ToResponse(competenceYm, row);
     }
@@ -69,6 +74,7 @@ public sealed class MonthService
     {
         await _plan.EnsureWritableAsync(ct);
         Competence.Require(competenceYm);
+        _scope.Ensure(competenceYm);
         await EnsureGroupBudgetOwnerAsync(ct);
         await EnsureCanCloseAsync(competenceYm, ct);
 
@@ -97,6 +103,7 @@ public sealed class MonthService
     {
         await _plan.EnsureWritableAsync(ct);
         Competence.Require(competenceYm);
+        _scope.Ensure(competenceYm);
         await EnsureGroupBudgetOwnerAsync(ct);
 
         var row = await _repo.FirstOrDefaultAsync<MonthLock>(m => m.CompetenceYm == competenceYm, ct);

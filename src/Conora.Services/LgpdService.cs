@@ -32,6 +32,7 @@ public sealed class LgpdService
     private readonly IServiceScopeFactory _scopes;
     private readonly IConfiguration _configuration;
     private readonly ILogger<LgpdService> _logger;
+    private readonly IConsultantScope _scope;
 
     public LgpdService(
         IUserRepository users,
@@ -48,7 +49,8 @@ public sealed class LgpdService
         IAppleTokenRevoker appleRevoker,
         IServiceScopeFactory scopes,
         IConfiguration configuration,
-        ILogger<LgpdService> logger)
+        ILogger<LgpdService> logger,
+        IConsultantScope scope)
     {
         _users = users;
         _audits = audits;
@@ -65,11 +67,15 @@ public sealed class LgpdService
         _scopes = scopes;
         _configuration = configuration;
         _logger = logger;
+        _scope = scope;
     }
 
     /// <summary>Registers an export request only. File is built overnight (~03:00 BR).</summary>
     public async Task<LgpdExportRequestResponse> RequestExportAsync(CancellationToken ct)
     {
+        if (_scope.IsActive)
+            throw new ForbiddenException("A exportação da conta inteira não entra no mês compartilhado.");
+
         var user = await RequireUserAsync(ct);
         var pending = await _requests.FindPendingExportAsync(ct);
         if (pending is not null)

@@ -1,5 +1,6 @@
 ﻿using System.Security.Cryptography;
 using Conora.Domain;
+using Conora.Domain.Catalog;
 using Conora.Domain.Entities;
 using Conora.Domain.Exceptions;
 using Conora.Domain.Ports;
@@ -20,6 +21,7 @@ public sealed class AuthService
     private const int MaxConfirmationClicks = 5;
     private static readonly TimeSpan PasswordResetTokenTtl = TimeSpan.FromMinutes(30);
     private static readonly TimeSpan PasswordResetCoolDown = TimeSpan.FromMinutes(15);
+    private static readonly TimeSpan OperatorPasswordResetCoolDown = TimeSpan.FromHours(24);
     private const string GoogleAccountUsesPasswordMessage =
         "Esta conta já tem senha. Entre com o e-mail e a senha, ou escolha outra conta Google.";
     private const string GoogleAccountAlreadyExistsMessage =
@@ -397,15 +399,21 @@ public sealed class AuthService
     public async Task RequestPasswordResetAsync(ForgotPasswordRequest request, CancellationToken ct)
     {
         var user = await FindByLoginIdentifierAsync(request.Usuario, ct);
-        if (user is null)
+        if (user is null || !_access.Allows(user.Email))
             return;
 
-        EnsureCanAccess(user.Email);
+        var cooldown = ConsoleAccess.IsAllowed(user.Email)
+            ? OperatorPasswordResetCoolDown
+            : PasswordResetCoolDown;
 
-        if (user.PasswordResetExpiresAtUtc is DateTime expiresAt)
+        string? token = null;
+        await _uow.ExecuteInTransactionAsync(async innerCt =>
         {
-            var issuedAt = expiresAt - PasswordResetTokenTtl;
-            if (DateTime.UtcNow - issuedAt < PasswordResetCoolDown)
+            await _users.LockPasswordResetAsync(user.Id, innerCt);
+            _tenant.Set(user.Id);
+            await _users.ReloadAsync(user, innerCt);
+
+            if (user.IsPasswordResetCoolingDown(PasswordResetTokenTtl, cooldown, DateTime.UtcNow))
             {
                 AuditRecorder.Record(
                     _audits,
@@ -414,24 +422,24 @@ public sealed class AuthService
                     user.Id,
                     "PasswordResetThrottled",
                     new { user.Email, ip = _correlation.ClientIp });
-                await _uow.SaveChangesAsync(ct);
-                throw new ValidationException(
-                    "usuario",
-                    "Já enviamos um link há pouco. Aguarde alguns minutos antes de pedir outro.");
+                await _uow.SaveChangesAsync(innerCt);
+                return;
             }
-        }
 
-        var token = NewRawToken();
-        user.IssuePasswordReset(_tokens.HashRefreshToken(token), DateTime.UtcNow.Add(PasswordResetTokenTtl));
-        _tenant.Set(user.Id);
-        AuditRecorder.Record(
-            _audits,
-            _correlation,
-            "User",
-            user.Id,
-            "PasswordResetRequested",
-            new { user.Email, ip = _correlation.ClientIp });
-        await _uow.SaveChangesAsync(ct);
+            token = NewRawToken();
+            user.IssuePasswordReset(_tokens.HashRefreshToken(token), DateTime.UtcNow.Add(PasswordResetTokenTtl));
+            AuditRecorder.Record(
+                _audits,
+                _correlation,
+                "User",
+                user.Id,
+                "PasswordResetRequested",
+                new { user.Email, ip = _correlation.ClientIp });
+            await _uow.SaveChangesAsync(innerCt);
+        }, ct);
+
+        if (token is null)
+            return;
 
         var link = AuthLink("redefinir-senha", token);
         try
@@ -452,7 +460,6 @@ public sealed class AuthService
         catch (Exception ex)
         {
             _logger.LogWarning(ex, "Password reset email failed for {Email}.", user.Email);
-            throw new ValidationException("usuario", "Não foi possível enviar o e-mail. Tente de novo.");
         }
     }
 

@@ -574,6 +574,9 @@ namespace Conora.Infrastructure.Persistence.Migrations
                     b.Property<Guid?>("AccountId")
                         .HasColumnType("uuid");
 
+                    b.Property<Guid?>("ActorUsuarioId")
+                        .HasColumnType("uuid");
+
                     b.Property<decimal>("Amount")
                         .HasPrecision(18, 2)
                         .HasColumnType("numeric(18,2)");
@@ -1116,9 +1119,9 @@ namespace Conora.Infrastructure.Persistence.Migrations
 
                     b.HasKey("Id");
 
-                    b.HasIndex("BatchId", "RowStatus", "SortIndex");
-
                     b.HasIndex("UsuarioId", "BatchId");
+
+                    b.HasIndex("BatchId", "RowStatus", "SortIndex");
 
                     b.ToTable("import_preview_rows", (string)null);
                 });
@@ -1349,6 +1352,47 @@ namespace Conora.Infrastructure.Persistence.Migrations
                         .HasFilter("\"DeletedAt\" IS NULL");
 
                     b.ToTable("month_locks", (string)null);
+                });
+
+            modelBuilder.Entity("Conora.Domain.Entities.MonthShare", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("ClientUsuarioId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("CompetenceYm")
+                        .IsRequired()
+                        .HasMaxLength(7)
+                        .HasColumnType("character varying(7)");
+
+                    b.Property<Guid>("ConsultantUsuarioId")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<DateTime?>("DeletedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<DateTime>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<long>("Version")
+                        .HasColumnType("bigint");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("ConsultantUsuarioId");
+
+                    b.HasIndex("ClientUsuarioId", "ConsultantUsuarioId", "CompetenceYm")
+                        .IsUnique()
+                        .HasDatabaseName("IX_month_shares_client_consultant_month")
+                        .HasFilter("\"DeletedAt\" IS NULL");
+
+                    b.ToTable("month_shares", (string)null);
                 });
 
             modelBuilder.Entity("Conora.Domain.Entities.PatrimonyItem", b =>
@@ -1803,6 +1847,14 @@ namespace Conora.Infrastructure.Persistence.Migrations
                         .HasMaxLength(9)
                         .HasColumnType("character varying(9)");
 
+                    b.Property<bool>("ComplimentaryAccessIndefinite")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("boolean")
+                        .HasDefaultValue(false);
+
+                    b.Property<DateTime?>("ComplimentaryAccessUntilUtc")
+                        .HasColumnType("timestamp with time zone");
+
                     b.Property<DateTime?>("ContractAcknowledgedAt")
                         .HasColumnType("timestamp with time zone");
 
@@ -1855,6 +1907,11 @@ namespace Conora.Infrastructure.Persistence.Migrations
                     b.Property<bool>("IncludeAbsoluteValuesInRetrospective")
                         .HasColumnType("boolean");
 
+                    b.Property<bool>("IsTrainingStudent")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("boolean")
+                        .HasDefaultValue(false);
+
                     b.Property<bool?>("JornadaDivida")
                         .HasColumnType("boolean");
 
@@ -1866,11 +1923,6 @@ namespace Conora.Infrastructure.Persistence.Migrations
 
                     b.Property<bool?>("JornadaRendaFixa")
                         .HasColumnType("boolean");
-
-                    b.Property<bool>("IsTrainingStudent")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("boolean")
-                        .HasDefaultValue(false);
 
                     b.Property<int>("MonthCloseDay")
                         .HasColumnType("integer");
@@ -1925,6 +1977,9 @@ namespace Conora.Infrastructure.Persistence.Migrations
                         .IsRequired()
                         .HasMaxLength(40)
                         .HasColumnType("character varying(40)");
+
+                    b.Property<DateTime?>("TrialEndsAtUtc")
+                        .HasColumnType("timestamp with time zone");
 
                     b.Property<DateTime>("UpdatedAt")
                         .HasColumnType("timestamp with time zone");
@@ -2320,6 +2375,21 @@ namespace Conora.Infrastructure.Persistence.Migrations
                     b.HasOne("Conora.Domain.Entities.User", null)
                         .WithMany()
                         .HasForeignKey("ToUsuarioId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("Conora.Domain.Entities.MonthShare", b =>
+                {
+                    b.HasOne("Conora.Domain.Entities.User", null)
+                        .WithMany()
+                        .HasForeignKey("ClientUsuarioId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("Conora.Domain.Entities.User", null)
+                        .WithMany()
+                        .HasForeignKey("ConsultantUsuarioId")
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
                 });

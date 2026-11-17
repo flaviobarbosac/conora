@@ -25,6 +25,7 @@ public sealed class ImportService
     private readonly ICorrelationContext _correlation;
     private readonly PlanService _plan;
     private readonly MonthService _months;
+    private readonly IConsultantScope _scope;
 
     public ImportService(
         IFinanceRepository repo,
@@ -32,7 +33,8 @@ public sealed class ImportService
         IUnitOfWork uow,
         ICorrelationContext correlation,
         PlanService plan,
-        MonthService months)
+        MonthService months,
+        IConsultantScope scope)
     {
         _repo = repo;
         _audits = audits;
@@ -40,6 +42,7 @@ public sealed class ImportService
         _correlation = correlation;
         _plan = plan;
         _months = months;
+        _scope = scope;
     }
 
     public async Task<ImportPreviewResponse> PreviewAsync(ImportPreviewRequest request, CancellationToken ct)
@@ -53,6 +56,7 @@ public sealed class ImportService
         var competenceYm = string.IsNullOrWhiteSpace(request.CompetenceYm)
             ? Competence.From(DateTime.UtcNow)
             : Competence.Require(request.CompetenceYm);
+        _scope.Ensure(competenceYm);
 
         await EnsureMonthOpenAsync(competenceYm, ct);
 
@@ -70,6 +74,7 @@ public sealed class ImportService
     {
         await _plan.EnsureWritableAsync(ct);
         var ym = Competence.Require(competenceYm);
+        _scope.Ensure(ym);
         await EnsureMonthOpenAsync(ym, ct);
 
         await using var memory = new MemoryStream();
@@ -98,6 +103,7 @@ public sealed class ImportService
     public async Task<ImportPreviewResponse?> GetOpenAsync(string competenceYm, CancellationToken ct)
     {
         var ym = Competence.Require(competenceYm);
+        _scope.Ensure(ym);
         var batch = await _repo.FirstOrDefaultAsync<ImportBatch>(
             b => b.CompetenceYm == ym && (b.Status == ImportStatus.Preview || b.Status == ImportStatus.InProgress),
             ct,

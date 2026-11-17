@@ -208,10 +208,13 @@ public sealed class ReceiptIntakeService
 
         var amount = request.Amount ?? intake.ExtractedAmount
                      ?? throw new ValidationException("amount", "Informe o valor do lançamento.");
-        var occurredAt = request.OccurredAt ?? intake.ExtractedOccurredAt ?? DateTime.UtcNow;
+        var occurredAt = request.OccurredAt ?? intake.ExtractedOccurredAt
+                         ?? throw new ValidationException("occurredAt", "Informe a data.");
         var description = string.IsNullOrWhiteSpace(request.Description)
-            ? intake.ExtractedName ?? "Recibo"
+            ? intake.ExtractedName
             : request.Description.Trim();
+        if (string.IsNullOrWhiteSpace(description))
+            throw new ValidationException("description", "Informe o fornecedor.");
 
         Guid? categoryId = request.CategoryId;
         if (categoryId is null && !string.IsNullOrWhiteSpace(intake.ProposedCategoryCode))
@@ -219,13 +222,11 @@ public sealed class ReceiptIntakeService
             var category = await _categories.GetByCodeAsync(intake.ProposedCategoryCode, ct);
             categoryId = category.Id;
         }
+        if (categoryId is null)
+            throw new ValidationException("categoryId", "Informe a categoria.");
 
-        var accountId = request.AccountId ?? intake.SelectedBankAccountId;
-        if (accountId is null)
-        {
-            var accounts = await _accounts.ListAsync(includeArchived: false, ct);
-            accountId = accounts.FirstOrDefault()?.Id;
-        }
+        var accountId = request.AccountId ?? intake.SelectedBankAccountId
+                        ?? throw new ValidationException("accountId", "Informe a conta bancária.");
 
         if (await IsDuplicateAsync(description, amount, occurredAt, ct) && !request.ConfirmDuplicate)
             throw new ValidationException("duplicate",
@@ -328,15 +329,7 @@ public sealed class ReceiptIntakeService
             var mime = ResolveMime(intake.ImageObjectKey);
             var extracted = await ExtractAsync(bytes, mime, ct);
 
-            if (extracted.InvalidCnpj
-                || BrazilianCnpj.LooksLikeInvalid(extracted.Cnpj, out _)
-                || BrazilianCnpj.LooksLikeInvalid(extracted.RawText, out _))
-            {
-                intake.MarkFailed("CNPJ inválido");
-                await _uow.SaveChangesAsync(ct);
-                return;
-            }
-
+            // A missing or unreadable CNPJ is a gap the user can fill. It does not discard the photo.
             // Cupom = has valor pago → expense; boleto = no valor pago → budget. Independent of which screen opened the camera.
             var purposeRerouted = intake.AlignPurposeFromPaidAmount(extracted.HasPaidAmount);
 
@@ -402,12 +395,6 @@ public sealed class ReceiptIntakeService
                     }
                 }
             }
-            else if (!string.IsNullOrWhiteSpace(cnpj))
-            {
-                intake.MarkFailed("CNPJ inválido");
-                await _uow.SaveChangesAsync(ct);
-                return;
-            }
             else
             {
                 cnpj = null;
@@ -415,6 +402,8 @@ public sealed class ReceiptIntakeService
             }
 
             intake.ApplyOcr(cnpj, name, amount, occurredAt, supplierId, proposedCode);
+            if (!intake.HasRequiredPhotoFields())
+                intake.AskManualFill();
             if (preferredBankAccountId is Guid bankId)
                 intake.SetBankAccount(bankId);
 
@@ -517,6 +506,8 @@ public sealed class ReceiptIntakeService
         if (intake.Status != ReceiptIntakeStatus.Ready)
             return;
         if (string.IsNullOrWhiteSpace(intake.ProposedCategoryCode))
+            return;
+        if (!intake.HasRequiredPhotoFields())
             return;
         if (intake.ExtractedAmount is null or <= 0)
             return;
@@ -767,7 +758,39 @@ public sealed class ReceiptIntakeService
             intake.FailureReason,
             intake.Status == ReceiptIntakeStatus.NeedsClassification,
             similar,
-            budgetYm);
+            budgetYm,
+            MissingPhotoFields(intake));
+    }
+
+    internal static IReadOnlyList<string> MissingPhotoFields(ReceiptIntake intake)
+    {
+        var missing = new List<string>();
+        if (string.IsNullOrWhiteSpace(intake.ExtractedCnpj))
+            missing.Add("cnpj");
+        if (string.IsNullOrWhiteSpace(intake.ExtractedName))
+            missing.Add("fornecedor");
+        if (intake.ExtractedOccurredAt is null)
+            missing.Add("data");
+        if (intake.ExtractedAmount is null or <= 0)
+            missing.Add("valor");
+        return missing;
+    }
+
+    public async Task<ReceiptIntakeResponse> AcceptManualFillAsync(Guid id, CancellationToken ct)
+    {
+        var intake = await _repo.GetAsync<ReceiptIntake>(id, ct)
+                     ?? throw new NotFoundException("Recibo", id);
+        intake.AcceptManualFill();
+        await _uow.SaveChangesAsync(ct);
+        return await ToResponseAsync(intake, ct);
+    }
+
+    public async Task DeclineManualFillAsync(Guid id, CancellationToken ct)
+    {
+        var intake = await _repo.GetAsync<ReceiptIntake>(id, ct)
+                     ?? throw new NotFoundException("Recibo", id);
+        intake.MarkFailed(ReceiptPhotoCopy.ClearerPhoto);
+        await _uow.SaveChangesAsync(ct);
     }
 
     private async Task<IReadOnlyList<SimilarSupplierResponse>> BuildSimilarAsync(

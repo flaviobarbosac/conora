@@ -5,13 +5,15 @@ using Conora.Domain.Services;
 namespace Conora.Domain.Entities;
 
 /// <summary>Single source of truth for money movement (spec v1.1 §2).</summary>
-public class Entry : ModelBase, ITenantOwned
+public class Entry : ModelBase, ITenantOwned, ICompetenceScoped
 {
     public Guid UsuarioId { get; set; }
     public EntryType Type { get; private set; }
     public decimal Amount { get; private set; }
     public DateTime OccurredAt { get; private set; }
     public string CompetenceYm { get; private set; } = default!;
+    /// <summary>Who launched this row when it was not the account owner. Null means the client.</summary>
+    public Guid? ActorUsuarioId { get; private set; }
     public Guid? AccountId { get; private set; }
     public Guid? ContraAccountId { get; private set; }
     public Guid? CategoryId { get; private set; }
@@ -141,6 +143,13 @@ public class Entry : ModelBase, ITenantOwned
         IncomeSourceId = Type == EntryType.Income ? incomeSourceId : null;
         MemberId = memberId;
         Description = description.Trim();
+    }
+
+    public void StampActor(Guid actorUsuarioId)
+    {
+        if (actorUsuarioId == Guid.Empty)
+            throw new ValidationException("actor", "Autor inválido.");
+        ActorUsuarioId = actorUsuarioId;
     }
 
     public void MoveCategory(Guid categoryId)

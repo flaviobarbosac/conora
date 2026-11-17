@@ -1,7 +1,7 @@
 namespace Conora.Domain.Entities;
 
 /// <summary>Marks a dashboard alert as seen for a user and competence. Counter counts only unseen.</summary>
-public class AlertSeen : ModelBase, ITenantOwned
+public class AlertSeen : ModelBase, ITenantOwned, ICompetenceScoped
 {
     public Guid UsuarioId { get; set; }
     public string CompetenceYm { get; private set; } = default!;

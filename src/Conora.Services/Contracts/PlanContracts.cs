@@ -56,5 +56,34 @@ public sealed record PlanResponse(
     /// <summary>Commercial label from PlanKind, e.g. "Individual mensal". Null when not subscribed.</summary>
     string? PlanLabel = null,
     /// <summary>Hotmart cancel: until this instant the account can only export. Null otherwise.</summary>
-    DateTime? ExportOnlyUntil = null);
+    DateTime? ExportOnlyUntil = null,
+    /// <summary>Console grant with no end date. Phase is Granted.</summary>
+    bool GrantIndefinite = false);
+
+public sealed record ConsoleUserAccessResponse(
+    Guid Id,
+    string Name,
+    string Email,
+    DateTime? TrialEndsAtUtc,
+    bool ComplimentaryIndefinite,
+    DateTime? ComplimentaryUntilUtc);
+
+public sealed record SetTrialEndRequest(DateOnly EndsOn);
+
+public sealed record SetAccessGrantRequest(bool Indefinite, DateOnly? Until);
+
+public sealed record ShareMonthRequest(string Email);
+
+public sealed record MonthShareResponse(
+    Guid Id,
+    Guid ClientUsuarioId,
+    Guid ConsultantUsuarioId,
+    string ConsultantEmail,
+    string CompetenceYm);
+
+public sealed record SharedMonthClientResponse(
+    Guid ClientUsuarioId,
+    string Name,
+    string Email,
+    IReadOnlyList<string> Months);
 

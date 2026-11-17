@@ -25,6 +25,8 @@ public sealed class EntryService
     private readonly MonthService _months;
     private readonly CategoryService _categories;
     private readonly FamilyGroupService _family;
+    private readonly IFamilyGroupRepository _familyRepo;
+    private readonly IConsultantScope _scope;
 
     public EntryService(
         IFinanceRepository repo,
@@ -36,7 +38,9 @@ public sealed class EntryService
         PlanService plan,
         MonthService months,
         CategoryService categories,
-        FamilyGroupService family)
+        FamilyGroupService family,
+        IFamilyGroupRepository familyRepo,
+        IConsultantScope scope)
     {
         _repo = repo;
         _audits = audits;
@@ -48,11 +52,15 @@ public sealed class EntryService
         _months = months;
         _categories = categories;
         _family = family;
+        _familyRepo = familyRepo;
+        _scope = scope;
     }
 
     public async Task<PagedResponse<EntryResponse>> SearchAsync(EntryFilter filter, CancellationToken ct)
     {
         var ym = string.IsNullOrWhiteSpace(filter.CompetenceYm) ? null : Competence.Require(filter.CompetenceYm);
+        if (ym is not null)
+            _scope.Ensure(ym);
         var type = filter.Type;
         var accountId = filter.AccountId;
         var search = string.IsNullOrWhiteSpace(filter.Search) ? null : filter.Search.Trim().ToLowerInvariant();
@@ -215,6 +223,7 @@ public sealed class EntryService
         var firstDate = Competence.ToUtc(request.OccurredAt);
         var baseYm = string.IsNullOrWhiteSpace(request.CompetenceYm) ? Competence.From(firstDate) : Competence.Require(request.CompetenceYm);
         var competences = Enumerable.Range(0, count).Select(i => Competence.AddMonths(baseYm, i)).ToList();
+        _scope.EnsureAll(competences);
 
         await _months.EnsureOpenAsync(competences, ct);
         await ValidateReferencesAsync(
@@ -243,6 +252,8 @@ public sealed class EntryService
                 recurrenceKey: groupKey,
                 installmentNumber: installments > 1 ? i + 1 : null,
                 installmentCount: installments > 1 ? installments : null));
+            if (_scope.IsActive && _scope.ActorUsuarioId is Guid actorId)
+                created[^1].StampActor(actorId);
         }
 
         _repo.AddRange(created);
@@ -268,6 +279,8 @@ public sealed class EntryService
         var oldYm = entry.CompetenceYm;
         var newDate = Competence.ToUtc(request.OccurredAt);
         var newYm = string.IsNullOrWhiteSpace(request.CompetenceYm) ? Competence.From(newDate) : Competence.Require(request.CompetenceYm);
+        _scope.Ensure(oldYm);
+        _scope.Ensure(newYm);
         await _months.EnsureOpenAsync([oldYm, newYm], ct);
 
         var categoryId = await ResolveCategoryAsync(entry.Type, request.CategoryId, ct);
@@ -287,6 +300,8 @@ public sealed class EntryService
             categoryId, request.IncomeSourceId, request.MemberId, request.Description);
         if (entry.Type == EntryType.Income)
             entry.LinkLifeProject(lifeProjectId);
+        if (_scope.IsActive && _scope.ActorUsuarioId is Guid actorId)
+            entry.StampActor(actorId);
         await EntryLedger.ApplyAsync(_repo, entry, 1, ct);
         await ApplyProjectAsync(entry, 1, ct);
         await ApplyPatrimonyAsync(entry, 1, ct);
@@ -672,6 +687,19 @@ public sealed class EntryService
                 names[member.UsuarioId] = FirstName(member.Name);
         }
 
+        var actorIds = items
+            .Select(e => e.ActorUsuarioId)
+            .Where(id => id is Guid)
+            .Select(id => id!.Value)
+            .Distinct()
+            .ToList();
+        if (actorIds.Count > 0)
+        {
+            var actors = await _familyRepo.ListUsersByIdsAsync(actorIds, ct);
+            foreach (var actor in actors)
+                names[actor.Id] = FirstName(actor.Name);
+        }
+
         Dictionary<Guid, Guid>? categoryRemap = null;
         if (multi)
         {
@@ -709,7 +737,7 @@ public sealed class EntryService
         return part;
     }
 
-    private static EntryResponse ToResponse(Entry e, EntryResponseMap? map = null)
+    private EntryResponse ToResponse(Entry e, EntryResponseMap? map = null)
     {
         var selfId = map?.SelfId ?? e.UsuarioId;
         var canEdit = e.UsuarioId == selfId;
@@ -722,6 +750,13 @@ public sealed class EntryService
         string? postedBy = null;
         if (!canEdit && map is not null)
             postedBy = map.Names.GetValueOrDefault(e.UsuarioId);
+        if (e.ActorUsuarioId is Guid actor)
+        {
+            if (map is not null && map.Names.TryGetValue(actor, out var actorName))
+                postedBy = actorName;
+            else if (_scope.ActorUsuarioId == actor && !string.IsNullOrWhiteSpace(_scope.ActorName))
+                postedBy = FirstName(_scope.ActorName);
+        }
 
         return new(
             e.Id, e.Type, e.Amount, e.OccurredAt, e.CompetenceYm, e.AccountId, e.ContraAccountId, categoryId,
