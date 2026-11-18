@@ -10,6 +10,13 @@ public class User : ModelBase
     public string Email { get; private set; } = default!;
     public string? Phone { get; private set; }
     public string? Cep { get; private set; }
+    public string? Logradouro { get; private set; }
+    public string? Numero { get; private set; }
+    public string? Bairro { get; private set; }
+    public string? Municipio { get; private set; }
+    public string? Uf { get; private set; }
+    public double? Latitude { get; private set; }
+    public double? Longitude { get; private set; }
     public string? Cpf { get; private set; }
     public string? PasswordHash { get; private set; }
     public string? PasswordResetTokenHash { get; private set; }
@@ -30,6 +37,9 @@ public class User : ModelBase
 
     /// <summary>Console override of the tasting end. Null keeps the profile length.</summary>
     public DateTime? TrialEndsAtUtc { get; private set; }
+
+    /// <summary>Tasting end already covered by the 24-hour notice. A later end can be notified again.</summary>
+    public DateTime? TrialEndingNoticeForUtc { get; private set; }
 
     /// <summary>Console grant with no end date. Duo and Família invites stay out.</summary>
     public bool ComplimentaryAccessIndefinite { get; private set; }
@@ -191,10 +201,65 @@ public class User : ModelBase
         Name = name.Trim();
     }
 
-    public void UpdateContact(string? phone, string? cep)
+    public void UpdateContact(
+        string? phone,
+        string? cep,
+        string? logradouro,
+        string? numero,
+        string? bairro,
+        string? municipio,
+        string? uf)
     {
         Phone = string.IsNullOrWhiteSpace(phone) ? null : phone.Trim();
-        Cep = string.IsNullOrWhiteSpace(cep) ? null : NormalizeCep(cep);
+        var nextCep = string.IsNullOrWhiteSpace(cep) ? null : NormalizeCep(cep);
+        var nextLogradouro = RequireText(logradouro, "logradouro", "Informe o logradouro.", 160);
+        var nextNumero = string.IsNullOrWhiteSpace(numero) ? "S/N" : RequireText(numero, "numero", "Informe o número.", 20);
+        var nextBairro = RequireText(bairro, "bairro", "Informe o bairro.", 120);
+        var nextMunicipio = RequireText(municipio, "municipio", "Informe o município.", 120);
+        var nextUf = RequireText(uf, "uf", "Informe a UF.", 2).ToUpperInvariant();
+        if (nextUf.Length != 2 || nextUf.Any(c => !char.IsLetter(c)))
+            throw new ArgumentException("Informe a UF.", nameof(uf));
+
+        if (!string.Equals(Cep, nextCep, StringComparison.Ordinal)
+            || !string.Equals(Logradouro, nextLogradouro, StringComparison.Ordinal)
+            || !string.Equals(Numero, nextNumero, StringComparison.Ordinal)
+            || !string.Equals(Bairro, nextBairro, StringComparison.Ordinal)
+            || !string.Equals(Municipio, nextMunicipio, StringComparison.Ordinal)
+            || !string.Equals(Uf, nextUf, StringComparison.Ordinal))
+            ClearCoordinates();
+
+        Cep = nextCep;
+        Logradouro = nextLogradouro;
+        Numero = nextNumero;
+        Bairro = nextBairro;
+        Municipio = nextMunicipio;
+        Uf = nextUf;
+    }
+
+    private static string RequireText(string? value, string name, string message, int max)
+    {
+        var text = value?.Trim() ?? "";
+        if (text.Length == 0)
+            throw new ArgumentException(message, name);
+        if (text.Length > max)
+            throw new ArgumentException(message, name);
+        return text;
+    }
+
+    public void ClearCoordinates()
+    {
+        Latitude = null;
+        Longitude = null;
+    }
+
+    public void SetCoordinates(double latitude, double longitude)
+    {
+        if (latitude is < -90 or > 90 || longitude is < -180 or > 180)
+            return;
+        if (latitude == 0 && longitude == 0)
+            return;
+        Latitude = latitude;
+        Longitude = longitude;
     }
 
     public void CompleteOnboarding() => OnboardingCompleted = true;
@@ -202,6 +267,8 @@ public class User : ModelBase
     public void SetTrainingStudent(bool isTrainingStudent) => IsTrainingStudent = isTrainingStudent;
 
     public void SetTrialEndsAt(DateTime endsAtUtc) => TrialEndsAtUtc = endsAtUtc;
+
+    public void MarkTrialEndingNotice(DateTime trialEndsAtUtc) => TrialEndingNoticeForUtc = trialEndsAtUtc;
 
     public void SetComplimentaryAccess(bool indefinite, DateTime? untilUtc)
     {
@@ -285,6 +352,7 @@ public class User : ModelBase
 
     public void RequestDeletion()
     {
+        ClearCoordinates();
         DeletedAt = DateTime.UtcNow;
         Version += 1;
     }

@@ -40,5 +40,10 @@ public sealed class MonthShareRepository : IMonthShareRepository
         ).ToListAsync(ct);
     }
 
+    public Task<List<MonthShare>> ListForClientAsync(Guid clientUsuarioId, CancellationToken ct = default)
+        => _context.MonthShares
+            .Where(share => share.DeletedAt == null && share.ClientUsuarioId == clientUsuarioId)
+            .ToListAsync(ct);
+
     public void Add(MonthShare share) => _context.MonthShares.Add(share);
 }

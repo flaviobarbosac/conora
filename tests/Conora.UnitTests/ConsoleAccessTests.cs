@@ -8,6 +8,7 @@ public class ConsoleAccessTests
 {
     [Theory]
     [InlineData("flaviobarbosa.vix@gmail.com")]
+    [InlineData("flavio.barbosa.vix@gmail.com")]
     [InlineData("FLAVIOBARBOSA.VIX@GMAIL.COM")]
     [InlineData(" lelcampos2009@gmail.com ")]
     [InlineData("lelcampos34@gmail.com")]

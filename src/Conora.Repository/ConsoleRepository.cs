@@ -1,9 +1,11 @@
 using Conora.Domain.Entities;
 using Conora.Domain.Enums;
 using Conora.Domain.Services;
+using Conora.Infrastructure.Billing;
 using Conora.Infrastructure.Persistence;
 using Conora.Repository.Interface;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Options;
 
 namespace Conora.Repository;
 
@@ -26,10 +28,12 @@ public sealed class ConsoleRepository : IConsoleRepository
     ];
 
     private readonly AppDbContext _db;
+    private readonly HotmartOptions _hotmart;
 
-    public ConsoleRepository(AppDbContext db)
+    public ConsoleRepository(AppDbContext db, IOptions<HotmartOptions> hotmart)
     {
         _db = db;
+        _hotmart = hotmart.Value;
     }
 
     public async Task<ConsoleReadModel> ReadAsync(CancellationToken ct)
@@ -45,7 +49,16 @@ public sealed class ConsoleRepository : IConsoleRepository
 
         var users = await _db.Users.IgnoreQueryFilters().AsNoTracking()
             .Where(u => u.DeletedAt == null)
-            .Select(u => new UserRow(u.Id, u.CreatedAt, u.OnboardingCompleted, u.ReserveTargetMonths))
+            .Select(u => new UserRow(
+                u.Id,
+                u.CreatedAt,
+                u.OnboardingCompleted,
+                u.ReserveTargetMonths,
+                u.Email,
+                u.IsTrainingStudent,
+                u.TrialEndsAtUtc,
+                u.ComplimentaryAccessIndefinite,
+                u.ComplimentaryAccessUntilUtc))
             .ToListAsync(ct);
         var active = users.Select(u => u.Id).ToHashSet();
 
@@ -140,6 +153,7 @@ public sealed class ConsoleRepository : IConsoleRepository
         var weeks = Weeks(weekStart, users, hits, budgetCreated.Where(r => active.Contains(r.UsuarioId)), closes.Where(r => active.Contains(r.UsuarioId)), failures);
         var recent = failures.Where(f => f.OccurredAt >= since30).ToList();
         var months = await HistoryAsync(historyYms, users, cells, failures, ct);
+        var access = await CountAccessAsync(users, now, ct);
 
         return new ConsoleReadModel(
             now,
@@ -186,7 +200,9 @@ public sealed class ConsoleRepository : IConsoleRepository
                 .ThenByDescending(g => g.Count)
                 .Take(40)
                 .ToList(),
-            months);
+            months,
+            access.Trial,
+            access.Paying);
     }
 
     private async Task<List<ConsoleMonthRaw>> HistoryAsync(
@@ -582,7 +598,98 @@ public sealed class ConsoleRepository : IConsoleRepository
         return null;
     }
 
-    private sealed record UserRow(Guid Id, DateTime CreatedAt, bool OnboardingCompleted, int ReserveTargetMonths);
+    private async Task<(int Trial, int Paying)> CountAccessAsync(
+        IReadOnlyList<UserRow> users,
+        DateTime now,
+        CancellationToken ct)
+    {
+        var subscriptions = await _db.WorkspaceSubscriptions.IgnoreQueryFilters().AsNoTracking()
+            .Where(s => s.DeletedAt == null)
+            .ToListAsync(ct);
+        var own = new Dictionary<Guid, WorkspaceSubscription>();
+        foreach (var group in subscriptions.GroupBy(s => s.UsuarioId))
+        {
+            var writable = group.FirstOrDefault(s => s.IsWritable(now));
+            own[group.Key] = writable ?? group.OrderByDescending(s => s.ExpiresAt).First();
+        }
+
+        var course = await CourseAccessAsync(now, ct);
+        var trial = 0;
+        var paying = 0;
+        foreach (var user in users)
+        {
+            own.TryGetValue(user.Id, out var subscription);
+            course.TryGetValue(user.Email.Trim(), out var hotmart);
+            var isStudent = hotmart.TrialEndsAt is not null || user.IsTrainingStudent;
+            var trialOverride = user.TrialEndsAtUtc ?? (isStudent ? hotmart.TrialEndsAt : null);
+            var state = AccessPolicy.Evaluate(
+                user.CreatedAt,
+                subscription,
+                now,
+                isStudent,
+                trialOverride,
+                user.ComplimentaryIndefinite,
+                user.ComplimentaryUntilUtc);
+            if (state.Phase != AccessPhase.Subscribed && hotmart.ExportUntilUtc is not null)
+                state = new AccessState(AccessPhase.Blocked, state.TrialEndsAt, state.BlockAt);
+            if (state.Phase == AccessPhase.Trial)
+                trial++;
+            else if (state.Phase == AccessPhase.Subscribed)
+                paying++;
+        }
+
+        return (trial, paying);
+    }
+
+    private async Task<Dictionary<string, (DateTime? TrialEndsAt, DateTime? ExportUntilUtc)>> CourseAccessAsync(
+        DateTime now,
+        CancellationToken ct)
+    {
+        var map = new Dictionary<string, (DateTime? TrialEndsAt, DateTime? ExportUntilUtc)>(StringComparer.OrdinalIgnoreCase);
+        if (_hotmart.ProductId <= 0)
+            return map;
+
+        var rows = await _db.HotmartCoursePurchases.AsNoTracking()
+            .Where(p => p.ProductId == _hotmart.ProductId)
+            .Select(p => new { p.Email, p.AcquiredAt, p.Approved, p.RevokedAt })
+            .ToListAsync(ct);
+
+        foreach (var emailGroup in rows.GroupBy(p => p.Email.Trim(), StringComparer.OrdinalIgnoreCase))
+        {
+            var open = emailGroup
+                .Where(p => p.RevokedAt == null)
+                .Select(p => HotmartCoursePurchase.AccessAvailableAtUtc(p.AcquiredAt))
+                .Where(at => at <= now)
+                .OrderByDescending(at => at)
+                .FirstOrDefault();
+            DateTime? trialEnd = open == default
+                ? null
+                : open.AddDays(AccessPolicy.StudentTrialDays);
+            var revoked = emailGroup
+                .Where(p => p.Approved && p.RevokedAt != null)
+                .OrderByDescending(p => p.RevokedAt)
+                .FirstOrDefault();
+            DateTime? exportUntil = trialEnd is null && revoked?.RevokedAt is DateTime revokedAt
+                ? revokedAt.AddDays(HotmartCoursePurchase.ExportGraceDays)
+                : null;
+            if (trialEnd is null && exportUntil is null)
+                continue;
+            map[emailGroup.Key] = (trialEnd, exportUntil);
+        }
+
+        return map;
+    }
+
+    private sealed record UserRow(
+        Guid Id,
+        DateTime CreatedAt,
+        bool OnboardingCompleted,
+        int ReserveTargetMonths,
+        string Email,
+        bool IsTrainingStudent,
+        DateTime? TrialEndsAtUtc,
+        bool ComplimentaryIndefinite,
+        DateTime? ComplimentaryUntilUtc);
     private sealed record MonthRow(Guid UsuarioId, string CompetenceYm);
     private sealed record ProjectRow(Guid UsuarioId, Guid? CategoryId, decimal AccumulatedAmount);
     private sealed record AmountRow(Guid UsuarioId, decimal Amount);

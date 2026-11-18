@@ -21,6 +21,7 @@ public class AppDbContext : DbContext
     }
 
     public DbSet<User> Users => Set<User>();
+    public DbSet<ConsoleMapConfig> ConsoleMapConfigs => Set<ConsoleMapConfig>();
     public DbSet<PreRegistration> PreRegistrations => Set<PreRegistration>();
     public DbSet<AuditEvent> AuditEvents => Set<AuditEvent>();
     public DbSet<RequestFailure> RequestFailures => Set<RequestFailure>();
@@ -206,12 +207,25 @@ public class AppDbContext : DbContext
             if (line.State is not (EntityState.Added or EntityState.Modified))
                 continue;
 
-            var ym = await Set<Budget>().AsNoTracking()
-                .Where(b => b.Id == line.Entity.BudgetId)
-                .Select(b => b.CompetenceYm)
-                .FirstOrDefaultAsync(ct);
+            var ym = CompetenceOfTrackedBudget(line.Entity.BudgetId);
+            if (ym is null)
+            {
+                ym = await Set<Budget>().AsNoTracking()
+                    .Where(b => b.Id == line.Entity.BudgetId)
+                    .Select(b => b.CompetenceYm)
+                    .FirstOrDefaultAsync(ct);
+            }
+
             if (!string.Equals(ym, _scope.CompetenceYm, StringComparison.Ordinal))
                 throw new ForbiddenException("Fora do mês compartilhado.");
         }
     }
+
+    /// <summary>
+    /// A new budget and its lines are saved together, so the parent is not in the database yet.
+    /// </summary>
+    private string? CompetenceOfTrackedBudget(Guid budgetId)
+        => ChangeTracker.Entries<Budget>()
+            .FirstOrDefault(entry => entry.Entity.Id == budgetId)
+            ?.Entity.CompetenceYm;
 }

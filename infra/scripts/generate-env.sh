@@ -92,6 +92,7 @@ Jwt__Audience=conora-app
 Google__ClientId=$(get_int .google.clientId)
 Gemini__ApiKey=$(esc "$(get_int .gemini.apiKey)")
 Gemini__Model=$(get_int .gemini.model)
+GoogleMaps__ApiKey=$(esc "$(get_int .googleMaps.apiKey)")
 Email__From=$(get_int .email.from)
 Email__SmtpHost=$(get_int .email.smtpHost)
 Email__SmtpPort=$(get_int .email.smtpPort)

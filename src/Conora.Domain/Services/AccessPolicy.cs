@@ -89,4 +89,8 @@ public static class AccessPolicy
     /// <summary>Whole days left until <paramref name="until"/> (rounded up, never negative).</summary>
     public static int DaysUntil(DateTime until, DateTime now)
         => Math.Max(0, (int)Math.Ceiling((until - now).TotalDays));
+
+    /// <summary>True while the tasting is still open and ends within the next 24 hours.</summary>
+    public static bool IsInsideEndingDay(DateTime now, DateTime trialEnds)
+        => trialEnds > now && trialEnds - now <= TimeSpan.FromHours(24);
 }

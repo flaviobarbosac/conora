@@ -169,7 +169,9 @@ public sealed class ConsoleService
                     Percent(month.WithBudget, month.Base),
                     Percent(month.BudgetWithin, month.WithBudget),
                     Percent(month.Closed, month.WithEntry));
-            }).ToList());
+            }).ToList(),
+            data.TrialUsers,
+            data.PayingUsers);
     }
 
     private static ConsoleMetricResponse Metric(string key, string label, int count, int baseline)

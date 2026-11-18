@@ -121,6 +121,8 @@ public class UserFeedbackTests
             => Task.FromResult<IReadOnlyList<Guid>>(new[] { id });
         public Task<IReadOnlyList<User>> SearchActiveAsync(string term, int take, CancellationToken ct = default)
             => Task.FromResult<IReadOnlyList<User>>(Array.Empty<User>());
+        public Task<IReadOnlyList<User>> ListActiveByCreatedDescAsync(CancellationToken ct = default)
+            => Task.FromResult<IReadOnlyList<User>>(Array.Empty<User>());
         public Task<User?> FindActiveByIdAsync(Guid userId, CancellationToken ct = default)
             => Task.FromResult<User?>(null);
         public Task<IReadOnlyList<User>> ListExpiredDeletionsAsync(DateTime cutoffUtc, CancellationToken ct = default)

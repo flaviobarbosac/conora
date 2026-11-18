@@ -24,7 +24,9 @@ public sealed record ConsoleKpisResponse(
     IReadOnlyList<ConsoleMetricResponse> ErrorsByStatus,
     IReadOnlyList<ConsoleMetricResponse> ErrorsByArea,
     IReadOnlyList<ConsoleErrorRowResponse> ErrorRows,
-    IReadOnlyList<ConsoleMonthResponse> Months);
+    IReadOnlyList<ConsoleMonthResponse> Months,
+    int TrialUsers,
+    int PayingUsers);
 
 public sealed record ConsoleMonthResponse(
     string CompetenceYm,
