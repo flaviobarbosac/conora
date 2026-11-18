@@ -12,6 +12,7 @@ namespace Conora.Repository;
 public sealed class ConsoleRepository : IConsoleRepository
 {
     private const int HistoryMonths = 24;
+    private const int ActivityWeeks = HistoryMonths * 4;
     private static readonly EntryType[] SpentTypes =
     [
         EntryType.Expense,
@@ -42,7 +43,7 @@ public sealed class ConsoleRepository : IConsoleRepository
         var competence = Competence.From(now);
         var previous = Competence.AddMonths(competence, -1);
         var weekStart = StartOfWeek(now);
-        var sinceWeeks = weekStart.AddDays(-7 * 11);
+        var sinceWeeks = weekStart.AddDays(-7 * (ActivityWeeks - 1));
         var since30 = now.AddDays(-30);
         var since7 = now.AddDays(-7);
         var since1 = now.AddDays(-1);
@@ -486,8 +487,8 @@ public sealed class ConsoleRepository : IConsoleRepository
     {
         var budgetList = budgets.ToList();
         var closeList = closes.ToList();
-        var weeks = new List<ConsoleWeekRaw>(12);
-        for (var index = 11; index >= 0; index--)
+        var weeks = new List<ConsoleWeekRaw>(ActivityWeeks);
+        for (var index = ActivityWeeks - 1; index >= 0; index--)
         {
             var start = currentWeek.AddDays(-7 * index);
             var end = start.AddDays(7);
