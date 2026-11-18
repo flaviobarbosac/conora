@@ -4,6 +4,7 @@ using Conora.Infrastructure.Billing;
 using Conora.Infrastructure.Maps;
 using Conora.Infrastructure.Email;
 using Conora.Infrastructure.Persistence;
+using Conora.Infrastructure.Push;
 using Conora.Infrastructure.Security;
 using Conora.Infrastructure.Telemetry;
 using Microsoft.EntityFrameworkCore;
@@ -64,6 +65,8 @@ public static class DependencyInjection
             client.BaseAddress = new Uri("https://graph.facebook.com/v21.0/");
             client.Timeout = TimeSpan.FromSeconds(30);
         });
+        services.Configure<FcmOptions>(configuration.GetSection(FcmOptions.SectionName));
+        services.AddSingleton<IPushNotificationSender, FcmPushNotificationSender>();
         var health = services.AddHealthChecks()
             .AddCheck("self", () => HealthCheckResult.Healthy(), tags: new[] { "live" })
             .AddNpgSql(_ => RequireConnection(configuration, "Postgres"), name: "postgres", tags: new[] { "ready" });

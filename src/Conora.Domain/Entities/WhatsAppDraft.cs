@@ -33,9 +33,18 @@ public class WhatsAppDraft : ModelBase, ITenantOwned
         Status = WhatsAppDraftStatus.Discarded;
     }
 
+    /// <summary>Updates the in-progress WhatsApp conversation payload (not a persisted finance draft).</summary>
+    public void ReplacePayload(string payloadJson)
+    {
+        EnsurePending();
+        if (string.IsNullOrWhiteSpace(payloadJson))
+            throw new ValidationException("payload", "Conversa inválida.");
+        PayloadJson = payloadJson;
+    }
+
     private void EnsurePending()
     {
         if (Status != WhatsAppDraftStatus.Pending)
-            throw new ValidationException("status", "O rascunho já foi processado.");
+            throw new ValidationException("status", "A conversa já foi encerrada.");
     }
 }

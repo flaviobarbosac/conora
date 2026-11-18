@@ -41,6 +41,7 @@ public class AppDbContext : DbContext
     public DbSet<Entry> Entries => Set<Entry>();
     public DbSet<Budget> Budgets => Set<Budget>();
     public DbSet<BudgetLine> BudgetLines => Set<BudgetLine>();
+    public DbSet<PendingDebt> PendingDebts => Set<PendingDebt>();
     public DbSet<MonthLock> MonthLocks => Set<MonthLock>();
     public DbSet<MonthShare> MonthShares => Set<MonthShare>();
     public DbSet<LifeProject> LifeProjects => Set<LifeProject>();
@@ -58,6 +59,7 @@ public class AppDbContext : DbContext
     public DbSet<ImportPreviewRow> ImportPreviewRows => Set<ImportPreviewRow>();
     public DbSet<WhatsAppLink> WhatsAppLinks => Set<WhatsAppLink>();
     public DbSet<WhatsAppDraft> WhatsAppDrafts => Set<WhatsAppDraft>();
+    public DbSet<DevicePushToken> DevicePushTokens => Set<DevicePushToken>();
     public DbSet<ReceiptIntake> ReceiptIntakes => Set<ReceiptIntake>();
     public DbSet<HotmartCoursePurchase> HotmartCoursePurchases => Set<HotmartCoursePurchase>();
     public DbSet<UserFeedback> UserFeedbacks => Set<UserFeedback>();
@@ -81,6 +83,7 @@ public class AppDbContext : DbContext
         MonthScopedFilter<Entry>(modelBuilder);
         MonthScopedFilter<Budget>(modelBuilder);
         TenantFilter<BudgetLine>(modelBuilder);
+        TenantFilter<PendingDebt>(modelBuilder);
         MonthScopedFilter<MonthLock>(modelBuilder);
         TenantFilter<LifeProject>(modelBuilder);
         TenantFilter<PatrimonyItem>(modelBuilder);
@@ -91,6 +94,7 @@ public class AppDbContext : DbContext
         TenantFilter<ImportPreviewRow>(modelBuilder);
         TenantFilter<WhatsAppLink>(modelBuilder);
         TenantFilter<WhatsAppDraft>(modelBuilder);
+        TenantFilter<DevicePushToken>(modelBuilder);
         TenantFilter<ReceiptIntake>(modelBuilder);
         TenantFilter<UserFeedback>(modelBuilder);
         MonthScopedFilter<AlertSeen>(modelBuilder);

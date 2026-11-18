@@ -581,6 +581,52 @@ namespace Conora.Infrastructure.Persistence.Migrations
                     b.ToTable("credit_cards", (string)null);
                 });
 
+            modelBuilder.Entity("Conora.Domain.Entities.DevicePushToken", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<DateTime?>("DeletedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<DateTime>("LastSeenAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("Platform")
+                        .IsRequired()
+                        .HasMaxLength(16)
+                        .HasColumnType("character varying(16)");
+
+                    b.Property<string>("Token")
+                        .IsRequired()
+                        .HasMaxLength(4096)
+                        .HasColumnType("character varying(4096)");
+
+                    b.Property<DateTime>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid>("UsuarioId")
+                        .HasColumnType("uuid");
+
+                    b.Property<long>("Version")
+                        .HasColumnType("bigint");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("Token")
+                        .IsUnique()
+                        .HasDatabaseName("IX_device_push_tokens_Token")
+                        .HasFilter("\"DeletedAt\" IS NULL");
+
+                    b.HasIndex("UsuarioId");
+
+                    b.ToTable("device_push_tokens", (string)null);
+                });
+
             modelBuilder.Entity("Conora.Domain.Entities.EmailSuppression", b =>
                 {
                     b.Property<string>("Email")
@@ -1474,6 +1520,56 @@ namespace Conora.Infrastructure.Persistence.Migrations
                         .HasFilter("\"DeletedAt\" IS NULL");
 
                     b.ToTable("patrimony_items", (string)null);
+                });
+
+            modelBuilder.Entity("Conora.Domain.Entities.PendingDebt", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("CategoryId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("CompetenceYm")
+                        .IsRequired()
+                        .HasMaxLength(7)
+                        .HasColumnType("character varying(7)");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<DateTime?>("DeletedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<decimal>("OpenAmount")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("numeric(18,2)");
+
+                    b.Property<decimal>("OriginalAmount")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("numeric(18,2)");
+
+                    b.Property<DateTime?>("PaidAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<DateTime>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid>("UsuarioId")
+                        .HasColumnType("uuid");
+
+                    b.Property<long>("Version")
+                        .HasColumnType("bigint");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("UsuarioId", "CompetenceYm", "CategoryId")
+                        .IsUnique()
+                        .HasDatabaseName("IX_pending_debts_User_Month_Category")
+                        .HasFilter("\"DeletedAt\" IS NULL");
+
+                    b.ToTable("pending_debts", (string)null);
                 });
 
             modelBuilder.Entity("Conora.Domain.Entities.PreRegistration", b =>

@@ -242,7 +242,8 @@ public sealed class ReceiptIntakeService
                 description,
                 AccountId: accountId,
                 CategoryId: categoryId,
-                ConfirmDuplicate: request.ConfirmDuplicate), token);
+                ConfirmDuplicate: request.ConfirmDuplicate,
+                PendingDebtIds: request.PendingDebtIds), token);
 
             if (accountId is Guid usedAccount && intake.SupplierId is Guid supplierId)
             {

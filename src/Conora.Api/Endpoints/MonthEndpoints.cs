@@ -39,8 +39,31 @@ public static class MonthEndpoints
             return Results.NoContent();
         });
 
-        group.MapPost("/{competenceYm}/close", async (string competenceYm, MonthService service, CancellationToken ct) =>
-            Results.Ok(await service.CloseAsync(competenceYm, ct)));
+        group.MapGet("/{competenceYm}/unpaid", async (string competenceYm, PendingDebtService debts, CancellationToken ct) =>
+            Results.Ok(await debts.ListGapsAsync(competenceYm, ct)));
+
+        group.MapGet("/{competenceYm}/close-preview-summary", async (
+            string competenceYm,
+            MonthCloseCoachService coach,
+            CancellationToken ct) =>
+            Results.Ok(await coach.GetClosePreviewSummaryAsync(competenceYm, ct)));
+
+        group.MapPost("/{competenceYm}/close", async (
+            string competenceYm,
+            HttpRequest http,
+            MonthService months,
+            PendingDebtService debts,
+            MonthCloseCoachService coach,
+            CancellationToken ct) =>
+        {
+            CloseMonthRequest? request = null;
+            if (http.ContentLength is > 0)
+                request = await http.ReadFromJsonAsync<CloseMonthRequest>(ct);
+            await debts.StageAsync(competenceYm, request?.CategoryIds ?? [], ct);
+            var status = await months.CloseAsync(competenceYm, ct);
+            await coach.NotifyIfNeededAsync(competenceYm, ct);
+            return Results.Ok(status);
+        });
 
         group.MapPost("/{competenceYm}/reopen", async (string competenceYm, ReopenMonthRequest request, MonthService service, CancellationToken ct) =>
             Results.Ok(await service.ReopenAsync(competenceYm, request, ct)));

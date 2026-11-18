@@ -71,6 +71,40 @@ public sealed class GeminiClient : IGeminiClient
         return SendAsync(body, ct);
     }
 
+    public Task<string?> TranscribeAudioAsync(
+        ReadOnlyMemory<byte> audioBytes,
+        string mimeType,
+        CancellationToken ct)
+    {
+        const string system =
+            "Transcreva o áudio em português do Brasil. Responda somente com o texto falado, sem aspas nem comentários.";
+        var body = new
+        {
+            systemInstruction = new { parts = new[] { new { text = system } } },
+            contents = new[]
+            {
+                new
+                {
+                    role = "user",
+                    parts = new object[]
+                    {
+                        new { text = "Transcreva:" },
+                        new
+                        {
+                            inline_data = new
+                            {
+                                mime_type = string.IsNullOrWhiteSpace(mimeType) ? "audio/ogg" : mimeType,
+                                data = Convert.ToBase64String(audioBytes.Span)
+                            }
+                        }
+                    }
+                }
+            },
+            generationConfig = new { temperature = 0.1 }
+        };
+        return SendAsync(body, ct);
+    }
+
     public async Task<byte[]?> SpeakAsync(string text, string voiceName, string style, CancellationToken ct)
     {
         if (!IsConfigured)

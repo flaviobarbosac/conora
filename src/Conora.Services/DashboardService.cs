@@ -22,6 +22,7 @@ public sealed class DashboardService
     private readonly IUnitOfWork _uow;
     private readonly IWhatsAppMessenger _whatsApp;
     private readonly IConsultantScope _scope;
+    private readonly MonthCloseCoachService _monthCloseCoach;
 
     public DashboardService(
         IFinanceRepository repo,
@@ -31,7 +32,8 @@ public sealed class DashboardService
         FamilyGroupService family,
         IUnitOfWork uow,
         IWhatsAppMessenger whatsApp,
-        IConsultantScope scope)
+        IConsultantScope scope,
+        MonthCloseCoachService monthCloseCoach)
     {
         _repo = repo;
         _months = months;
@@ -41,6 +43,7 @@ public sealed class DashboardService
         _uow = uow;
         _whatsApp = whatsApp;
         _scope = scope;
+        _monthCloseCoach = monthCloseCoach;
     }
 
     public async Task<DashboardResponse> GetAsync(string competenceYm, CancellationToken ct)
@@ -362,6 +365,10 @@ public sealed class DashboardService
 
             await TryAddMonthCloseAlertAsync(ym, alerts, IsSeen, ct);
         }
+
+        var coachAlert = await _monthCloseCoach.BuildAlertAsync(ym, IsSeen, ct);
+        if (coachAlert is not null)
+            alerts.Add(coachAlert);
 
         var budget = await _budgets.GetAsync(ym, ct);
         foreach (var line in budget.Lines.Where(l => l.Status != "Ok"))
