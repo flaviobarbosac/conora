@@ -39,7 +39,8 @@ public sealed record ConfirmReceiptRequest(
     decimal? Amount = null,
     DateTime? OccurredAt = null,
     string? Description = null,
-    bool ConfirmDuplicate = false);
+    bool ConfirmDuplicate = false,
+    IReadOnlyList<Guid>? PendingDebtIds = null);
 
 public sealed record BudgetBoletoConfirmResponse(
     Guid IntakeId,

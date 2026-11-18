@@ -180,6 +180,7 @@ app.MapEntryEndpoints();
 app.MapImportEndpoints();
 app.MapBudgetEndpoints();
 app.MapMonthEndpoints();
+app.MapPendingDebtEndpoints();
 app.MapLifeProjectEndpoints();
 app.MapPatrimonyEndpoints();
 app.MapDashboardEndpoints();

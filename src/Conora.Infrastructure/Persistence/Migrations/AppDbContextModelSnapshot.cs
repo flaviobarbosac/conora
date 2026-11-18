@@ -1476,6 +1476,56 @@ namespace Conora.Infrastructure.Persistence.Migrations
                     b.ToTable("patrimony_items", (string)null);
                 });
 
+            modelBuilder.Entity("Conora.Domain.Entities.PendingDebt", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("CategoryId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("CompetenceYm")
+                        .IsRequired()
+                        .HasMaxLength(7)
+                        .HasColumnType("character varying(7)");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<DateTime?>("DeletedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<decimal>("OpenAmount")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("numeric(18,2)");
+
+                    b.Property<decimal>("OriginalAmount")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("numeric(18,2)");
+
+                    b.Property<DateTime?>("PaidAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<DateTime>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid>("UsuarioId")
+                        .HasColumnType("uuid");
+
+                    b.Property<long>("Version")
+                        .HasColumnType("bigint");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("UsuarioId", "CompetenceYm", "CategoryId")
+                        .IsUnique()
+                        .HasDatabaseName("IX_pending_debts_User_Month_Category")
+                        .HasFilter("\"DeletedAt\" IS NULL");
+
+                    b.ToTable("pending_debts", (string)null);
+                });
+
             modelBuilder.Entity("Conora.Domain.Entities.PreRegistration", b =>
                 {
                     b.Property<Guid>("Id")

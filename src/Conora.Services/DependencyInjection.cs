@@ -26,6 +26,7 @@ public static class DependencyInjection
         services.AddScoped<TrialEndingNoticeService>();
         services.AddScoped<IStoreSubscriptionBilling, StoreSubscriptionBilling>();
         services.AddScoped<MonthService>();
+        services.AddScoped<PendingDebtService>();
         services.AddScoped<MonthShareService>();
         services.AddScoped<ConsultantAccessService>();
         services.AddScoped<CategoryService>();

@@ -20,7 +20,8 @@ public sealed record CreateEntryRequest(
     Guid? MemberId = null,
     int? InstallmentCount = null,
     int? RepeatMonths = null,
-    bool ConfirmDuplicate = false);
+    bool ConfirmDuplicate = false,
+    IReadOnlyList<Guid>? PendingDebtIds = null);
 
 public sealed record UpdateEntryRequest(
     decimal Amount,

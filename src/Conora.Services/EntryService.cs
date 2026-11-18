@@ -27,6 +27,7 @@ public sealed class EntryService
     private readonly FamilyGroupService _family;
     private readonly IFamilyGroupRepository _familyRepo;
     private readonly IConsultantScope _scope;
+    private readonly PendingDebtService _debts;
 
     public EntryService(
         IFinanceRepository repo,
@@ -40,7 +41,8 @@ public sealed class EntryService
         CategoryService categories,
         FamilyGroupService family,
         IFamilyGroupRepository familyRepo,
-        IConsultantScope scope)
+        IConsultantScope scope,
+        PendingDebtService debts)
     {
         _repo = repo;
         _audits = audits;
@@ -54,6 +56,7 @@ public sealed class EntryService
         _family = family;
         _familyRepo = familyRepo;
         _scope = scope;
+        _debts = debts;
     }
 
     public async Task<PagedResponse<EntryResponse>> SearchAsync(EntryFilter filter, CancellationToken ct)
@@ -262,6 +265,13 @@ public sealed class EntryService
             await EntryLedger.ApplyAsync(_repo, entry, 1, ct);
             await ApplyProjectAsync(entry, 1, ct);
             await ApplyPatrimonyAsync(entry, 1, ct);
+        }
+
+        if (request.PendingDebtIds is { Count: > 0 } debtIds)
+        {
+            if (count != 1 || request.Type != EntryType.Expense || categoryId is not Guid debtCategoryId)
+                throw new ValidationException("pendingDebtIds", "A quitação de dívida é um lançamento de despesa, sem parcela.");
+            await _debts.ApplyManyAsync(debtIds, debtCategoryId, request.Amount, ct);
         }
 
         AuditRecorder.Record(_audits, _correlation, "Entry", created[0].Id, "EntryCreated",
