@@ -59,6 +59,7 @@ public class AppDbContext : DbContext
     public DbSet<ImportPreviewRow> ImportPreviewRows => Set<ImportPreviewRow>();
     public DbSet<WhatsAppLink> WhatsAppLinks => Set<WhatsAppLink>();
     public DbSet<WhatsAppDraft> WhatsAppDrafts => Set<WhatsAppDraft>();
+    public DbSet<DevicePushToken> DevicePushTokens => Set<DevicePushToken>();
     public DbSet<ReceiptIntake> ReceiptIntakes => Set<ReceiptIntake>();
     public DbSet<HotmartCoursePurchase> HotmartCoursePurchases => Set<HotmartCoursePurchase>();
     public DbSet<UserFeedback> UserFeedbacks => Set<UserFeedback>();
@@ -93,6 +94,7 @@ public class AppDbContext : DbContext
         TenantFilter<ImportPreviewRow>(modelBuilder);
         TenantFilter<WhatsAppLink>(modelBuilder);
         TenantFilter<WhatsAppDraft>(modelBuilder);
+        TenantFilter<DevicePushToken>(modelBuilder);
         TenantFilter<ReceiptIntake>(modelBuilder);
         TenantFilter<UserFeedback>(modelBuilder);
         MonthScopedFilter<AlertSeen>(modelBuilder);

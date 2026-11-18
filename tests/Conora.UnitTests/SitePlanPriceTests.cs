@@ -17,6 +17,16 @@ public class SitePlanPriceTests
         Assert.Contains("R$ 499 por ano", html);
     }
 
+    [Fact]
+    public void Public_site_advertises_seven_day_trial_not_ninety()
+    {
+        var html = File.ReadAllText(FindSite());
+        Assert.Contains("7 dias com tudo", html);
+        Assert.Contains("Por 7 dias", html);
+        Assert.DoesNotContain("90 dias com tudo", html);
+        Assert.DoesNotContain("Por 90 dias", html);
+    }
+
     private static string FindSite()
     {
         var dir = new DirectoryInfo(AppContext.BaseDirectory);

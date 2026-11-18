@@ -581,6 +581,52 @@ namespace Conora.Infrastructure.Persistence.Migrations
                     b.ToTable("credit_cards", (string)null);
                 });
 
+            modelBuilder.Entity("Conora.Domain.Entities.DevicePushToken", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<DateTime?>("DeletedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<DateTime>("LastSeenAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("Platform")
+                        .IsRequired()
+                        .HasMaxLength(16)
+                        .HasColumnType("character varying(16)");
+
+                    b.Property<string>("Token")
+                        .IsRequired()
+                        .HasMaxLength(4096)
+                        .HasColumnType("character varying(4096)");
+
+                    b.Property<DateTime>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid>("UsuarioId")
+                        .HasColumnType("uuid");
+
+                    b.Property<long>("Version")
+                        .HasColumnType("bigint");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("Token")
+                        .IsUnique()
+                        .HasDatabaseName("IX_device_push_tokens_Token")
+                        .HasFilter("\"DeletedAt\" IS NULL");
+
+                    b.HasIndex("UsuarioId");
+
+                    b.ToTable("device_push_tokens", (string)null);
+                });
+
             modelBuilder.Entity("Conora.Domain.Entities.EmailSuppression", b =>
                 {
                     b.Property<string>("Email")

@@ -2,6 +2,8 @@ namespace Conora.Services.Contracts;
 
 public sealed record CloseMonthRequest(IReadOnlyList<Guid>? CategoryIds = null);
 
+public sealed record MonthClosePreviewSummaryResponse(string CompetenceYm, string Summary);
+
 public sealed record CloseGapResponse(
     Guid CategoryId,
     string CategoryName,

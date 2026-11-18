@@ -83,7 +83,9 @@ public class CompetenceAndBalanceTests
         var now = new DateTime(2026, 1, 10, 0, 0, 0, DateTimeKind.Utc);
         Assert.Equal(0, AccessPolicy.DaysUntil(now.AddDays(-1), now));
         Assert.Equal(5, AccessPolicy.DaysUntil(now.AddDays(5), now));
+        Assert.Equal(7, AccessPolicy.StandardTrialDays);
         Assert.Equal(7, AccessPolicy.TrialDaysFor(false));
         Assert.Equal(90, AccessPolicy.TrialDaysFor(true));
+        Assert.Equal(90, AccessPolicy.StudentTrialDays);
     }
 }

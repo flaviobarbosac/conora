@@ -19,4 +19,10 @@ public interface IGeminiClient
     /// <summary>Spoken reply as a WAV clip, or null when speech is unavailable.</summary>
     /// <param name="style">Natural-language speaking style, e.g. the age the voice should sound.</param>
     Task<byte[]?> SpeakAsync(string text, string voiceName, string style, CancellationToken ct);
+
+    /// <summary>Speech-to-text for WhatsApp voice notes. Returns plain transcript or null.</summary>
+    Task<string?> TranscribeAudioAsync(
+        ReadOnlyMemory<byte> audioBytes,
+        string mimeType,
+        CancellationToken ct);
 }

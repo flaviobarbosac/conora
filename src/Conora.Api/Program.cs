@@ -192,6 +192,7 @@ app.MapFeedbackEndpoints();
 app.MapHelpEndpoints();
 app.MapAiEndpoints();
 app.MapWhatsAppEndpoints();
+app.MapPushEndpoints();
 app.MapReceiptEndpoints();
 app.MapSesWebhookEndpoints();
 app.MapStoreBillingWebhookEndpoints();

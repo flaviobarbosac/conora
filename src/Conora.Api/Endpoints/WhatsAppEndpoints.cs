@@ -1,6 +1,5 @@
 using System.Security.Cryptography;
 using System.Text;
-using Conora.Domain.Enums;
 using Conora.Services;
 using Conora.Services.Contracts;
 
@@ -24,19 +23,6 @@ public static class WhatsAppEndpoints
         group.MapDelete("/link", async (WhatsAppService service, CancellationToken ct) =>
         {
             await service.UnlinkAsync(ct);
-            return Results.NoContent();
-        });
-
-        group.MapGet("/drafts", async (WhatsAppService service, CancellationToken ct, WhatsAppDraftStatus? status = null) =>
-            Results.Ok(await service.ListDraftsAsync(status, ct)));
-
-        // The only way a WhatsApp message becomes an entry.
-        group.MapPost("/drafts/{id:guid}/confirm", async (Guid id, ConfirmWhatsAppDraftRequest request, WhatsAppService service, CancellationToken ct) =>
-            Results.Ok(await service.ConfirmDraftAsync(id, request, ct)));
-
-        group.MapPost("/drafts/{id:guid}/discard", async (Guid id, WhatsAppService service, CancellationToken ct) =>
-        {
-            await service.DiscardDraftAsync(id, ct);
             return Results.NoContent();
         });
 

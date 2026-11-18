@@ -27,6 +27,7 @@ public static class DependencyInjection
         services.AddScoped<IStoreSubscriptionBilling, StoreSubscriptionBilling>();
         services.AddScoped<MonthService>();
         services.AddScoped<PendingDebtService>();
+        services.AddScoped<MonthCloseCoachService>();
         services.AddScoped<MonthShareService>();
         services.AddScoped<ConsultantAccessService>();
         services.AddScoped<CategoryService>();
@@ -52,6 +53,7 @@ public static class DependencyInjection
         services.AddScoped<GeminiService>();
         services.AddScoped<VoiceCommandService>();
         services.AddScoped<WhatsAppService>();
+        services.AddScoped<PushNotificationService>();
         services.AddScoped<ReceiptIntakeService>();
         services.Configure<SesFeedbackOptions>(configuration.GetSection(SesFeedbackOptions.SectionName));
         services.AddSingleton<SnsMessageVerifier>();

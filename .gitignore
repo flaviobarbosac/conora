@@ -42,3 +42,7 @@ Thumbs.db
 ## Arquivos temporários que a Claude não teve permissão de apagar do disco —
 ## seguro ignorar; pode ser removido manualmente a qualquer momento.
 _to_delete/
+
+# Local secrets (FCM service account, etc.)
+secrets/
+
