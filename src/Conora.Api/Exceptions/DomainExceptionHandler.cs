@@ -93,6 +93,7 @@ public sealed class DomainExceptionHandler : IExceptionHandler
         SystemCategoryProtectedException => (StatusCodes.Status409Conflict, "Conta padrão protegida"),
         PlanReadOnlyException => (StatusCodes.Status402PaymentRequired, "Modo somente leitura"),
         PlanBlockedException => (StatusCodes.Status402PaymentRequired, "Conta bloqueada"),
+        ForbiddenException { Message: "Usuário não autenticado" } => (StatusCodes.Status401Unauthorized, "Não autorizado"),
         ForbiddenException => (StatusCodes.Status403Forbidden, "Acesso negado"),
         UserNotFoundException => (StatusCodes.Status404NotFound, "Usuário não encontrado"),
         DuplicateEmailException => (StatusCodes.Status409Conflict, "Conta existente"),

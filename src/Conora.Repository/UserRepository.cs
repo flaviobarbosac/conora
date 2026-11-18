@@ -65,6 +65,12 @@ public sealed class UserRepository : BaseRepository<User>, IUserRepository
             .ToListAsync(ct);
     }
 
+    public async Task<IReadOnlyList<User>> ListActiveByCreatedDescAsync(CancellationToken ct = default)
+        => await Set.IgnoreQueryFilters()
+            .Where(u => u.DeletedAt == null)
+            .OrderByDescending(u => u.CreatedAt)
+            .ToListAsync(ct);
+
     public Task<User?> FindActiveByIdAsync(Guid id, CancellationToken ct = default)
         => Set.IgnoreQueryFilters()
             .FirstOrDefaultAsync(u => u.Id == id && u.DeletedAt == null, ct);

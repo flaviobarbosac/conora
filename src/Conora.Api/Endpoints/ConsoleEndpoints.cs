@@ -50,21 +50,7 @@ public static class ConsoleEndpoints
             return Results.Ok(result);
         }).WithTags("Console").RequireAuthorization();
 
-        app.MapGet("/console/users", async (
-            HttpContext http,
-            ConsoleAccessAdminService service,
-            string? term,
-            CancellationToken ct) =>
-        {
-            if (!IsConsoleOperator(http))
-                return Forbidden();
-
-            return Results.Ok(await service.SearchAsync(term, ct));
-        }).WithTags("Console").RequireAuthorization();
-
-        app.MapPost("/console/users/{id:guid}/trial-end", async (
-            Guid id,
-            SetTrialEndRequest request,
+        app.MapGet("/console/users/registered", async (
             HttpContext http,
             ConsoleAccessAdminService service,
             CancellationToken ct) =>
@@ -72,7 +58,7 @@ public static class ConsoleEndpoints
             if (!IsConsoleOperator(http))
                 return Forbidden();
 
-            return Results.Ok(await service.SetTrialEndAsync(id, request.EndsOn, ct));
+            return Results.Ok(await service.ListAsync(ct));
         }).WithTags("Console").RequireAuthorization();
 
         app.MapPost("/console/users/{id:guid}/grant", async (
@@ -88,8 +74,9 @@ public static class ConsoleEndpoints
             return Results.Ok(await service.SetGrantAsync(id, request.Indefinite, request.Until, ct));
         }).WithTags("Console").RequireAuthorization();
 
-        app.MapDelete("/console/users/{id:guid}/grant", async (
+        app.MapPost("/console/users/{id:guid}/plan", async (
             Guid id,
+            SetUserPlanRequest request,
             HttpContext http,
             ConsoleAccessAdminService service,
             CancellationToken ct) =>
@@ -97,7 +84,7 @@ public static class ConsoleEndpoints
             if (!IsConsoleOperator(http))
                 return Forbidden();
 
-            return Results.Ok(await service.ClearGrantAsync(id, ct));
+            return Results.Ok(await service.AssignPlanAsync(id, request.Plan, ct));
         }).WithTags("Console").RequireAuthorization();
 
         app.MapGet("/console/abandonment", async (HttpContext http, ConsoleService service, CancellationToken ct) =>
@@ -191,6 +178,47 @@ public static class ConsoleEndpoints
             var detail = await service.ReplyAdminAsync(id, admin.Value.Id, admin.Value.Nome, request, ct);
             return detail is null ? Results.NotFound() : Results.Ok(detail);
         });
+
+        app.MapGet("/console/geo", async (HttpContext http, ConsoleGeoService service, CancellationToken ct) =>
+        {
+            if (!IsConsoleOperator(http))
+                return Forbidden();
+
+            return Results.Ok(await service.ObterAsync(ct));
+        }).WithTags("Console").RequireAuthorization();
+
+        app.MapGet("/console/geo/config", async (HttpContext http, ConsoleGeoService service, CancellationToken ct) =>
+        {
+            if (!IsConsoleOperator(http))
+                return Forbidden();
+
+            return Results.Ok(await service.ObterConfigAsync(ct));
+        }).WithTags("Console").RequireAuthorization();
+
+        app.MapPut("/console/geo/config", async (
+            HttpContext http,
+            ConsoleGeoService service,
+            ConsoleGeoConfigSave pedido,
+            CancellationToken ct) =>
+        {
+            if (!IsConsoleOperator(http))
+                return Forbidden();
+
+            return Results.Ok(await service.SalvarConfigAsync(pedido, ct));
+        }).WithTags("Console").RequireAuthorization();
+
+        app.MapPost("/console/geo/coordenadas", async (
+            HttpContext http,
+            ConsoleGeoService service,
+            List<ConsoleGeoCoordenada> itens,
+            CancellationToken ct) =>
+        {
+            if (!IsConsoleOperator(http))
+                return Forbidden();
+
+            var alterados = await service.SalvarCoordenadasAsync(itens, ct);
+            return Results.Ok(new { alterados });
+        }).WithTags("Console").RequireAuthorization();
 
         return app;
     }

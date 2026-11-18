@@ -25,6 +25,17 @@ public class WorkspaceSubscription : ModelBase, ITenantOwned
         ExpiresAt = ExpiryFrom(plan, now)
     };
 
+    /// <summary>Operator grant for one billing period from now. Not a store charge.</summary>
+    public void Grant(PlanKind plan, DateTime now)
+    {
+        Plan = plan;
+        Status = SubscriptionStatus.Active;
+        ExpiresAt = ExpiryFrom(plan, now);
+        Store = null;
+        StoreProductId = null;
+        StoreSubscriptionId = null;
+    }
+
     /// <summary>Renews from the current expiry when still valid, otherwise from now.</summary>
     public void Renew(PlanKind plan, DateTime now)
     {

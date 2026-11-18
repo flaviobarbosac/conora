@@ -14,6 +14,7 @@ public static class DependencyInjection
         services.AddScoped<UserService>();
         services.AddScoped<AuditService>();
         services.AddScoped<ConsoleService>();
+        services.AddScoped<ConsoleGeoService>();
         services.AddScoped<ConsoleAccessAdminService>();
         services.AddScoped<JourneyService>();
         services.AddScoped<AuthService>();
@@ -22,6 +23,7 @@ public static class DependencyInjection
         // Finance domain
         services.AddScoped<PlanService>();
         services.AddScoped<HotmartCourseService>();
+        services.AddScoped<TrialEndingNoticeService>();
         services.AddScoped<IStoreSubscriptionBilling, StoreSubscriptionBilling>();
         services.AddScoped<MonthService>();
         services.AddScoped<MonthShareService>();
@@ -30,6 +32,11 @@ public static class DependencyInjection
         services.AddSingleton<ICategoryAccessPolicyFactory, CategoryAccessPolicyFactory>();
         services.AddScoped<MemberService>();
         services.AddScoped<FamilyGroupService>();
+        services.AddHttpClient<ICepLookup, ViaCepLookup>(client =>
+        {
+            client.BaseAddress = new Uri("https://viacep.com.br/");
+            client.Timeout = TimeSpan.FromSeconds(8);
+        });
         services.AddScoped<EntryService>();
         services.AddScoped<AccountService>();
         services.AddScoped<CreditCardService>();

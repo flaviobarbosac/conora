@@ -136,4 +136,14 @@ public class PlanAccessTests
         Assert.Equal(1, PlanCatalog.MaxExtraMembers(PlanTier.Family));
         Assert.Equal(5, PlanCatalog.MaxExtraMembers(PlanTier.FamilyPlus));
     }
+
+    [Fact]
+    public void Ending_day_is_the_last_24_hours_of_an_open_trial()
+    {
+        var ends = new DateTime(2026, 11, 18, 15, 0, 0, DateTimeKind.Utc);
+        Assert.True(AccessPolicy.IsInsideEndingDay(ends.AddHours(-24), ends));
+        Assert.True(AccessPolicy.IsInsideEndingDay(ends.AddHours(-1), ends));
+        Assert.False(AccessPolicy.IsInsideEndingDay(ends.AddHours(-24).AddTicks(-1), ends));
+        Assert.False(AccessPolicy.IsInsideEndingDay(ends, ends));
+    }
 }

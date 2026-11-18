@@ -58,7 +58,15 @@ public sealed record FamilyGroupResponse(
     IReadOnlyList<FamilyNoticeResponse> Notices,
     FamilyOwnerTransferResponse? PendingOwnerTransfer);
 
-public sealed record UpdateProfileRequest(string Name, string? Phone = null, string? Cep = null);
+public sealed record UpdateProfileRequest(
+    string Name,
+    string? Phone = null,
+    string? Cep = null,
+    string? Logradouro = null,
+    string? Numero = null,
+    string? Bairro = null,
+    string? Municipio = null,
+    string? Uf = null);
 
 public sealed record UpdatePreferencesRequest(
     string ThemeId,
@@ -102,7 +110,12 @@ public sealed record ProfileResponse(
     bool HasPhoto = false,
     string? PhotoContentHash = null,
     string HomeJourneyDisplay = User.HomeJourneyShown,
-    JornadaDiagnosticoResponse? JornadaDiagnostico = null);
+    JornadaDiagnosticoResponse? JornadaDiagnostico = null,
+    string? Logradouro = null,
+    string? Numero = null,
+    string? Bairro = null,
+    string? Municipio = null,
+    string? Uf = null);
 
 public sealed record ProfilePhotoContent(byte[] Content, string ContentType, string ContentHash);
 

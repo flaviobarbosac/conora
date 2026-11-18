@@ -34,7 +34,9 @@ public sealed record ConsoleReadModel(
     IReadOnlyList<ConsoleStatusRaw> ErrorsByStatus,
     IReadOnlyList<ConsoleAreaRaw> ErrorsByArea,
     IReadOnlyList<ConsoleErrorRowRaw> ErrorRows,
-    IReadOnlyList<ConsoleMonthRaw> Months);
+    IReadOnlyList<ConsoleMonthRaw> Months,
+    int TrialUsers,
+    int PayingUsers);
 
 public sealed record ConsoleMonthRaw(
     string CompetenceYm,

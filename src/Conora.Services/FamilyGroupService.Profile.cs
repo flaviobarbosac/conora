@@ -28,13 +28,24 @@ public sealed partial class FamilyGroupService
     {
         var user = await RequireUserAsync(ct, track: true);
         user.Rename(request.Name);
+        if (string.IsNullOrWhiteSpace(request.Cep))
+            throw new ValidationException("cep", "Informe o CEP.");
+        if (!await _cepLookup.ExistsAsync(request.Cep, ct))
+            throw new ValidationException("cep", "CEP não encontrado.");
         try
         {
-            user.UpdateContact(request.Phone, request.Cep);
+            user.UpdateContact(
+                request.Phone,
+                request.Cep,
+                request.Logradouro,
+                request.Numero,
+                request.Bairro,
+                request.Municipio,
+                request.Uf);
         }
         catch (ArgumentException ex)
         {
-            throw new ValidationException(ex.ParamName == "cep" ? "cep" : "phone", ex.Message);
+            throw new ValidationException(ex.ParamName ?? "cep", ex.Message);
         }
         await _uow.SaveChangesAsync(ct);
         return ToProfile(user);
@@ -86,6 +97,16 @@ public sealed partial class FamilyGroupService
             errors["phone"] = ["Informe o telefone."];
         if (string.IsNullOrWhiteSpace(user.Cep))
             errors["cep"] = ["Informe o CEP."];
+        if (string.IsNullOrWhiteSpace(user.Logradouro))
+            errors["logradouro"] = ["Informe o logradouro."];
+        if (string.IsNullOrWhiteSpace(user.Numero))
+            errors["numero"] = ["Informe o número."];
+        if (string.IsNullOrWhiteSpace(user.Bairro))
+            errors["bairro"] = ["Informe o bairro."];
+        if (string.IsNullOrWhiteSpace(user.Municipio))
+            errors["municipio"] = ["Informe o município."];
+        if (string.IsNullOrWhiteSpace(user.Uf))
+            errors["uf"] = ["Informe a UF."];
         if (!await _repo.AnyAsync<Account>(a => !a.IsArchived, ct))
             errors["account"] = ["Cadastre ao menos uma conta bancária."];
         // Credit card is optional on onboard (available later under Contas).

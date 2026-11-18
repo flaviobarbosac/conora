@@ -32,6 +32,7 @@ public sealed partial class FamilyGroupService
     private readonly PlanService _plan;
     private readonly IStoreBillingGateway _storeBilling;
     private readonly IUserPhotoStore _photos;
+    private readonly ICepLookup _cepLookup;
 
     public FamilyGroupService(
         IFamilyGroupRepository family,
@@ -47,7 +48,8 @@ public sealed partial class FamilyGroupService
         CategoryService categories,
         PlanService plan,
         IStoreBillingGateway storeBilling,
-        IUserPhotoStore photos)
+        IUserPhotoStore photos,
+        ICepLookup cepLookup)
     {
         _plan = plan;
         _storeBilling = storeBilling;
@@ -63,6 +65,7 @@ public sealed partial class FamilyGroupService
         _logger = logger;
         _categories = categories;
         _photos = photos;
+        _cepLookup = cepLookup;
     }
 
     public Guid RequireUserId() => _tenant.UsuarioId ?? throw new ForbiddenException("Usuário não autenticado.");
@@ -285,7 +288,12 @@ public sealed partial class FamilyGroupService
                 user.JornadaRendaFixa,
                 user.JornadaDivida,
                 user.JornadaPatrimonio,
-                user.JornadaProjetoVida));
+                user.JornadaProjetoVida),
+            user.Logradouro,
+            user.Numero,
+            user.Bairro,
+            user.Municipio,
+            user.Uf);
 
     private static FamilyInviteResponse ToInvite(FamilyInvite i)
         => new(i.Id, i.Email, i.ExpiresAt, i.AcceptedAt, i.CancelledAt, i.IsOpen);

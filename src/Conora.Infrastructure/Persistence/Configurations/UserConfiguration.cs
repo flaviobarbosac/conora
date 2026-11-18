@@ -15,6 +15,13 @@ public class UserConfiguration : IEntityTypeConfiguration<User>
         builder.Property(u => u.Email).IsRequired().HasMaxLength(320);
         builder.Property(u => u.Phone).HasMaxLength(32);
         builder.Property(u => u.Cep).HasMaxLength(9);
+        builder.Property(u => u.Logradouro).HasMaxLength(160);
+        builder.Property(u => u.Numero).HasMaxLength(20);
+        builder.Property(u => u.Bairro).HasMaxLength(120);
+        builder.Property(u => u.Municipio).HasMaxLength(120);
+        builder.Property(u => u.Uf).HasMaxLength(2);
+        builder.Property(u => u.Latitude);
+        builder.Property(u => u.Longitude);
         builder.Property(u => u.Cpf).HasMaxLength(11);
         builder.Property(u => u.PasswordHash).HasMaxLength(500);
         builder.Property(u => u.PasswordResetTokenHash).HasMaxLength(64);
@@ -25,6 +32,7 @@ public class UserConfiguration : IEntityTypeConfiguration<User>
         builder.Property(u => u.OnboardingCompleted).IsRequired();
         builder.Property(u => u.IsTrainingStudent).IsRequired().HasDefaultValue(false);
         builder.Property(u => u.TrialEndsAtUtc);
+        builder.Property(u => u.TrialEndingNoticeForUtc);
         builder.Property(u => u.ComplimentaryAccessIndefinite).IsRequired().HasDefaultValue(false);
         builder.Property(u => u.ComplimentaryAccessUntilUtc);
         builder.Property(u => u.ThemeId).IsRequired().HasMaxLength(40);

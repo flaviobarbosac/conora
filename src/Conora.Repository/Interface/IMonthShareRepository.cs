@@ -8,5 +8,6 @@ public interface IMonthShareRepository
 {
     Task<MonthShare?> FindAsync(Guid clientUsuarioId, Guid consultantUsuarioId, string competenceYm, CancellationToken ct = default);
     Task<IReadOnlyList<SharedMonthRow>> ListForConsultantAsync(Guid consultantUsuarioId, CancellationToken ct = default);
+    Task<List<MonthShare>> ListForClientAsync(Guid clientUsuarioId, CancellationToken ct = default);
     void Add(MonthShare share);
 }

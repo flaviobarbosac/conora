@@ -42,7 +42,12 @@ public sealed class NewAccountJornadaTests : IClassFixture<ApiFactory>
         {
             Name = "Conta Nova",
             Phone = "27999999999",
-            Cep = "29000-000"
+            Cep = "29000-000",
+            Logradouro = "Rua A",
+            Numero = "S/N",
+            Bairro = "Centro",
+            Municipio = "Vitória",
+            Uf = "ES"
         });
         Assert.Equal(HttpStatusCode.OK, profileUpdate.StatusCode);
 

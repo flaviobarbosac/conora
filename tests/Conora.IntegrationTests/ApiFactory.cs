@@ -1,6 +1,9 @@
+using Conora.Services;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.DependencyInjection.Extensions;
 using Testcontainers.PostgreSql;
 using Xunit;
 
@@ -32,6 +35,12 @@ public sealed class ApiFactory : WebApplicationFactory<Program>, IAsyncLifetime
                 ["RegistrationAccess:Closed"] = "false"
             });
         });
+
+        builder.ConfigureTestServices(services =>
+        {
+            services.RemoveAll<ICepLookup>();
+            services.AddSingleton<ICepLookup, TestCepLookup>();
+        });
     }
 
     async Task IAsyncLifetime.InitializeAsync()
@@ -42,5 +51,14 @@ public sealed class ApiFactory : WebApplicationFactory<Program>, IAsyncLifetime
     async Task IAsyncLifetime.DisposeAsync()
     {
         await _postgres.DisposeAsync();
+    }
+}
+
+sealed class TestCepLookup : ICepLookup
+{
+    public Task<bool> ExistsAsync(string cep, CancellationToken ct)
+    {
+        var digits = new string((cep ?? "").Where(char.IsDigit).ToArray());
+        return Task.FromResult(digits.Length == 8);
     }
 }

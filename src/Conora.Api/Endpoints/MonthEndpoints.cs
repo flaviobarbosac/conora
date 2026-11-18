@@ -12,6 +12,9 @@ public static class MonthEndpoints
         group.MapGet("/shared-with-me", async (MonthShareService service, CancellationToken ct) =>
             Results.Ok(await service.ListSharedWithMeAsync(ct)));
 
+        group.MapGet("/shared", async (MonthShareService service, CancellationToken ct) =>
+            Results.Ok(await service.ListMineAsync(ct)));
+
         group.MapGet("/", async (MonthService service, CancellationToken ct) =>
             Results.Ok(await service.ListAsync(ct)));
 
@@ -20,10 +23,21 @@ public static class MonthEndpoints
 
         group.MapPost("/{competenceYm}/share", async (
             string competenceYm,
-            ShareMonthRequest request,
             MonthShareService service,
             CancellationToken ct) =>
-            Results.Ok(await service.ShareAsync(competenceYm, request.Email, ct)));
+        {
+            await service.ShareWithOperatorsAsync(competenceYm, ct);
+            return Results.NoContent();
+        });
+
+        group.MapDelete("/{competenceYm}/share", async (
+            string competenceYm,
+            MonthShareService service,
+            CancellationToken ct) =>
+        {
+            await service.UnshareAsync(competenceYm, ct);
+            return Results.NoContent();
+        });
 
         group.MapPost("/{competenceYm}/close", async (string competenceYm, MonthService service, CancellationToken ct) =>
             Results.Ok(await service.CloseAsync(competenceYm, ct)));

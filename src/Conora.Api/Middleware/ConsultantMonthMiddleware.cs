@@ -41,6 +41,13 @@ public sealed class ConsultantMonthMiddleware
             return;
         }
 
+        // Expired or missing token must stay a 401 from authorization, not a 403 that the app treats as onboard.
+        if (context.User.Identity?.IsAuthenticated != true)
+        {
+            await _next(context);
+            return;
+        }
+
         if (!hasClient || !hasMonth || !Guid.TryParse(clientRaw, out var clientId))
         {
             context.Response.StatusCode = StatusCodes.Status400BadRequest;

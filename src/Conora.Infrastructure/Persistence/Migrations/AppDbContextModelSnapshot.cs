@@ -496,6 +496,45 @@ namespace Conora.Infrastructure.Persistence.Migrations
                     b.ToTable("categories", (string)null);
                 });
 
+            modelBuilder.Entity("Conora.Domain.Entities.ConsoleMapConfig", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<DateTime?>("DeletedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("PinLabelField")
+                        .IsRequired()
+                        .HasMaxLength(40)
+                        .HasColumnType("character varying(40)");
+
+                    b.Property<string>("PinLabelText")
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)");
+
+                    b.Property<bool>("ShowLabel")
+                        .HasColumnType("boolean");
+
+                    b.Property<DateTime>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<long>("Version")
+                        .HasColumnType("bigint");
+
+                    b.Property<string>("VisibleFieldsJson")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.HasKey("Id");
+
+                    b.ToTable("console_map_config", (string)null);
+                });
+
             modelBuilder.Entity("Conora.Domain.Entities.CreditCard", b =>
                 {
                     b.Property<Guid>("Id")
@@ -1838,6 +1877,10 @@ namespace Conora.Infrastructure.Persistence.Migrations
                         .HasMaxLength(100)
                         .HasColumnType("character varying(100)");
 
+                    b.Property<string>("Bairro")
+                        .HasMaxLength(120)
+                        .HasColumnType("character varying(120)");
+
                     b.Property<int>("BudgetAlertPercent")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("integer")
@@ -1924,13 +1967,31 @@ namespace Conora.Infrastructure.Persistence.Migrations
                     b.Property<bool?>("JornadaRendaFixa")
                         .HasColumnType("boolean");
 
+                    b.Property<double?>("Latitude")
+                        .HasColumnType("double precision");
+
+                    b.Property<string>("Logradouro")
+                        .HasMaxLength(160)
+                        .HasColumnType("character varying(160)");
+
+                    b.Property<double?>("Longitude")
+                        .HasColumnType("double precision");
+
                     b.Property<int>("MonthCloseDay")
                         .HasColumnType("integer");
+
+                    b.Property<string>("Municipio")
+                        .HasMaxLength(120)
+                        .HasColumnType("character varying(120)");
 
                     b.Property<string>("Name")
                         .IsRequired()
                         .HasMaxLength(200)
                         .HasColumnType("character varying(200)");
+
+                    b.Property<string>("Numero")
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)");
 
                     b.Property<bool>("OnboardingCompleted")
                         .HasColumnType("boolean");
@@ -1978,8 +2039,15 @@ namespace Conora.Infrastructure.Persistence.Migrations
                         .HasMaxLength(40)
                         .HasColumnType("character varying(40)");
 
+                    b.Property<DateTime?>("TrialEndingNoticeForUtc")
+                        .HasColumnType("timestamp with time zone");
+
                     b.Property<DateTime?>("TrialEndsAtUtc")
                         .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("Uf")
+                        .HasMaxLength(2)
+                        .HasColumnType("character varying(2)");
 
                     b.Property<DateTime>("UpdatedAt")
                         .HasColumnType("timestamp with time zone");

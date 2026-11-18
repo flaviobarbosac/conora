@@ -1,6 +1,7 @@
 using Conora.Domain.Ports;
 using Conora.Domain.Services;
 using Conora.Infrastructure.Billing;
+using Conora.Infrastructure.Maps;
 using Conora.Infrastructure.Email;
 using Conora.Infrastructure.Persistence;
 using Conora.Infrastructure.Security;
@@ -39,6 +40,7 @@ public static class DependencyInjection
         services.AddSingleton<IAppleTokenRevoker, Security.AppleTokenRevoker>();
         services.AddScoped<IEmailSuppressionStore, EfEmailSuppressionStore>();
         services.Configure<HotmartOptions>(configuration.GetSection(HotmartOptions.SectionName));
+        services.Configure<GoogleMapsOptions>(configuration.GetSection(GoogleMapsOptions.SectionName));
         services.AddScoped<IHotmartCourseStore, EfHotmartCourseStore>();
         services.AddScoped<ISupplierStore, Persistence.EfSupplierStore>();
         services.AddScoped<IReceiptOcrQueue, Persistence.EfReceiptOcrQueue>();

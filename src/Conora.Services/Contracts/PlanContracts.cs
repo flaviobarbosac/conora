@@ -66,13 +66,18 @@ public sealed record ConsoleUserAccessResponse(
     string Email,
     DateTime? TrialEndsAtUtc,
     bool ComplimentaryIndefinite,
-    DateTime? ComplimentaryUntilUtc);
+    DateTime? ComplimentaryUntilUtc,
+    DateTime CreatedAt,
+    string Plan,
+    bool InTrial,
+    DateTime TastingEndsAt,
+    IReadOnlyList<string> SharedMonths);
+
+public sealed record SetUserPlanRequest(PlanKind Plan);
 
 public sealed record SetTrialEndRequest(DateOnly EndsOn);
 
 public sealed record SetAccessGrantRequest(bool Indefinite, DateOnly? Until);
-
-public sealed record ShareMonthRequest(string Email);
 
 public sealed record MonthShareResponse(
     Guid Id,

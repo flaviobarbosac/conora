@@ -42,6 +42,70 @@ public sealed class MonthShareService
         return ToResponse(share, consultant.Email);
     }
 
+    public async Task ShareWithOperatorsAsync(string competenceYm, CancellationToken ct)
+    {
+        var clientId = _tenant.UsuarioId ?? throw new ForbiddenException("Usuário não autenticado.");
+        var ym = Competence.Require(competenceYm);
+        var added = false;
+        foreach (var email in ConsoleAccess.OperatorEmails)
+        {
+            var consultant = await _users.FindByEmailAsync(email, ct);
+            if (consultant is null || consultant.Id == clientId)
+                continue;
+            if (await _shares.FindAsync(clientId, consultant.Id, ym, ct) is not null)
+                continue;
+            _shares.Add(MonthShare.Open(clientId, consultant.Id, ym));
+            added = true;
+        }
+
+        if (added)
+            await _uow.SaveChangesAsync(ct);
+    }
+
+    public async Task<IReadOnlyList<string>> ListMineAsync(CancellationToken ct)
+    {
+        var clientId = _tenant.UsuarioId ?? throw new ForbiddenException("Usuário não autenticado.");
+        var operatorIds = await OperatorIdsAsync(ct);
+        var rows = await _shares.ListForClientAsync(clientId, ct);
+        return rows
+            .Where(share => operatorIds.Contains(share.ConsultantUsuarioId))
+            .Select(share => share.CompetenceYm)
+            .Distinct()
+            .Order()
+            .ToList();
+    }
+
+    public async Task UnshareAsync(string competenceYm, CancellationToken ct)
+    {
+        var clientId = _tenant.UsuarioId ?? throw new ForbiddenException("Usuário não autenticado.");
+        var ym = Competence.Require(competenceYm);
+        var operatorIds = await OperatorIdsAsync(ct);
+        var rows = await _shares.ListForClientAsync(clientId, ct);
+        var now = DateTime.UtcNow;
+        var changed = false;
+        foreach (var share in rows.Where(share => share.CompetenceYm == ym && operatorIds.Contains(share.ConsultantUsuarioId)))
+        {
+            share.DeletedAt = now;
+            changed = true;
+        }
+
+        if (changed)
+            await _uow.SaveChangesAsync(ct);
+    }
+
+    private async Task<HashSet<Guid>> OperatorIdsAsync(CancellationToken ct)
+    {
+        var ids = new HashSet<Guid>();
+        foreach (var email in ConsoleAccess.OperatorEmails)
+        {
+            var consultant = await _users.FindByEmailAsync(email, ct);
+            if (consultant is not null)
+                ids.Add(consultant.Id);
+        }
+
+        return ids;
+    }
+
     public async Task<IReadOnlyList<SharedMonthClientResponse>> ListSharedWithMeAsync(CancellationToken ct)
     {
         var consultantId = _tenant.UsuarioId ?? throw new ForbiddenException("Usuário não autenticado.");
@@ -96,7 +160,7 @@ public sealed class ConsultantAccessService
 
     public async Task EnterAsync(Guid clientUsuarioId, string competenceYm, CancellationToken ct)
     {
-        var actorId = _tenant.UsuarioId ?? throw new ForbiddenException("Usuário não autenticado.");
+        var actorId = _tenant.UsuarioId ?? throw new UnauthorizedAccessException("Usuário não autenticado.");
         if (actorId == clientUsuarioId)
             return;
 
