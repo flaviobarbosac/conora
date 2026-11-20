@@ -40,6 +40,18 @@ conora.com.br, www.conora.com.br {
 		file_server
 	}
 
+	# Single download link for bios, posts and WhatsApp (sends each device to its store).
+	handle /baixar/ {
+		redir * /baixar?{query} permanent
+	}
+
+	handle /baixar {
+		root * /srv/public
+		rewrite * /baixar.html
+		header Cache-Control "no-cache"
+		file_server
+	}
+
 	handle /site.css {
 		root * /srv/public
 		file_server

@@ -162,7 +162,7 @@ public sealed class MilestoneEvaluationService
         return (false, null);
     }
 
-    /// <summary>Age 15: first closed month where every expense with ExpenseDay was paid on that day (not value limit).</summary>
+    /// <summary>Age 15: first closed month where every expense with ExpenseDay was paid on or before that day (not value limit).</summary>
     private async Task<(bool, DateTime?)> MetPaymentOnTimeAsync(CancellationToken ct)
     {
         var closed = (await _repo.ListAsync<MonthLock>(m => m.IsClosed, ct))
@@ -237,18 +237,17 @@ public sealed class MilestoneEvaluationService
 
         var year = int.Parse(ym[..4]);
         var month = int.Parse(ym[5..7]);
-        var daysInMonth = DateTime.DaysInMonth(year, month);
         var entries = await _repo.ListAsync<Entry>(
             e => e.CompetenceYm == ym && e.Type == EntryType.Expense && e.CategoryId != null, ct);
 
         foreach (var line in lines)
         {
-            var day = Math.Min(line.ExpenseDay!.Value, daysInMonth);
-            var due = new DateTime(year, month, day, 0, 0, 0, DateTimeKind.Utc);
+            var due = PaymentPunctuality.DueDate(year, month, line.ExpenseDay!.Value);
             var paid = entries.Where(e => e.CategoryId == line.CategoryId).ToList();
             if (paid.Count == 0)
                 return false;
-            if (paid.Any(e => e.OccurredAt.Date != due.Date))
+            // Paying early counts as on time; only payments after the due day break the milestone.
+            if (paid.Any(e => !PaymentPunctuality.IsOnTime(e.OccurredAt, due)))
                 return false;
         }
 

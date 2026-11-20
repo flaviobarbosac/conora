@@ -312,7 +312,7 @@ public sealed class GamificationService
             var ok = true;
             foreach (var line in lines)
             {
-                var day = line.ExpenseDay!.Value;
+                var due = PaymentPunctuality.DueDate(year, monthNum, line.ExpenseDay!.Value);
                 var entries = await _repo.ListAsync<Entry>(
                     e => e.CategoryId == line.CategoryId
                          && e.Type == EntryType.Expense
@@ -320,7 +320,7 @@ public sealed class GamificationService
                          && e.OccurredAt.Month == monthNum,
                     ct,
                     track: false);
-                if (entries.Count == 0 || entries.Any(e => e.OccurredAt.Day > day))
+                if (entries.Count == 0 || entries.Any(e => !PaymentPunctuality.IsOnTime(e.OccurredAt, due)))
                 {
                     ok = false;
                     break;
