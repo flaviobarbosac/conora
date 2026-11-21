@@ -388,6 +388,35 @@ public sealed partial class BudgetService
         return hasLinkedProject ? LinkedLifeProjectPlanMessage : UnlinkedLifeProjectPlanMessage;
     }
 
+    /// <summary>Family budget: every group project, plus the budget owner's personal projects.</summary>
+    internal static bool ProjectFeedsFamilyBudget(LifeProjectScope projectScope, bool ownedByBudgetOwner)
+        => projectScope == LifeProjectScope.Group
+            || (ownedByBudgetOwner && projectScope == LifeProjectScope.Personal);
+
+    /// <summary>Personal budget: only that person's personal projects.</summary>
+    internal static bool ProjectFeedsPersonalBudget(LifeProjectScope projectScope)
+        => projectScope == LifeProjectScope.Personal;
+
+    /// <summary>Parcel of each category in one competence. Categories are already the viewer's local ids.</summary>
+    internal static Dictionary<Guid, decimal> ParcelTotalsForMonth(
+        IEnumerable<(Guid CategoryId, decimal GoalAmount, IReadOnlyList<string> Months)> projects,
+        string ym)
+    {
+        var totals = new Dictionary<Guid, decimal>();
+        foreach (var project in projects)
+        {
+            if (project.Months.Count == 0 || !project.Months.Contains(ym, StringComparer.Ordinal))
+                continue;
+            if (!LifeProjectService.BuildParcelSchedule(project.GoalAmount, project.Months).TryGetValue(ym, out var value))
+                continue;
+            if (value <= 0)
+                continue;
+            totals[project.CategoryId] = totals.GetValueOrDefault(project.CategoryId) + value;
+        }
+
+        return totals;
+    }
+
     private static CategoryResponse ToResponse(Category c)
         => new(
             c.Id, c.ParentId, c.Name, c.Code, c.DisplayNumber, c.Level, c.Section, c.IsSystem, c.IsActive,

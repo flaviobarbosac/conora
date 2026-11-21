@@ -24,6 +24,7 @@ public sealed partial class BudgetService
 
         var scope = await _family.ResolveSharingScopeAsync(sharingScope, ct);
         var userIds = await _family.GetReadableUsuarioIdsAsync(ct, scope);
+        var parcelsByMonth = await LifeProjectParcelsByMonthAsync(months, scope, ct);
         var multi = userIds.Count > 1;
         var ownerId = scope == SharingScope.Family
             ? await _family.GetBudgetOwnerUsuarioIdAsync(ct) ?? _family.RequireUserId()
@@ -61,6 +62,15 @@ public sealed partial class BudgetService
                 }
 
                 planned[localId] = planned.GetValueOrDefault(localId) + line.PlannedAmount;
+            }
+
+            if (parcelsByMonth.TryGetValue(ym, out var monthParcels))
+            {
+                foreach (var (categoryId, amount) in monthParcels)
+                {
+                    if (accounts.ContainsKey(categoryId))
+                        planned[categoryId] = amount;
+                }
             }
 
             plannedByMonth[ym] = planned;

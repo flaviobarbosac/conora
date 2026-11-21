@@ -85,6 +85,33 @@ public class LifeProjectRateioTests
     }
 
     [Fact]
+    public void Family_view_takes_group_projects_and_personal_view_takes_personal_ones()
+    {
+        Assert.True(BudgetService.ProjectFeedsFamilyBudget(LifeProjectScope.Group, ownedByBudgetOwner: false));
+        Assert.True(BudgetService.ProjectFeedsFamilyBudget(LifeProjectScope.Personal, ownedByBudgetOwner: true));
+        Assert.False(BudgetService.ProjectFeedsFamilyBudget(LifeProjectScope.Personal, ownedByBudgetOwner: false));
+        Assert.True(BudgetService.ProjectFeedsPersonalBudget(LifeProjectScope.Personal));
+        Assert.False(BudgetService.ProjectFeedsPersonalBudget(LifeProjectScope.Group));
+    }
+
+    [Fact]
+    public void Parcel_for_the_month_sums_projects_on_the_same_account()
+    {
+        var account = Guid.NewGuid();
+        var other = Guid.NewGuid();
+        var totals = BudgetService.ParcelTotalsForMonth(
+            [
+                (account, 100m, (IReadOnlyList<string>)["2026-11", "2026-12"]),
+                (account, 50m, (IReadOnlyList<string>)["2026-12"]),
+                (other, 80m, (IReadOnlyList<string>)["2026-11"])
+            ],
+            "2026-12");
+
+        Assert.Equal(100m, totals[account]);
+        Assert.False(totals.ContainsKey(other));
+    }
+
+    [Fact]
     public void Linked_entry_blocks_project_deletion()
     {
         Assert.Equal(

@@ -85,9 +85,6 @@ private async Task<Guid> ResolveLocalCategoryIdAsync(
 public async Task<BudgetResponse> GetAsync(string competenceYm, CancellationToken ct, SharingScope? sharingScope = null)
     {
         var ym = Competence.Require(competenceYm);
-        // Heal missing parcels from life projects before assembling the response.
-        if (sharingScope is null or SharingScope.Personal)
-            await SyncLifeProjectParcelsAsync(ym, ct);
         var scope = await _family.ResolveSharingScopeAsync(sharingScope, ct);
         var userIds = await _family.GetReadableUsuarioIdsAsync(ct, scope);
         var multi = userIds.Count > 1;
@@ -121,6 +118,8 @@ public async Task<BudgetResponse> GetAsync(string competenceYm, CancellationToke
             if (line.ExpenseDay is int expenseDay)
                 dayById[targetId] = expenseDay;
         }
+
+        await ApplyLifeProjectParcelsAsync(plannedById, [ym], scope, accounts, ct);
 
         var actuals = await GetActualsAsync(ym, ct, scope);
         if (multi)
@@ -249,5 +248,127 @@ public async Task<CategoryMemberBreakdownResponse> GetCategoryBreakdownAsync(
             scope,
             rows.Sum(r => r.Amount),
             rows);
+    }
+
+    /// <summary>
+    /// Life-project parcels are the previsto. Group projects feed the family budget,
+    /// including a project owned by another member. Personal projects feed the personal budget.
+    /// </summary>
+    private async Task ApplyLifeProjectParcelsAsync(
+        Dictionary<Guid, decimal> plannedById,
+        IReadOnlyList<string> months,
+        SharingScope scope,
+        IReadOnlyDictionary<Guid, CategoryResponse> accounts,
+        CancellationToken ct)
+    {
+        var parcelsByMonth = await LifeProjectParcelsByMonthAsync(months, scope, ct);
+        foreach (var monthParcels in parcelsByMonth.Values)
+        {
+            foreach (var (categoryId, amount) in monthParcels)
+            {
+                if (accounts.ContainsKey(categoryId))
+                    plannedById[categoryId] = amount;
+            }
+        }
+    }
+
+    private async Task<Dictionary<string, Dictionary<Guid, decimal>>> LifeProjectParcelsByMonthAsync(
+        IReadOnlyList<string> months,
+        SharingScope scope,
+        CancellationToken ct)
+    {
+        var result = new Dictionary<string, Dictionary<Guid, decimal>>(StringComparer.Ordinal);
+        if (months.Count == 0)
+            return result;
+
+        var ownerId = scope == SharingScope.Family
+            ? await _family.GetBudgetOwnerUsuarioIdAsync(ct)
+            : null;
+        var familyConsolidated = scope == SharingScope.Family && ownerId is not null;
+        var self = _family.RequireUserId();
+        IReadOnlyList<LifeProject> projects;
+        IReadOnlyList<Guid> userIds;
+        if (familyConsolidated)
+        {
+            userIds = await _family.GetReadableUsuarioIdsAsync(ct, SharingScope.Family);
+            var loaded = await _repo.ListForUsuariosAsync<LifeProject>(
+                userIds, p => p.CategoryId != null, ct);
+            projects = loaded
+                .Where(p => ProjectFeedsFamilyBudget(p.Scope, p.UsuarioId == ownerId))
+                .ToList();
+        }
+        else
+        {
+            userIds = [self];
+            var loaded = await _repo.ListAsync<LifeProject>(p => p.CategoryId != null, ct);
+            projects = loaded.Where(p => ProjectFeedsPersonalBudget(p.Scope)).ToList();
+        }
+
+        if (projects.Count == 0)
+            return result;
+
+        var localCategories = await _repo.ListAsync<Category>(
+            c => c.Section == CategorySection.LifeProject, ct);
+        var localById = localCategories.ToDictionary(c => c.Id);
+        var remoteCategories = familyConsolidated
+            ? await _repo.ListForUsuariosAsync<Category>(
+                userIds, c => c.Section == CategorySection.LifeProject, ct)
+            : localCategories;
+        var remoteById = remoteCategories.ToDictionary(c => c.Id);
+        var mapped = new List<(Guid CategoryId, decimal GoalAmount, IReadOnlyList<string> Months)>();
+        foreach (var project in projects)
+        {
+            if (project.CategoryId is not Guid remoteId)
+                continue;
+            var localId = MapLifeProjectCategory(remoteId, localById, remoteById);
+            if (localId is not Guid categoryId)
+                continue;
+
+            IReadOnlyList<string> projectMonths;
+            try
+            {
+                projectMonths = Competence.RangeInclusive(
+                    project.ContributionStartYm, Competence.From(project.DueDate));
+            }
+            catch (ValidationException)
+            {
+                continue;
+            }
+
+            mapped.Add((categoryId, project.GoalAmount, projectMonths));
+        }
+
+        foreach (var ym in months.Distinct(StringComparer.Ordinal))
+        {
+            var totals = ParcelTotalsForMonth(mapped, ym);
+            if (totals.Count > 0)
+                result[ym] = totals;
+        }
+
+        return result;
+    }
+
+    private static Guid? MapLifeProjectCategory(
+        Guid remoteId,
+        IReadOnlyDictionary<Guid, Category> localById,
+        IReadOnlyDictionary<Guid, Category> remoteById)
+    {
+        if (localById.ContainsKey(remoteId))
+            return remoteId;
+        if (!remoteById.TryGetValue(remoteId, out var remote))
+            return null;
+
+        if (remote.FamilyKey is Guid key)
+        {
+            var byKey = localById.Values.FirstOrDefault(c => c.FamilyKey == key && c.Level == remote.Level);
+            if (byKey is not null)
+                return byKey.Id;
+        }
+
+        if (remote.Code is null)
+            return null;
+
+        return localById.Values.FirstOrDefault(c =>
+            c.Code == remote.Code && c.Level == remote.Level && c.Section == remote.Section)?.Id;
     }
 }
