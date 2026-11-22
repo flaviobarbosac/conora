@@ -197,8 +197,7 @@ public sealed class MilestoneEvaluationService
 
     private async Task<(bool, DateTime?)> MetProjectProgressAsync(CancellationToken ct)
     {
-        var projects = await _repo.ListAsync<LifeProject>(null, ct);
-        var advanced = projects.FirstOrDefault(p => p.AccumulatedAmount > 0);
+        var advanced = await _repo.FirstFundedDreamAsync(ct);
         return advanced is null ? (false, null) : (true, advanced.UpdatedAt);
     }
 

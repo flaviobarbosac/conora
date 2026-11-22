@@ -253,7 +253,7 @@ public sealed class GamificationService
             }
             case "project-progress":
             {
-                var advanced = (await _repo.ListAsync<LifeProject>(null, ct)).FirstOrDefault(p => p.AccumulatedAmount > 0);
+                var advanced = await _repo.FirstFundedDreamAsync(ct);
                 return (advanced is not null, advanced?.UpdatedAt);
             }
             case "budget-half-filled":
